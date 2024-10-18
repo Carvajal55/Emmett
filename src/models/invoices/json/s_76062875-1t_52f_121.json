@@ -1,0 +1,16 @@
+{
+    "headers": {
+        "supplier": "76062875-1",
+        "supplierName": "",
+        "typeDocument": "52",
+        "nDocument": "121",
+        "dcto": "21",
+        "datePurchase": "2024-07-11",
+        "dateExpired": "2024-07-17",
+        "observation": "",
+        "typePay": "2",
+        "nCheque": "121",
+        "qtyCheque": "21",
+        "subtotal": "212"
+    }
+}

@@ -1,0 +1,76 @@
+{
+    "headers": {
+        "supplier": "17914740-8",
+        "supplierName": "MELISSA DEL CARMEN RUMINAO ROCHA",
+        "typeDocument": "33",
+        "nDocument": "100",
+        "dcto": "0",
+        "datePurchase": "2024-08-27",
+        "dateExpired": "2024-09-29",
+        "observation": "agrega le los sub totales en subtotal igual",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "1383040",
+        "urlPDF": "http:\/\/dte.bsale.cl\/get_dte\/48846606?sign=1919ad303c6b1e43",
+        "urlJson": "\/models\/invoices\/json\/s_17914740-8t_33f_100.json",
+        "dateReception": "2024-08-29",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_17914740-8t_33f_100"
+    },
+    "details": [
+        {
+            "qty": "10",
+            "cost": "43320",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "433200",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS26017",
+            "idERP": "156783",
+            "model": "LEGUERO 20",
+            "idPro": "12855"
+        },
+        {
+            "qty": "8",
+            "cost": "29880",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "239040",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS16509",
+            "idERP": "96602",
+            "model": "2014",
+            "idPro": "858"
+        },
+        {
+            "qty": "12",
+            "cost": "25400",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "304800",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS20318",
+            "idERP": "99218",
+            "model": "12",
+            "idPro": "6837"
+        },
+        {
+            "qty": "7",
+            "cost": "58000",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "406000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS26028",
+            "idERP": "156799",
+            "model": "ESPECIAL 16",
+            "idPro": "12860"
+        }
+    ],
+    "type": "1"
+}

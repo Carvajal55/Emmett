@@ -1,0 +1,50 @@
+{
+    "headers": {
+        "supplier": "178349007",
+        "supplierName": "Boris Fuentes",
+        "typeDocument": "33",
+        "nDocument": "8889",
+        "dcto": "1",
+        "datePurchase": "2024-09-28",
+        "dateExpired": "2024-09-28",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "5000",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_178349007t_33f_8889.json",
+        "dateReception": "2024-09-27",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_178349007t_33f_8889"
+    },
+    "details": [
+        {
+            "qty": "20",
+            "cost": "5900",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD20635",
+            "idERP": "100215",
+            "model": "A10L4 USB",
+            "idPro": "7155"
+        },
+        {
+            "qty": "30",
+            "cost": "6700",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "ILU20984",
+            "idERP": "102690",
+            "model": "64514 120v 300w",
+            "idPro": "7509"
+        }
+    ],
+    "type": "1"
+}

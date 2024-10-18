@@ -1,0 +1,22 @@
+{
+    "headers": {
+        "supplier": "76488021-8",
+        "supplierName": "G.C.R. SPA",
+        "typeDocument": "33",
+        "nDocument": "1231",
+        "dcto": "0",
+        "datePurchase": "",
+        "dateExpired": "",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "1231321",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_76488021-8t_33f_1231.json",
+        "dateReception": "2024-09-12",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_76488021-8t_33f_1231"
+    },
+    "type": "1"
+}

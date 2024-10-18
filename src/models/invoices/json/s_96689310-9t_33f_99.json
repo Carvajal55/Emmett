@@ -1,0 +1,37 @@
+{
+    "headers": {
+        "supplier": "96689310-9",
+        "supplierName": "TRANSBANK S.A.",
+        "typeDocument": "33",
+        "nDocument": "99",
+        "dcto": "0",
+        "datePurchase": "2024-08-31",
+        "dateExpired": "2024-08-31",
+        "observation": "Prueba",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "1500",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_96689310-9t_33f_99.json",
+        "dateReception": "2024-08-31",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_96689310-9t_33f_99"
+    },
+    "details": [
+        {
+            "qty": "3",
+            "cost": "500",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD20635",
+            "idERP": "100215",
+            "model": "A10L4 USB",
+            "idPro": "7155"
+        }
+    ],
+    "type": "1"
+}

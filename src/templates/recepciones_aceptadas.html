@@ -1,0 +1,183 @@
+{% extends 'partials/base.html' %}
+{% load static %}
+
+{% block content %}
+<div id="app" class="m-2">
+    <div class="container-fluid">
+        <!-- Filtros y Búsqueda -->
+        <div class="row mb-3">
+            <h5>Gestión de Facturas</h5>
+            <div class="col-md-4">
+                <select class="form-control" v-model="filterStatus" @change="fetchFacturas(1)">
+                    <option value="1">Aceptadas</option>
+                    <option value="0">Pendientes</option>
+                    <option value="2">Rechazadas</option>
+                    <option value="all">Todas</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <input type="text" class="form-control" placeholder="Buscar por folio" v-model="searchQuery" @input="fetchFacturas(1)">
+            </div>
+        </div>
+
+        <!-- Tabla para las facturas -->
+        <div class="row scrollable">
+            <div class="col-md-12">
+               <table class="table table-striped table-hover" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>TIPO.DOCUMENTO</th>
+                            <th>FOLIO</th>
+                            <th>PROVEEDOR</th>
+                            <th>RAZON.SOCIAL</th>
+                            <th>SUBTOTAL</th>
+                            <th>ESTADO</th>
+                            <th>FECHA.INGRESO</th>
+                            <th>ACCIONES</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(factura, index) in facturas" :key="factura.id">
+                            <td>[[ index + 1 ]]</td>
+                            <td>[[ factura.typeDocument ]]</td>
+                            <td>[[ factura.number ]]</td>
+                            <td>[[ factura.supplier ]]</td>
+                            <td>[[ factura.supplierName ]]</td>
+                            <!-- Formatear el subtotal en pesos chilenos -->
+                            <td>[[ formatCurrency(factura.subtotal) ]]</td>
+                            <td>
+                                [[ factura.status == 1 ? 'Aceptado' : (factura.status == 0 ? 'Pendientes de Revisión' : 'Rechazado') ]]
+                            </td>
+                            <td>[[ factura.dateAdd ]]</td>
+                            <td>
+                                <button v-if="factura.status == 1" @click="printLabelUnique(factura.urlJson)" class="btn btn-primary btn-sm">Ver Detalles</button>
+                            </td>
+                        </tr>
+                    </tbody>
+               </table>  
+            </div>
+        </div>
+
+        <!-- Paginación -->
+        <nav aria-label="Page navigation example" class="mt-3">
+            <ul class="pagination">
+                <li class="page-item" :class="{ 'disabled': currentPage === 1 }">
+                    <a class="page-link" href="javascript:;" @click="fetchFacturas(currentPage - 1)">Previous</a>
+                </li>
+                <li class="page-item" v-for="page in totalPages" :key="page" :class="{ 'active': page === currentPage }">
+                    <a class="page-link" href="javascript:;" @click="fetchFacturas(page)">[[ page ]]</a>
+                </li>
+                <li class="page-item" :class="{ 'disabled': currentPage === totalPages }">
+                    <a class="page-link" href="javascript:;" @click="fetchFacturas(currentPage + 1)">Next</a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Modal para mostrar los detalles -->
+        <div class="modal fade" id="detallesModal" tabindex="-1" aria-labelledby="detallesModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="detallesModalLabel">Detalles de la Factura</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Modelo</th>
+                            <th>Cantidad</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="detalle in detallesFactura" :key="detalle.sku">
+                            <td>[[ detalle.sku ]]</td>
+                            <td>[[ detalle.model ]]</td>
+                            <td>[[ detalle.qty ]]</td>
+                            <td>
+                                <button @click="imprimirDetalle(detalle)" class="btn btn-success btn-sm">Imprimir</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block js %}
+<script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],  // Evitar conflictos con las etiquetas Django
+        data: {
+            facturas: [],  // Lista de facturas
+            detallesFactura: [],  // Detalles de la factura seleccionada
+            filterStatus: '1',  // Estado de las facturas para filtrar (por defecto: Aceptadas)
+            searchQuery: '',  // Búsqueda por folio
+            currentPage: 1,  // Página actual
+            totalPages: 1  // Total de páginas
+        },
+        methods: {
+            // Obtener las facturas desde la API
+            fetchFacturas(page = 1) {
+                this.currentPage = page;
+                let params = {
+                    status: this.filterStatus,
+                    page: this.currentPage,
+                    q: this.searchQuery
+                };
+                axios.get('/api/listar-compras/', { params })
+                    .then(response => {
+                        this.facturas = response.data.data;
+                        this.totalPages = response.data.total_pages;
+                    })
+                    .catch(error => {
+                        console.error('Error al cargar facturas:', error);
+                    });
+            },
+            // Mostrar los detalles de la factura en el modal
+            printLabelUnique(urlJson) {
+                console.log('URL JSON enviada:', urlJson);
+                let formData = new FormData();
+                formData.append('urlJson', urlJson);
+
+                axios.post('/api/resumen-facturas/', formData)
+                    .then(response => {
+                        console.log('Detalles de la factura:', response.data.details);
+                        this.detallesFactura = response.data.details;
+                        let modal = new bootstrap.Modal(document.getElementById('detallesModal'));
+                        modal.show();
+                    })
+                    .catch(error => {
+                        console.error('Error al obtener los detalles de la factura:', error);
+                    });
+            },
+            // Imprimir un detalle de la factura
+            imprimirDetalle(detalle) {
+                console.log("Imprimiendo detalle:", detalle);
+                // Lógica para la impresión del detalle
+            },
+            formatCurrency(value) {
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+            },
+        },
+        mounted() {
+            this.fetchFacturas();  // Cargar las facturas al montar la página
+        }
+    });
+</script>
+{% endblock js %}

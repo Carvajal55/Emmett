@@ -1,0 +1,63 @@
+{
+    "headers": {
+        "supplier": "76488021-8",
+        "supplierName": "G.C.R. SPA",
+        "typeDocument": "33",
+        "nDocument": "9855",
+        "dcto": "0",
+        "datePurchase": "2024-08-14",
+        "dateExpired": "2024-10-11",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "619074",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_76488021-8t_33f_9855.json",
+        "dateReception": "2024-09-11",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_76488021-8t_33f_9855"
+    },
+    "details": [
+        {
+            "qty": "4",
+            "cost": "94491",
+            "codeBar": "",
+            "dctoItem": "0",
+            "subtotalItem": "419960",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS24443",
+            "idERP": "139531",
+            "model": "YWFL 558",
+            "idPro": "10918"
+        },
+        {
+            "qty": "200",
+            "cost": "891",
+            "codeBar": "",
+            "dctoItem": "0",
+            "subtotalItem": "198000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS26032",
+            "idERP": "157050",
+            "model": "BAQML",
+            "idPro": "12864"
+        },
+        {
+            "qty": "10",
+            "cost": "6291",
+            "codeBar": "",
+            "dctoItem": "0",
+            "subtotalItem": "69900",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS26016",
+            "idERP": "156777",
+            "model": "COMB WOOD",
+            "idPro": "12854"
+        }
+    ],
+    "type": "1"
+}

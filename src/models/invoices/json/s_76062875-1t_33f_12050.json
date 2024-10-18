@@ -1,0 +1,76 @@
+{
+    "headers": {
+        "supplier": "76062875-1",
+        "supplierName": "COMERCIAL MACAIO CHILE LIMITADA",
+        "typeDocument": "33",
+        "nDocument": "12050",
+        "dcto": "0",
+        "datePurchase": "2024-09-25",
+        "dateExpired": "2024-10-25",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "2050420",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_76062875-1t_33f_12050.json",
+        "dateReception": "2024-09-28",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_76062875-1t_33f_12050"
+    },
+    "details": [
+        {
+            "qty": "2",
+            "cost": "184874",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "369748",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD24975",
+            "idERP": "143288",
+            "model": "DOME CORE 360",
+            "idPro": "11444"
+        },
+        {
+            "qty": "12",
+            "cost": "54902",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "658824",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD24938",
+            "idERP": "142828",
+            "model": "DOME W5",
+            "idPro": "11409"
+        },
+        {
+            "qty": "12",
+            "cost": "54902",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "658824",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD25396",
+            "idERP": "145449",
+            "model": "DOME W5 W ",
+            "idPro": "11854"
+        },
+        {
+            "qty": "18",
+            "cost": "20168",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "363024",
+            "deliveryItem": "",
+            "checkItem": "false",
+            "sku": "ILU25348",
+            "idERP": "145234",
+            "model": "COSMOS 36 ",
+            "idPro": "11806"
+        }
+    ],
+    "type": "1"
+}

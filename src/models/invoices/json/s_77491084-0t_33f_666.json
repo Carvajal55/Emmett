@@ -1,0 +1,37 @@
+{
+    "headers": {
+        "supplier": "77491084-0",
+        "supplierName": "24K SPA",
+        "typeDocument": "33",
+        "nDocument": "666",
+        "dcto": "0",
+        "datePurchase": "2024-09-26",
+        "dateExpired": "2024-09-26",
+        "observation": "prueba rcs",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "0",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_77491084-0t_33f_666.json",
+        "dateReception": "2024-09-26",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_77491084-0t_33f_666"
+    },
+    "details": [
+        {
+            "qty": "1",
+            "cost": "100000",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "100000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD20635",
+            "idERP": "100215",
+            "model": "A10L4 USB",
+            "idPro": "7155"
+        }
+    ],
+    "type": "1"
+}

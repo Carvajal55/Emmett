@@ -1,0 +1,367 @@
+{% extends 'partials/base.html' %}
+{% load static %}
+
+{% block content %}
+<div id="app" class="m-2">
+    <h3>Agregar Recepción EMMETT [[ currentDate ]]</h3>
+
+    <div class="container-fluid">
+        <!-- Selector de Proveedor -->
+        <div>
+            <!-- Campo de búsqueda de proveedor -->
+            <input type="text" class="form-control" placeholder="Buscar proveedor por RUT o Nombre"
+                   v-model="searchQuery" @input="searchProveedores" />
+
+            <!-- Selector de proveedores -->
+            <select class="form-select mt-3" v-model="form.proveedor" style="width: 100%">
+                <option v-for="proveedor in proveedores" :key="proveedor.id" :value="proveedor.id">
+                    [[ proveedor.rutsupplier ]] - [[ proveedor.namesupplier ]]
+                </option>
+            </select>
+        </div>
+
+        <!-- Datos del proveedor -->
+        <div class="row">
+            <div class="mb-3 col-3">
+                <label for="txtRutSupplier2" class="form-label">RUT PROVEEDOR MTD2</label>
+                <input class="form-control form-control-md" type="text" v-model="form.rutProveedor">
+            </div>
+            <div class="mb-3 col-9">
+                <label for="txtNameCompany2" class="form-label">RAZON SOCIAL MTD2</label>
+                <input class="form-control form-control-md" type="text" v-model="form.razonSocial">
+            </div>
+        </div>
+
+        <!-- Tipo de documento -->
+        <div class="mb-3">
+            <label for="cbTypeDocument" class="form-label">Tipo de Documento</label>
+            <select class="form-select" v-model="form.tipoDocumento">
+                <option value="33">Factura de Compra</option>
+                <option value="52">Guía de Despacho</option>
+            </select>
+        </div>
+
+        <!-- Información del documento -->
+        <div class="mb-3 row">
+            <div class="col-3">
+                <label for="nDocument" class="form-label">Número Documento</label>
+                <div class="input-group">
+                    <input class="form-control" type="number" v-model="form.numeroDocumento">
+                    <button class="input-group-text" @click=""><i class="bi bi-search"></i></button>
+                </div>
+            </div>
+
+            <div class="col-2">
+                <label for="dctoGeneral" class="form-label">Descuento</label>
+                <input class="form-control" type="number" v-model="form.descuentoGeneral" value="0">
+            </div>
+
+            <div class="col-3">
+                <label for="datePurchase" class="form-label">Fecha Emisión</label>
+                <input class="form-control" type="date" v-model="form.fechaEmision">
+            </div>
+
+            <div class="col-3">
+                <label for="dateExpired" class="form-label">Fecha Vencimiento</label>
+                <input class="form-control" type="date" v-model="form.fechaVencimiento">
+            </div>
+        </div>
+
+        <!-- Información adicional -->
+        <div class="row">
+            <div class="col-2">
+                <label for="cbTypePay" class="form-label">Tipo de Pago</label>
+                <select class="form-select" v-model="form.tipoPago">
+                    <option value="1">No Pagado al Proveedor</option>
+                    <option value="2">Cheque - Itau</option>
+                    <option value="3">Cheque - BCI</option>
+                    <option value="4">Cheque - Banco Estado</option>
+                    <option value="5">Cheque - Santander</option>
+                    <option value="6">Efectivo</option>
+                    <option value="7">Transferencia</option>
+                    <option value="8">Otros</option>
+                </select>
+            </div>
+
+            <div class="col-2">
+                <label for="nCheque" class="form-label">Nº Cheque</label>
+                <input class="form-control" type="number" v-model="form.numeroCheque" value="0">
+            </div>
+
+            <div class="col-2">
+                <label for="qtyCheque" class="form-label">Cantidad Cheque</label>
+                <input class="form-control" type="number" v-model="form.cantidadCheque" value="0">
+            </div>
+
+            <div class="col-4">
+                <label for="subtotal" class="form-label">SUBTOTAL</label>
+                <input class="form-control" type="number" v-model="form.subtotal" value="0">
+            </div>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="mb-3">
+            <label for="observation" class="form-label">Observación</label>
+            <input class="form-control form-control-lg" v-model="form.observaciones">
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="btn-group mb-3" role="group">
+            <button class="btn btn-primary" @click="">Descargar Documentos</button>
+            <button class="btn btn-success" @click="">Guardar Documento</button>
+            <button class="btn btn-primary" @click="">Agregar Producto</button>
+            <button class="btn btn-primary" @click="limpiarCeldas">Limpiar Celdas</button>
+            <button class="btn btn-primary" @click="">Respaldar Factura</button>
+        </div>
+
+        <!-- Tabla de Productos Disponibles (más pequeña) -->
+        <div class="mb-4">
+            <!-- Campo de búsqueda para los productos -->
+            <input type="text" class="form-control mb-3" placeholder="Buscar producto por SKU o Nombre"
+                   v-model="searchProduct" @input="searchProductos" />
+
+            <!-- Tabla para mostrar los productos disponibles -->
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <table class="table table-striped table-hover fixed-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 5%;">#</th>
+                            <th style="width: 15%;">SKU</th>
+                            <th style="width: 25%;">Nombre</th>
+                            <th style="width: 15%;">Marca</th>
+                            <th style="width: 20%;">Código de Barras</th>
+                            <th style="width: 10%;">Precio</th>
+                            <th style="width: 10%;">Agregar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(producto, index) in productos" :key="producto.id">
+                            <td>[[ index + 1 ]]</td>
+                            <td>[[ producto.sku ]]</td>
+                            <td class="text-truncate">[[ producto.nameproduct ]]</td>
+                            <td>[[ producto.brands ]]</td>
+                            <td>[[ producto.codebar ]]</td>
+                            <td>[[ formatCurrency(producto.lastprice) ]]</td>
+                            <td><button class="btn btn-primary btn-sm" @click="agregarProducto(producto)">Agregar</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Controles de paginación -->
+            <nav aria-label="Page navigation">
+                <ul class="pagination">
+                    <!-- Botón "Anterior" -->
+                    <li class="page-item" :class="{ 'disabled': pagination.current_page === 1 }">
+                        <button class="page-link" @click="changePage(pagination.current_page - 1)">Anterior</button>
+                    </li>
+            
+                    <!-- Botones de páginas -->
+                    <li class="page-item" v-for="page in paginatedPages()" :key="page" :class="{ 'active': page === pagination.current_page }">
+                        <button class="page-link" @click="changePage(page)">[[ page ]]</button>
+                    </li>
+            
+                    <!-- Botón "Siguiente" -->
+                    <li class="page-item" :class="{ 'disabled': pagination.current_page === pagination.total_pages }">
+                        <button class="page-link" @click="changePage(pagination.current_page + 1)">Siguiente</button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+
+        <!-- Tabla de Productos en el Documento -->
+        <div>
+            <h4>Productos en el Documento</h4>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>MODELO</th>
+                            <th>SKU</th>
+                            <th>CANT</th>
+                            <th>COSTO</th>
+                            <th>CÓD. BARRA</th>
+                            <th>DCTO</th>
+                            <th>SUBTOTAL</th>
+                            <th>ENTREGA</th>
+                            <th>ELIMINAR</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(producto, index) in productosDocumento" :key="producto.sku">
+                            <td>[[ index + 1 ]]</td>
+                            <td>[[ producto.model ]]</td>
+                            <td>[[ producto.sku ]]</td>
+                            <td><input class="form-control" v-model="producto.cantidad" type="number"></td>
+                            <td><input class="form-control" v-model="producto.costo" type="number"></td>
+                            <td><input class="form-control" v-model="producto.codebar" type="text"></td>
+                            <td><input class="form-control" v-model="producto.descuento" type="number"></td>
+                            <td>[[ formatCurrency(producto.costo * producto.cantidad) ]]</td>
+                            <td><input type="checkbox" v-model="producto.entrega"></td>
+                            <td><button class="btn btn-danger btn-sm" @click="eliminarProducto(producto.sku)">Eliminar</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block js %}
+<script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> <!-- SweetAlert -->
+
+<script>
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            form: {
+                proveedor: null,
+                rutProveedor: '',
+                razonSocial: '',
+                tipoDocumento: '33',
+                numeroDocumento: '',
+                fechaEmision: '',
+                fechaVencimiento: '',
+                descuentoGeneral: 0,
+                tipoPago: 1,
+                numeroCheque: 0,
+                cantidadCheque: 0,
+                subtotal: 0,
+                observaciones: '',
+            },
+            pagination: {
+                current_page: 1,
+                total_pages: 1
+            },
+            searchProduct: '',
+            searchQuery: '', 
+            productosDocumento: [],
+            productos: [],
+            proveedores: [],
+            currentDate: new Date().toISOString().slice(0, 10)
+        },
+        methods: {
+            searchProductos(page = 1) {
+                axios.get('/api/get-products/', {
+                    params: {
+                        q: this.searchProduct,
+                        page: page
+                    }
+                })
+                .then(response => {
+                    this.productos = response.data.products;
+                    this.pagination.current_page = response.data.current_page;
+                    this.pagination.total_pages = response.data.total_pages;
+                })
+                .catch(error => {
+                    console.error('Error al buscar productos:', error);
+                });
+            },
+            changePage(page) {
+                if (page > 0 && page <= this.pagination.total_pages) {
+                    this.searchProductos(page);
+                }
+            },
+            paginatedPages() {
+                const range = 5;
+                let start = this.pagination.current_page - Math.floor(range / 2);
+                let end = this.pagination.current_page + Math.floor(range / 2);
+
+                if (start < 1) {
+                    start = 1;
+                    end = range;
+                }
+
+                if (end > this.pagination.total_pages) {
+                    end = this.pagination.total_pages;
+                    start = this.pagination.total_pages - range + 1;
+                    if (start < 1) {
+                        start = 1;
+                    }
+                }
+
+                const pages = [];
+                for (let i = start; i <= end; i++) {
+                    pages.push(i);
+                }
+                return pages;
+            },
+            formatCurrency(value) {
+                return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+            },
+            agregarProducto(producto) {
+                // Verificar si el producto ya está agregado
+                const productoExistente = this.productosDocumento.find(p => p.sku === producto.sku);
+                if (productoExistente) {
+                    // Mostrar SweetAlert de advertencia
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Producto duplicado',
+                        text: 'Este producto ya ha sido agregado.',
+                    });
+                } else {
+                    const nuevoProducto = {
+                        model: producto.nameproduct,
+                        sku: producto.sku,
+                        cantidad: 1,
+                        costo: 0,
+                        codebar: producto.codebar || '',
+                        descuento: 0,
+                        subtotal: 0,
+                        entrega: false
+                    };
+                    this.productosDocumento.push(nuevoProducto);
+                }
+            },
+            eliminarProducto(sku) {
+                // Filtrar la lista de productos y eliminar el producto con el SKU correspondiente
+                this.productosDocumento = this.productosDocumento.filter(producto => producto.sku !== sku);
+            },
+            limpiarCeldas() {
+                this.form = {
+                    proveedor: null,
+                    rutProveedor: '',
+                    razonSocial: '',
+                    tipoDocumento: '33',
+                    numeroDocumento: '',
+                    fechaEmision: '',
+                    fechaVencimiento: '',
+                    descuentoGeneral: 0,
+                    tipoPago: 1,
+                    numeroCheque: 0,
+                    cantidadCheque: 0,
+                    subtotal: 0,
+                    observaciones: ''
+                };
+                this.productosDocumento = [];
+            },
+            searchProveedores() {
+                axios.get('/api/get-suppliers/', {
+                    params: { q: this.searchQuery }
+                })
+                .then(response => {
+                    this.proveedores = response.data;
+                })
+                .catch(error => {
+                    console.error('Error al buscar proveedores:', error);
+                });
+            },
+            cargarProveedores() {
+                this.searchProveedores();
+            },
+            cargarProductos() {
+                this.searchProductos();
+            }
+        },
+        mounted() {
+            this.cargarProveedores();
+            this.cargarProductos();
+        }
+    });
+</script>
+{% endblock js %}

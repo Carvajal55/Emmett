@@ -1,0 +1,423 @@
+.safeware-chat-btn {
+    position: absolute!important;
+    right: 35px!important;
+    bottom: 35px!important;
+    cursor: pointer!important;
+    padding-left: 0px !important;
+}
+
+.safeware-chat-btn::before{
+    display: none!important;
+}
+
+.safeware-chat-btn .close {
+    display: none!important;
+}
+
+.safeware-chat-btn i {
+    transition: all 0.9s ease!important;
+}
+
+#chekbox-safeware:checked~.safeware-chat-btn i {
+    display: block!important;
+    pointer-events: auto!important;
+    transform: rotate(180deg)!important;
+}
+
+#chekbox-safeware:checked~.safeware-chat-btn .safeware-comment {
+    display: none!important;
+}
+
+.safeware-chat-btn i {
+    font-size: 29px!important;
+    color: #fff !important;
+}
+
+.safeware-chat-btn {
+    width: 70px!important;
+    height: 70px!important;
+    display: flex!important;
+    justify-content: center!important;
+    align-items: center!important;
+    border-radius: 50px!important;
+    background-color: #07b89e!important;
+    color: #fff!important;
+    font-size: 22px!important;
+    border: none!important;
+}
+
+.safeware-wrapper {
+    position: absolute!important;
+    right: 20px!important;
+    bottom: 120px!important;
+    width: 350px!important;
+    background-color: #fff!important;
+    border-radius: 16px!important;
+    opacity: 0!important;
+    transition: all 0.4s!important;
+    box-shadow: 5px 5px 25px 0 rgba(46, 61, 73, 0.8)!important;
+    
+}
+
+#chekbox-safeware:checked~.safeware-wrapper {
+    opacity: 1!important;
+}
+
+/* .header {
+    padding: 13px!important;
+    background-color: #25D366!important;
+    border-radius: 5px 5px 0px 0px!important;
+    color: #fff
+}
+*/
+.safeware-header {
+    padding: 10px 20px!important;
+    background-color: #07b89e!important;
+    color: #fff!important;
+    border-radius: 5px 5px 0 0!important;
+    position: relative!important;
+    font-size: 18px!important;
+}
+
+.safeware-header-content {
+    display: flex!important;
+    align-items: center!important;
+}
+
+.safeware-header-image img {
+    width: 40px!important;
+    height: 40px!important;
+    border-radius: 50%!important;
+    margin-right: 15px!important;
+}
+
+.safeware-header-info h6 {
+    margin: 0!important;
+    font-size: 1.2em!important;
+}
+
+.safeware-header-info span {
+    font-size: 0.8em!important;
+}
+
+.safeware-chat-form {
+    background-image: url('https://safeware.nyc3.cdn.digitaloceanspaces.com/fondo.png')!important; 
+    background-size: cover!important; 
+    background-position: center!important; 
+    background-repeat: no-repeat!important; 
+    padding: 15px!important;
+    border-radius:  0px 0px 5px 5px!important;
+    max-height: 350px!important;
+    min-height: 350px!important;
+    overflow-y: auto!important;
+
+}
+
+
+.safeware-chat-form textarea {
+    resize: none!important;
+}
+
+.form-control:focus,
+.safeware-btn:focus {
+    box-shadow: none!important;
+}
+
+.safeware-btn,
+.safeware-btn:focus,
+.safeware-btn:hover {
+    background-color: #25D366!important;
+    border: #25D366!important;
+}
+
+.safeware-check-bot {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center!important;
+}
+
+.safeware-p-2 {
+    padding: 1rem!important;
+}
+.safeware-contenedor-message{
+    display: flex!important;
+    justify-content: flex-end!important; /* Alinea el contenido al extremo derecho del contenedor */
+    width: 100%!important;
+    box-sizing: border-box!important; /* Asegura que el borde se incluya en el ancho total */
+}
+.safeware-whatsapp-message {
+    display: inline-block!important;
+    padding: 1px 14px 1px!important;
+    border-radius: 0 8px 8px!important;
+    position: relative!important;
+    transform-origin: center top!important;
+    z-index: 2!important;
+    box-shadow: rgba(0,0,0,.13) 0 1px 0.5px!important;
+    margin-top: 5px!important;
+    margin-left: 15px!important;
+    max-width: calc(100% - 40px)!important;
+    font-size: 14px!important;
+    color:white!important;
+}
+
+.safeware-whatsapp-message-bot {
+    display: inline-block!important;
+    padding: 1px 14px 1px!important;
+    background-color: #fff!important;
+    border-radius: 0 8px 8px!important;
+    position: relative!important;
+    transform-origin: center top!important;
+    z-index: 2!important;
+    box-shadow: rgba(0,0,0,.13) 0 1px 0.5px!important;
+    margin-top: 5px!important;
+    max-width: calc(100% - 40px)!important;
+    font-size: 14px!important;
+}
+
+.safeware-chat-option {
+    box-sizing: border-box!important;
+    display: inline-block!important;
+    padding: 10px 0px!important;
+    border-radius: 5px!important;
+    width: 100%!important;
+    margin-bottom: 5px!important;
+    text-decoration: none!important;
+    color: black!important;
+    transition: background-color 0.3s ease!important;
+}
+
+.safeware-button{
+    border-radius: 8px 8px 8px!important;
+    text-align: center!important;
+    padding: 2px 14px 2px!important;
+}
+.safeware-button::before{
+    text-align: center!important;
+    padding: 2px 14px 2px!important;
+    left: 0px!important;
+}
+.safeware-button:hover{
+    border: 2px solid #c5d3ca!important;
+}
+
+.safeware-scrollbar {
+overflow-y: auto!important;
+overflow-x: hidden !important;
+scrollbar-width: thin!important;
+scrollbar-color: #808080 #D3D3D3!important;
+}
+
+.safeware-scrollbar::-webkit-scrollbar {
+width: 4px!important;
+
+}
+
+.safeware-scrollbar::-webkit-scrollbar-track {
+background-color: #D3D3D3!important;
+}
+
+.safeware-scrollbar::-webkit-scrollbar-thumb {
+background-color: #808080!important;
+border-radius: 1rem!important;
+height: 4px!important;
+}
+
+#chekbox-safeware:not(:checked) ~ .safeware-wrapper {
+    display: none!important;
+}
+
+#chekbox-safeware:checked ~ .safeware-wrapper {
+    display: block!important;
+}
+
+.safeware-chatbox-popup__header{
+    box-sizing: border-box!important;
+    display: flex!important;
+    width: 100%!important;
+    padding: 16px!important;
+    color: #fff!important;
+    background-color: #09b99d!important;
+    align-items: center!important;
+    justify-content: space-around!important;
+    border-top-right-radius: 12px!important;
+    border-top-left-radius: 12px!important;
+
+}
+
+.safeware-chatbox-popup__avatar{
+    margin-top: -32px!important;
+    background-color: #09b99d!important;
+    border: 5px solid rgba(0, 0, 0, 0.1)!important;
+    border-radius: 50%!important;
+}
+.safeware-title-bot{
+    margin: 0px!important;
+    font-size:17px!important;
+    font-weight: bold!important;
+    color: white!important;
+}
+.safeware-subtitle-bot{
+    font-size: 14px!important;
+}
+.safeware-chatbox-popup__footer{
+    background-color: #fff!important;
+    box-sizing: border-box!important;
+    display: flex!important;
+    padding: 16px!important;
+    border-top: 1px solid #ddd!important;
+    align-items: center!important;
+    justify-content: space-around!important;
+    border-bottom-right-radius: 12px!important;
+    border-bottom-left-radius: 12px!important;
+    width: 100%!important;
+}
+.safeware-text-input{
+    box-sizing: border-box!important;
+    width: 100%!important;
+    margin: 0!important;
+    height: calc(16px + 16px / 2)!important;
+    padding: 0 calc(16px / 2)!important;
+    font-family: inherit!important;
+    font-size: 16px!important;
+    line-height: calc(16px + 16px / 2)!important;
+    color: #888!important;
+    background-color: none!important;
+    border: 0!important;
+    outline: 0 !important;
+    resize: none!important;
+    overflow: hidden!important;
+    min-height: 0px!important;
+}
+
+.safeware-p-chat{
+    display: block!important;
+    margin-block-start: 1em!important;
+    margin-block-end: 1em!important;
+    margin-inline-start: 0px!important;
+    margin-inline-end: 0px!important;
+    color:white!important;
+}
+.safeware-p-chat-bot{
+    display: block!important;
+    margin-block-start: 1em!important;
+    margin-block-end: 1em!important;
+    margin-inline-start: 0px!important;
+    margin-inline-end: 0px!important;
+    color:black!important;
+}
+
+.safeware-chat-master{
+    position: fixed!important;
+    top: 100%!important;
+    left: 0!important;
+    width: 100%!important;
+    height: 0px!important;
+    background-color: #f1f1f100!important;
+    z-index: 1000!important;
+}
+
+.safeware-form-control-chat{
+    display: block!important;
+    width: 90%!important;
+    padding: 0.375rem 0.75rem!important;
+    font-size: 1rem!important;
+    line-height: 1.5!important;
+    color: #495057!important;
+    background-color: #fff!important;
+    background-clip: padding-box!important;
+    border: 1px solid #ced4da!important;
+    border-radius: 0.25rem!important;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out!important;
+
+}
+.safeware-form-control-btn{
+    display: inline-block!important;
+    font-weight: 400!important;
+    text-align: center!important;
+    white-space: nowrap!important;
+    vertical-align: middle!important;
+    user-select: none!important;
+    border: 1px solid transparent!important;
+    padding: 0.375rem 0.75rem!important;
+    font-size: 1rem!important;
+    line-height: 1.5!important;
+    border-radius: 0.25rem!important;
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out!important;
+
+}
+.safeware-form-control-btn:hover {
+    color: #212529!important;
+    text-decoration: none!important;
+}
+
+/* Estilo para el clic del botón */
+.safeware-form-control-btn:focus,
+.safeware-form-control-btn:active {
+    color: #212529!important;
+    text-decoration: none!important;
+    background-color: #e2e2e2!important;
+    border-color: #d3d3d3!important;
+    outline: 0!important;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25)!important;
+}
+
+/* Estilo adicional para el botón activo (cuando se mantiene presionado) */
+.safeware-form-control-btn.active,
+.safeware-form-control-btn:active {
+    background-color: #d4d4d4!important;
+    border-color: #c7c7c7!important;
+    box-shadow: none!important;
+}
+/* Estilo para el botón btn-aurora */
+.safeware-btn-aurora {
+    color: #fff!important;
+    background-color: #07b89e!important;
+    border-color: #07b89e!important;
+}
+
+/* Estilo para el hover del botón btn-aurora */
+.safeware-btn-aurora:hover {
+    color: #fff!important;
+    background-color: #058775!important;
+    border-color: #058775!important;
+}
+
+/* Estilo para el clic del botón btn-aurora */
+.safeware-btn-aurora:focus,
+.safeware-btn-aurora:active {
+    color: #fff!important;
+    background-color: #04695b!important;
+    border-color: #04695b!important;
+    box-shadow: 0 0 0 0.2rem rgba(7, 184, 158, 0.5)!important;
+}
+
+/* Estilo adicional para el botón activo (cuando se mantiene presionado) btn-aurora */
+.safeware-btn-aurora.active,
+.safeware-btn-aurora:active {
+    background-color: #034d41!important;
+    border-color: #034d41!important;
+    box-shadow: none!important;
+}
+
+.safeware-btn-whatsapp {
+    background-color: #25d366!important; /* Color de fondo WhatsApp */
+    border-color: #25d366!important; /* Color del borde */
+    color: white!important; /* Color del texto */
+    text-align: center!important;
+    width: 100%!important;
+}
+
+.safeware-btn-whatsapp:hover {
+    background-color: #20be5b!important; /* Color de fondo más oscuro al pasar el mouse */
+    border-color: #20be5b!important; /* Color del borde más oscuro al pasar el mouse */
+    color: white!important; /* Color del texto */
+    text-align: center!important;
+}
+
+.safeware-whatsapp {
+    background-color: #25d366!important; /* Color de fondo del contenedor */
+    text-align: center!important;
+    width: 100%!important;
+}

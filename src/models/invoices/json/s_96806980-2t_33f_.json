@@ -1,0 +1,75 @@
+{
+    "headers": {
+        "supplier": "96806980-2",
+        "supplierName": "Entel PCS Telecomunicaciones S.A.",
+        "typeDocument": "33",
+        "nDocument": "",
+        "dcto": "0",
+        "datePurchase": "",
+        "dateExpired": "",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "",
+        "qtyCheque": "",
+        "subtotal": "",
+        "urlJson": "\/models\/invoices\/json\/s_96806980-2t_33f_.json",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_96806980-2t_33f_"
+    },
+    "details": [
+        {
+            "qty": "1",
+            "cost": "4",
+            "codeBar": "7",
+            "dctoItem": "10",
+            "subtotalItem": "13",
+            "deliveryItem": "16",
+            "checkItem": "true",
+            "sku": "AUD12658",
+            "idERP": "85582"
+        },
+        {
+            "qty": "2",
+            "cost": "5",
+            "codeBar": "8",
+            "dctoItem": "11",
+            "subtotalItem": "14",
+            "deliveryItem": "17",
+            "checkItem": "true",
+            "sku": "AUD10378",
+            "idERP": "85622"
+        },
+        {
+            "qty": "3",
+            "cost": "6",
+            "codeBar": "9",
+            "dctoItem": "12",
+            "subtotalItem": "15",
+            "deliveryItem": "18",
+            "checkItem": "true",
+            "sku": "MUS11130",
+            "idERP": "85939"
+        },
+        {
+            "qty": "2",
+            "cost": "32",
+            "codeBar": "23",
+            "dctoItem": "23",
+            "subtotalItem": "32",
+            "deliveryItem": "32",
+            "checkItem": "false",
+            "sku": "MUS10668",
+            "idERP": "86674"
+        },
+        {
+            "qty": "3",
+            "cost": "32",
+            "codeBar": "32",
+            "dctoItem": "23",
+            "subtotalItem": "32",
+            "deliveryItem": "32",
+            "checkItem": "false",
+            "sku": "MUS11704",
+            "idERP": "86932"
+        }
+    ]
+}

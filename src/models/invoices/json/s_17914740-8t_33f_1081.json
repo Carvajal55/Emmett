@@ -1,0 +1,37 @@
+{
+    "headers": {
+        "supplier": "17914740-8",
+        "supplierName": "MELISSA DEL CARMEN RUMINAO ROCHA",
+        "typeDocument": "33",
+        "nDocument": "1081",
+        "dcto": "0",
+        "datePurchase": "2024-08-27",
+        "dateExpired": "2024-08-28",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "0",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_17914740-8t_33f_1081.json",
+        "dateReception": "2024-08-28",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_17914740-8t_33f_1081"
+    },
+    "details": [
+        {
+            "qty": "2",
+            "cost": "49500",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "99000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS26017",
+            "idERP": "156783",
+            "model": "LEGUERO 20",
+            "idPro": "12855"
+        }
+    ],
+    "type": "1"
+}

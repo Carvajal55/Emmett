@@ -1,0 +1,66 @@
+{
+    "headers": {
+        "supplier": "77491084-0",
+        "supplierName": "24K SPA",
+        "typeDocument": "33",
+        "nDocument": "13948",
+        "dcto": "0",
+        "datePurchase": "2024-08-21",
+        "dateExpired": "2024-09-21",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "319200",
+        "urlPDF": "http:\/\/dte.bsale.cl\/get_dte\/48625296?sign=191758a5df03887c",
+        "urlJson": "\/models\/invoices\/json\/s_77491084-0t_33f_13948.json",
+        "dateReception": "2024-08-27",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_77491084-0t_33f_13948"
+    },
+    "details": [
+        {
+            "qty": "4",
+            "cost": "46000",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "184000",
+            "deliveryItem": "",
+            "checkItem": "false",
+            "sku": "MUS23513",
+            "idERP": "132100",
+            "model": "BDBA 1071",
+            "codProv": "040IMT3932",
+            "idPro": "9991"
+        },
+        {
+            "qty": "30",
+            "cost": "2800",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "84000",
+            "deliveryItem": "",
+            "checkItem": "false",
+            "sku": "MUS24822",
+            "idERP": "141701",
+            "model": "PBEM-14",
+            "codProv": "038IMT4855",
+            "idPro": "11295"
+        },
+        {
+            "qty": "8",
+            "cost": "6400",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "51200",
+            "deliveryItem": "",
+            "checkItem": "false",
+            "sku": "MUS17061",
+            "idERP": "96406",
+            "model": "PPPH-25",
+            "codProv": "038IMT4890",
+            "idPro": "4678"
+        }
+    ],
+    "type": "1"
+}

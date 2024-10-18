@@ -1,0 +1,280 @@
+{% extends 'partials/base.html' %}
+{% load static %}
+
+{% block content %}
+<div id="app">
+    <div class="card">
+        <div class="card-body">
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>Gestión de Usuarios</h5>
+                    <!-- Botón de Crear Usuario -->
+                    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#crearModalLabel">
+                        Crear Usuario
+                    </button>
+                </div>
+                <hr>
+                <div class="modal fade" id="crearModalLabel" tabindex="-1" aria-labelledby="crearModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="crearModalLabel">Crear Usuario</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form @submit.prevent="createUser">
+                                    <div class="mb-3">
+                                        <label for="createName" class="form-label">Nombre</label>
+                                        <input type="text" class="form-control" id="createName" v-model="newUser.nombres_apellidos" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="createEmail" class="form-label">Correo</label>
+                                        <input type="email" class="form-control" id="createEmail" v-model="newUser.correo" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="createRut" class="form-label">Rut</label>
+                                        <input type="text" class="form-control" id="createRut" v-model="newUser.rut" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="createPhone" class="form-label">Teléfono</label>
+                                        <input type="text" class="form-control" id="createPhone" v-model="newUser.telefono" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="createRole" class="form-label">Rol</label>
+                                        <select id="createRole" class="form-control" v-model="newUser.rol" required>
+                                            <option value="ADMIN">Administrador</option>
+                                            <option value="VENTAS">Ventas</option>
+                                            <option value="BODEGA">Bodega</option>
+                                        </select>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Crear Usuario</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered mb-0" id="table1">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">Nombre</th>
+                                <th scope="col">Correo</th>
+                                <th scope="col">Rut</th>
+                                <th scope="col">Teléfono</th>
+                                <th name="bstable-actions">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(user, index) in users" :key="user.id">
+                                <th scope="row">[[ index + 1 ]]</th>
+                                <td>[[ user.nombres_apellidos ]]</td>
+                                <td>[[ user.correo ]]</td>
+                                <td>[[ user.rut ]]</td>
+                                <td>[[ user.telefono ]]</td>
+                                <td name="bstable-actions">
+                                    <div class="btn-group pull-right">
+                                        <button @click="setSelectedUser(user)" class="btn btn-sm btn-default" type="button"  data-bs-toggle="modal" data-bs-target="#editModal">
+                                            <span class="fa fa-edit"></span>
+                                        </button>
+                                        <button @click="setSelectedUser(user)" class="btn btn-sm btn-default" type="button"  data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                            <span class="fa fa-trash"></span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Modal Editar Usuario -->
+                <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="editModalLabel">Editar Usuario</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form @submit.prevent="updateUser">
+                                    <div class="mb-3">
+                                        <label for="editName" class="form-label">Nombre</label>
+                                        <input type="text" class="form-control" id="editName" v-model="selectedUser.nombres_apellidos">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="editEmail" class="form-label">Correo</label>
+                                        <input type="email" class="form-control" id="editEmail" v-model="selectedUser.correo">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="editRut" class="form-label">Rut</label>
+                                        <input type="text" class="form-control" id="editRut" v-model="selectedUser.rut">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="editPhone" class="form-label">Teléfono</label>
+                                        <input type="text" class="form-control" id="editPhone" v-model="selectedUser.telefono">
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Eliminar Usuario -->
+                <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="deleteModalLabel">Eliminar Usuario</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                ¿Estás seguro que deseas eliminar al usuario: [[ selectedUser.nombres_apellidos ]]?
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" @click="confirmDelete" class="btn btn-danger">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block js %}
+<script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+    new Vue({
+    el: '#app',
+    delimiters: ['[[', ']]'],  // Asegurarse de que los delimitadores estén correctamente configurados
+    data: {
+        users: [],
+        selectedUser: {},
+        csrfToken: '',
+        newUser: { nombres_apellidos: '', correo: '', rut: '', telefono: '', rol: 'VENTAS' },  // Datos del nuevo usuario con rol predeterminado
+    },
+    methods: {
+        async loadUsers() {
+            try {
+                const response = await axios.get('/api/listar-usuarios/');
+                this.users = response.data;
+            } catch (error) {
+                console.error('Error al cargar usuarios:', error);
+            }
+        },
+        setSelectedUser(user) {
+            this.selectedUser = { ...user };
+        },
+        async createUser() {
+            try {
+                const response = await axios.post('/api/crear-usuario/', this.newUser, {
+                    headers: {
+                        'X-CSRFToken': this.csrfToken  // Incluye el token CSRF en el encabezado
+                    }
+                });
+
+                Swal.fire({
+                    title: '¡Usuario creado!',
+                    text: 'El usuario ha sido creado correctamente.',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
+
+                this.loadUsers();  // Recargar la lista de usuarios después de crear
+                $('#crearModalLabel').modal('hide');  // Cerrar el modal
+
+                // Limpiar el objeto newUser después de la creación
+                this.newUser = { nombres_apellidos: '', correo: '', rut: '', telefono: '', rol: 'VENTAS' };
+
+            } catch (error) {
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Hubo un problema al crear el usuario.',
+                    icon: 'error',
+                    confirmButtonText: 'Cerrar'
+                });
+                console.error('Error al crear el usuario:', error);
+            }
+        },
+        async updateUser() {
+            try {
+                const response = await axios.put(`/api/actualizar-usuario/${this.selectedUser.id}/`, this.selectedUser, {
+                    headers: {
+                        'X-CSRFToken': this.csrfToken  // Incluye el token CSRF en el encabezado
+                    }
+                });
+
+                // Usar SweetAlert para mostrar el mensaje de éxito
+                Swal.fire({
+                    title: '¡Usuario actualizado!',
+                    text: 'El usuario ha sido actualizado correctamente.',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
+
+                this.loadUsers();  // Recargar la lista de usuarios después de la actualización
+                $('#editModal').modal('hide');  // Cerrar el modal después de la actualización
+
+            } catch (error) {
+                // Usar SweetAlert para mostrar el mensaje de error
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Hubo un problema al actualizar el usuario.',
+                    icon: 'error',
+                    confirmButtonText: 'Cerrar'
+                });
+                console.error('Error al actualizar el usuario:', error);
+            }
+        },
+        async confirmDelete() {
+            try {
+                const response = await axios.delete(`/api/eliminar-usuario/${this.selectedUser.id}/`, {
+                    headers: {
+                        'X-CSRFToken': this.csrfToken  // Incluye el token CSRF en el encabezado
+                    }
+                });
+
+                // Usar SweetAlert para mostrar el mensaje de éxito
+                Swal.fire({
+                    title: '¡Usuario eliminado!',
+                    text: 'El usuario ha sido eliminado correctamente.',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
+
+                this.loadUsers();  // Recargar la lista de usuarios después de eliminar
+                $('#deleteModal').modal('hide');  // Cerrar el modal después de eliminar
+
+            } catch (error) {
+                // Usar SweetAlert para mostrar el mensaje de error
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Hubo un problema al eliminar el usuario.',
+                    icon: 'error',
+                    confirmButtonText: 'Cerrar'
+                });
+                console.error('Error al eliminar el usuario:', error);
+            }
+        }
+    },
+    mounted() {
+        this.loadUsers();
+        // Obtener el token CSRF desde el meta tag
+        this.csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
+});
+</script>
+{% endblock js %}

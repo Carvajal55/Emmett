@@ -1,0 +1,50 @@
+{
+    "headers": {
+        "supplier": "77491084-0",
+        "supplierName": "24K SPA",
+        "typeDocument": "33",
+        "nDocument": "999999",
+        "dcto": "0",
+        "datePurchase": "2024-09-12",
+        "dateExpired": "2024-10-12",
+        "observation": "prueba",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "100000",
+        "urlPDF": "",
+        "urlJsonDraft": "\/models\/invoices\/json\/draft\/s_77491084-0t_33f_999999.json",
+        "dateReception": "2024-09-12",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_77491084-0t_33f_999999"
+    },
+    "details": [
+        {
+            "qty": "1",
+            "cost": "150000",
+            "codeBar": "",
+            "dctoItem": "50",
+            "subtotalItem": "100000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS20086",
+            "idERP": "98032",
+            "model": "MEDIANO 25CM",
+            "idPro": "6612"
+        },
+        {
+            "qty": "1",
+            "cost": "25000",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "25000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD26369",
+            "idERP": "157067",
+            "model": "xxx3",
+            "idPro": "12870"
+        }
+    ],
+    "type": "2"
+}

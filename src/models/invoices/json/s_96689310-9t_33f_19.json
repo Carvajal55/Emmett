@@ -1,0 +1,63 @@
+{
+    "headers": {
+        "supplier": "96689310-9",
+        "supplierName": "TRANSBANK S.A.",
+        "typeDocument": "33",
+        "nDocument": "19",
+        "dcto": "0",
+        "datePurchase": "",
+        "dateExpired": "",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "0",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_96689310-9t_33f_19.json",
+        "dateReception": "2024-08-22",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_96689310-9t_33f_19"
+    },
+    "details": [
+        {
+            "qty": "1",
+            "cost": "100",
+            "codeBar": "",
+            "dctoItem": "0",
+            "subtotalItem": "100",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD24396",
+            "idERP": "139336",
+            "model": "R1380DB BROWN",
+            "idPro": "10871"
+        },
+        {
+            "qty": "10",
+            "cost": "200",
+            "codeBar": "",
+            "dctoItem": "0",
+            "subtotalItem": "2000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD24398",
+            "idERP": "139338",
+            "model": "R1380DB WHITE SILVER",
+            "idPro": "10873"
+        },
+        {
+            "qty": "5",
+            "cost": "300",
+            "codeBar": "",
+            "dctoItem": "0",
+            "subtotalItem": "1500",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD24397",
+            "idERP": "139337",
+            "model": "R1380DB BLACK",
+            "idPro": "10872"
+        }
+    ],
+    "type": "1"
+}

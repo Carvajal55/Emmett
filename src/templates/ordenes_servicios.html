@@ -1,0 +1,148 @@
+{% extends 'partials/base.html' %}
+{% load static %}
+
+{% block css %}
+
+{% endblock css %}
+{% block content %}
+
+<div id="app">
+    <div class="card bg-light-info shadow-none position-relative overflow-hidden">
+        <div class="card-body px-4 py-3">
+            <div class="row align-items-center">
+                <div class="col-9">
+                    <h4 class="fw-semibold mb-8">Ordenes Servicios</h4>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a class="text-muted " href="{% url 'index' %}">Dashboard</a>
+                            </li>
+                            <li class="breadcrumb-item" aria-current="page">Ordenes Servicios</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="table-responsive rounded-2 mb-4">
+        <table class="table border text-nowrap customize-table mb-0 align-middle">
+            <thead class="text-dark fs-4">
+                <tr>
+                    <th>
+                        <h6 class="fs-4 fw-semibold mb-0">Cliente</h6>
+                    </th>
+                    <th>
+                        <h6 class="fs-4 fw-semibold mb-0">Teléfono</h6>
+                    </th>
+                    <th>
+                        <h6 class="fs-4 fw-semibold mb-0">Sucursal</h6>
+                    </th>
+                    <th>
+                        <h6 class="fs-4 fw-semibold mb-0">Servicio</h6>
+                    </th>
+                    <th>
+                        <h6 class="fs-4 fw-semibold mb-0">Datos Auto</h6>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="orden in ordenes" :key="orden.id">
+                    <td>[[orden.cliente]]</td>
+                    <td>[[orden.telefono]]</td>
+                    <td>[[orden.sucursal]]</td>
+                    <td>[[orden.servicio]]</td>
+                    <td>[[orden.datos_auto]]</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="row">
+        <div class="col-12 col-md-3">
+            <ul class="pagination">
+                <template v-if="act_page != 1">
+                    <li class="page-item">
+                        <a v-on:click="getOrdenes(act_page-1)" class="page-link">Anterior</a>
+                    </li>
+                </template>
+                <template v-if="act_page == 1">
+                    <li class="page-item disabled">
+                        <a class="page-link">Anterior</a>
+                    </li>
+                </template>
+                <template v-for="page in paginas">
+                    <template v-if="page == act_page">
+                        <li class="page-item active">
+                            <a class="page-link">[[page]]</a>
+                        </li>
+                    </template>
+                    <template v-if="page != act_page">
+                        <li class="page-item">
+                            <a v-on:click="getOrdenes(page)" class="page-link">[[page]]</a>
+                        </li>
+                    </template>
+                </template>
+                <template v-if="act_page != max_page">
+                    <li class="page-item">
+                        <a v-on:click="getOrdenes(act_page+1)" class="page-link">Siguiente</a>
+                    </li>
+                </template>
+                <template v-if="act_page == max_page">
+                    <li class="page-item disabled">
+                        <a class="page-link">Siguiente</a>
+                    </li>
+                </template>
+
+            </ul>
+        </div>
+    </div>
+</div>
+
+
+
+
+{% endblock content %}
+
+{% block js %}
+
+<script>
+    var app = new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            ordenes: [],
+            act_page: 1,
+            max_page: 1,
+            paginas: [],
+        },
+        mounted() {
+            this.getOrdenes();
+        },
+        methods: {
+            CalculatePages(total, per_page) {
+                let cantidad = Math.ceil(total / per_page)
+                this.max_page = cantidad
+                this.paginas = []
+                for (let index = 1; index <= cantidad; index++) {
+                    this.paginas.push(index)
+                }
+            },
+            getOrdenes(page = 1) {
+                axios.get(`/api/internal/get/ordenes_servicios/?page=${page}`, {
+                    xsrfCookieName: 'csrftoken',
+                    xsrfHeaderName: 'X-CSRFTOKEN'
+                }).then(response => {
+                    this.act_page = page;
+                    this.act_page = page
+                    this.ordenes = response.data.results
+                    this.CalculatePages(response.data.results.count, 5.0)
+                    console.log(response.data)
+                }).catch(error => {
+                    console.error('Error al obtener las órdenes:', error);
+                });
+            }
+        },
+    })
+</script>
+
+
+{% endblock js %}

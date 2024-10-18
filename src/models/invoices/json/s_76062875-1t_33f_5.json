@@ -1,0 +1,18 @@
+{
+    "headers": {
+        "supplier": "76062875-1",
+        "supplierName": "COMERCIAL MACAIO CHILE LIMITADA",
+        "typeDocument": "33",
+        "nDocument": "5",
+        "dcto": "0",
+        "datePurchase": "",
+        "dateExpired": "",
+        "observation": "1231312",
+        "typePay": "1",
+        "nCheque": "",
+        "qtyCheque": "",
+        "subtotal": "154",
+        "urlJson": "\/models\/invoices\/json\/s_76062875-1t_33f_5.json",
+        "urlImg": "\/file\/img\/invoice-purchase\/r_76062875-1_t_33_n_5"
+    }
+}

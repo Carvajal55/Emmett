@@ -1,0 +1,60 @@
+{
+    "headers": {
+        "supplier": "76085228-7",
+        "supplierName": "RENTAS FONZASO SPA",
+        "typeDocument": "33",
+        "nDocument": "100",
+        "dcto": "0",
+        "datePurchase": "2024-08-01",
+        "dateExpired": "2024-09-01",
+        "observation": "esto es una prueba",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "1580000",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_76085228-7t_33f_100.json",
+        "dateReception": "2024-08-01",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_76085228-7t_33f_100"
+    },
+    "details": [
+        {
+            "qty": "3",
+            "cost": "1000",
+            "codeBar": "545454545",
+            "dctoItem": "0",
+            "subtotalItem": "156000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD12658",
+            "idERP": "85582",
+            "model": "VENICE F24"
+        },
+        {
+            "qty": "4",
+            "cost": "1000",
+            "codeBar": "54545454",
+            "dctoItem": "0",
+            "subtotalItem": "15000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD10378",
+            "idERP": "85622",
+            "model": "215SV"
+        },
+        {
+            "qty": "5",
+            "cost": "1000",
+            "codeBar": "45454",
+            "dctoItem": "0",
+            "subtotalItem": "15000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS11130",
+            "idERP": "85939",
+            "model": "PREDATOR"
+        }
+    ],
+    "type": "1"
+}

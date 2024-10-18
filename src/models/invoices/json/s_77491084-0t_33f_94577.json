@@ -1,0 +1,37 @@
+{
+    "headers": {
+        "supplier": "77491084-0",
+        "supplierName": "24K SPA",
+        "typeDocument": "33",
+        "nDocument": "94577",
+        "dcto": "0",
+        "datePurchase": "2024-09-06",
+        "dateExpired": "2024-09-06",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "3085674",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_77491084-0t_33f_94577.json",
+        "dateReception": "2024-09-23",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_77491084-0t_33f_94577"
+    },
+    "details": [
+        {
+            "qty": "6",
+            "cost": "514279",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "3085674",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD25805",
+            "idERP": "150084",
+            "model": "S1 PRO PLUS",
+            "idPro": "12262"
+        }
+    ],
+    "type": "1"
+}

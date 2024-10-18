@@ -1,0 +1,40 @@
+services:
+
+  db:
+    image: mysql/mysql-server:5.7
+    env_file:
+      - ./conf/.env
+    ports:
+      - "33006:3306"
+    volumes:
+      - dbdata_baseproyecto:/var/lib/mysql
+    command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+    networks:
+      - baseproyecto_net
+
+  backend: &backend
+    build: 
+      dockerfile: Dockerfile
+      context: . 
+    command: python3 manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./src/:/code
+    ports:
+      - "8081:8000"
+    expose:
+      - "8000"
+    depends_on:
+      - db
+    env_file:
+      - ./conf/.env
+    networks:
+      - baseproyecto_net
+
+  
+
+
+networks:
+  baseproyecto_net:
+
+volumes:
+  dbdata_baseproyecto:

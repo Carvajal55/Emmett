@@ -1,0 +1,48 @@
+{
+    "headers": {
+        "supplier": "76488021-8",
+        "supplierName": "G.C.R. SPA",
+        "typeDocument": "33",
+        "nDocument": "994444",
+        "dcto": "0",
+        "datePurchase": "2024-12-24",
+        "dateExpired": "2024-10-11",
+        "observation": "esto es una prueba de borrador",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "10000",
+        "urlPDF": "http:\/\/dte.bsale.cl\/get_dte\/49147872?sign=191c7e30a06abaff",
+        "urlJson": "\/models\/invoices\/json\/s_76488021-8t_33f_994444.json",
+        "dateReception": "2024-09-11",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_76488021-8t_33f_994444"
+    },
+    "details": [
+        {
+            "qty": "200",
+            "cost": "100",
+            "codeBar": "",
+            "dctoItem": "5",
+            "subtotalItem": "1000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD20635",
+            "idERP": "100215",
+            "model": "A10L4 USB"
+        },
+        {
+            "qty": "5",
+            "cost": "50",
+            "codeBar": "",
+            "dctoItem": "8",
+            "subtotalItem": "250",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "ILU20984",
+            "idERP": "102690",
+            "model": "64514 120v 300w"
+        }
+    ],
+    "type": "1"
+}

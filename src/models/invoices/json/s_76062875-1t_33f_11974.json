@@ -1,0 +1,102 @@
+{
+    "headers": {
+        "supplier": "76062875-1",
+        "supplierName": "COMERCIAL MACAIO CHILE LIMITADA",
+        "typeDocument": "33",
+        "nDocument": "11974",
+        "dcto": "0",
+        "datePurchase": "2024-08-30",
+        "dateExpired": "2024-09-30",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "2542212",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_76062875-1t_33f_11974.json",
+        "dateReception": "2024-08-30",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_76062875-1t_33f_11974"
+    },
+    "details": [
+        {
+            "qty": "200",
+            "cost": "2896",
+            "codeBar": "0",
+            "dctoItem": "",
+            "subtotalItem": "579200",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD21569",
+            "idERP": "104906",
+            "model": "CLM PMP2",
+            "idPro": "8096"
+        },
+        {
+            "qty": "200",
+            "cost": "2896",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "579200",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD14763",
+            "idERP": "87941",
+            "model": "CLM MPRCA2",
+            "idPro": "1059"
+        },
+        {
+            "qty": "600",
+            "cost": "594",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "356400",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD14376",
+            "idERP": "88991",
+            "model": "CLSP 215B",
+            "idPro": "1073"
+        },
+        {
+            "qty": "100",
+            "cost": "5490",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "549000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD25478",
+            "idERP": "146358",
+            "model": "3DMX4.5C ",
+            "idPro": "11936"
+        },
+        {
+            "qty": "3",
+            "cost": "60504",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "181512",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "ILU16002",
+            "idERP": "95897",
+            "model": "NAVIGATOR 2",
+            "idPro": "2039"
+        },
+        {
+            "qty": "100",
+            "cost": "2969",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "296900",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "ILU23397",
+            "idERP": "131306",
+            "model": "APA 10P",
+            "idPro": "9875"
+        }
+    ],
+    "type": "1"
+}

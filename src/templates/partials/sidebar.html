@@ -1,0 +1,141 @@
+{% load static %}
+
+<!-- Sidebar Start -->
+<aside class="left-sidebar">
+  <!-- Sidebar scroll-->
+  <div>
+    <div class="brand-logo d-flex align-items-center justify-content-center">
+      <a href="{% url 'index' %}" class="text-nowrap logo-img text-center" style="margin-top: 10rem;">
+        <img src="{% static 'images/logos/emmett_logo_azul.png' %}" class="dark-logo" width="180" alt="Logo Emmett" />
+        <img src="{% static 'images/logos/emmett_logo_azul.png' %}" class="light-logo" width="180" alt="Logo Emmett" />
+      </a>
+      
+      <div class="close-btn d-lg-none d-block sidebartoggler cursor-pointer" id="sidebarCollapse">
+        <i class="ti ti-x fs-8"></i>
+      </div>
+    </div>
+    <!-- Sidebar navigation-->
+    <nav class="sidebar-nav scroll-sidebar" data-simplebar>
+      <ul id="sidebarnav">
+
+        <!-- New Options -->
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'ingresar_documentos' %}" >
+            <span>
+              <i class="ti ti-plus"></i>
+            </span>
+            <span class="hide-menu">Agregar Factura</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'anadir_psector' %}" >
+            <span>
+              <i class="ti ti-plus"></i>
+            </span>
+            <span class="hide-menu">Ordenar Productos</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'cuadrar_sector' %}" >
+            <span>
+              <i class="ti ti-plus"></i>
+            </span>
+            <span class="hide-menu">Cuadrar Sector</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'recepciones_pendientes' %}" >
+            <span>
+              <i class="ti ti-file-check"></i>
+            </span>
+            <span class="hide-menu">Autorizar Documento</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="listar-todas-recepciones.phtml" >
+            <span>
+              <i class="ti ti-file-text"></i>
+            </span>
+            <span class="hide-menu">Documentos Autorizados</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'recepciones_aceptadas' %}" >
+            <span>
+              <i class="ti ti-printer"></i>
+            </span>
+            <span class="hide-menu">Imprimir Etiquetas</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="dispatch.phtml" >
+            <span>
+              <i class="ti ti-truck"></i>
+            </span>
+            <span class="hide-menu">Despachar Productos</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'buscar_productos' %}" >
+            <span>
+              <i class="ti ti-search"></i>
+            </span>
+            <span class="hide-menu">Buscar Productos</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="sectorizar.phtml" >
+            <span>
+              <i class="ti ti-map"></i>
+            </span>
+            <span class="hide-menu">Sectorizar</span>
+          </a>
+        </li>
+
+        <!-- Submenú ERP -->
+        <li class="sidebar-item">
+          <a class="sidebar-link has-arrow" href="javascript:void(0)">
+            <span>
+              <i class="ti ti-settings"></i>
+            </span>
+            <span class="hide-menu">ERP</span>
+          </a>
+          <ul class="collapse first-level">
+            <li class="sidebar-item">
+              <a href="{% url 'buscar_productos' %}" class="sidebar-link">
+                <span class="hide-menu">Buscar Productos ERP</span>
+              </a>
+            </li>
+            <li class="sidebar-item">
+              <a href="{% url 'recepciones_aceptadas' %}" class="sidebar-link">
+                <span class="hide-menu">Imprimir Etiquetas</span>
+              </a>
+            </li>
+            <li class="sidebar-item"></li>
+              <a href="{% url 'recepciones_pendientes' %}" class="sidebar-link">
+                <span class="hide-menu">Autorizar Documento</span>
+              </a>
+            </li>
+            <!-- Puedes agregar más opciones dentro del submenú ERP aquí -->
+            <!-- Puedes agregar más opciones dentro del submenú ERP aquí -->
+          </ul>
+          
+        </li>
+
+        <!-- Botón para crear usuarios -->
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'crear_usuarios_view' %}">
+            <span>
+              <i class="ti ti-user-plus"></i>
+            </span>
+            <span class="hide-menu">Crear Usuarios</span>
+          </a>
+        </li>
+        
+      </ul>
+    </nav>
+    <!-- End Sidebar navigation -->
+  </div>
+  <!-- End Sidebar scroll-->
+</aside>
+<!-- Sidebar End -->

@@ -1,0 +1,37 @@
+{
+    "headers": {
+        "supplier": "76885736-9",
+        "supplierName": "COMERCIALIZADORA E IMPORTADORA JYP SPA",
+        "typeDocument": "33",
+        "nDocument": "9627",
+        "dcto": "0",
+        "datePurchase": "2024-08-27",
+        "dateExpired": "2024-09-28",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_76885736-9t_33f_9627.json",
+        "dateReception": "2024-08-28",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_76885736-9t_33f_9627"
+    },
+    "details": [
+        {
+            "qty": "200",
+            "cost": "20432",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "4086400",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD11344",
+            "idERP": "86478",
+            "model": "SV 200",
+            "idPro": "4250"
+        }
+    ],
+    "type": "1"
+}

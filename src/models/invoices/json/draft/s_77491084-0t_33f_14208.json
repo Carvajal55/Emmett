@@ -1,0 +1,37 @@
+{
+    "headers": {
+        "supplier": "77491084-0",
+        "supplierName": "24K SPA",
+        "typeDocument": "33",
+        "nDocument": "14208",
+        "dcto": "0",
+        "datePurchase": "",
+        "dateExpired": "",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "585000",
+        "urlPDF": "",
+        "urlJsonDraft": "\/models\/invoices\/json\/draft\/s_77491084-0t_33f_14208.json",
+        "dateReception": "2024-09-30",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_77491084-0t_33f_14208"
+    },
+    "details": [
+        {
+            "qty": "3900",
+            "cost": "",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "585000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS11646",
+            "idERP": "87221",
+            "model": "RD100",
+            "idPro": "728"
+        }
+    ],
+    "type": "2"
+}

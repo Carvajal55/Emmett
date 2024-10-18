@@ -1,0 +1,52 @@
+{
+    "headers": {
+        "supplier": "76885736-9",
+        "supplierName": "COMERCIALIZADORA E IMPORTADORA JYP SPA",
+        "typeDocument": "33",
+        "nDocument": "9525",
+        "dcto": "232780",
+        "datePurchase": "2024-08-14",
+        "dateExpired": "2024-09-14",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "1906240",
+        "urlPDF": "http:\/\/dte.bsale.cl\/get_dte\/48464273?sign=1915294d7ddb61b6",
+        "urlJson": "\/models\/invoices\/json\/s_76885736-9t_33f_9525.json",
+        "dateReception": "2024-08-28",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_76885736-9t_33f_9525"
+    },
+    "details": [
+        {
+            "qty": "20",
+            "cost": "95312",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "1906240",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS26269",
+            "idERP": "155106",
+            "model": "CTS195C2 bk",
+            "codProv": "CT-S195C2",
+            "idPro": "12725"
+        },
+        {
+            "qty": "20",
+            "cost": "11639",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "232780",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS26018",
+            "idERP": "156784",
+            "model": "E95100LG-P7 OP1",
+            "codProv": "AD-E95100LG-P7-OP1",
+            "idPro": "12856"
+        }
+    ],
+    "type": "1"
+}

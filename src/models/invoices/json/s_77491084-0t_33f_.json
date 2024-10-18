@@ -1,0 +1,22 @@
+{
+    "headers": {
+        "supplier": "77491084-0",
+        "supplierName": "24K SPA",
+        "typeDocument": "33",
+        "nDocument": "",
+        "dcto": "0",
+        "datePurchase": "",
+        "dateExpired": "",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "0",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_77491084-0t_33f_.json",
+        "dateReception": "2024-09-12",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_77491084-0t_33f_"
+    },
+    "type": "1"
+}

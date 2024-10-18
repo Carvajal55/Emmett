@@ -1,0 +1,49 @@
+{
+    "headers": {
+        "supplier": "774910840",
+        "typeDocument": "33",
+        "nDocument": "14516",
+        "dcto": "0",
+        "datePurchase": "2024-09-11",
+        "dateExpired": "2024-08-11",
+        "observation": "",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "332000",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_774910840t_33f_14516.json",
+        "dateReception": "2024-09-13",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_774910840t_33f_14516"
+    },
+    "details": [
+        {
+            "qty": "8",
+            "cost": "26000",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "208000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS11669",
+            "idERP": "87242",
+            "model": "GB100",
+            "idPro": "2724"
+        },
+        {
+            "qty": "4",
+            "cost": "31000",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "124000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "MUS17560",
+            "idERP": "97137",
+            "model": "GB1000 MGBK",
+            "idPro": "2727"
+        }
+    ],
+    "type": "1"
+}

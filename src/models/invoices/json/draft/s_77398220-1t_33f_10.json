@@ -1,0 +1,60 @@
+{
+    "headers": {
+        "supplier": "77398220-1",
+        "supplierName": "MercadoLibre Chile Ltda.",
+        "typeDocument": "33",
+        "nDocument": "10",
+        "dcto": "0",
+        "datePurchase": "2024-08-21",
+        "dateExpired": "2024-08-21",
+        "observation": "Prueba",
+        "typePay": "1",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "0",
+        "urlPDF": "",
+        "urlJsonDraft": "\/models\/invoices\/json\/draft\/s_77398220-1t_33f_10.json",
+        "dateReception": "2024-08-22",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_77398220-1t_33f_10"
+    },
+    "details": [
+        {
+            "qty": "1",
+            "cost": "1000",
+            "codeBar": "",
+            "dctoItem": "0",
+            "subtotalItem": "1000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD24396",
+            "idERP": "139336",
+            "model": "R1380DB BROWN"
+        },
+        {
+            "qty": "2",
+            "cost": "2000",
+            "codeBar": "",
+            "dctoItem": "0",
+            "subtotalItem": "4000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD24397",
+            "idERP": "139337",
+            "model": "R1380DB BLACK"
+        },
+        {
+            "qty": "3",
+            "cost": "3000",
+            "codeBar": "",
+            "dctoItem": "0",
+            "subtotalItem": "9000",
+            "deliveryItem": "",
+            "checkItem": "true",
+            "sku": "AUD24398",
+            "idERP": "139338",
+            "model": "R1380DB WHITE SILVER"
+        }
+    ],
+    "type": "2"
+}
