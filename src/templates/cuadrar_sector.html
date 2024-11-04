@@ -5,13 +5,10 @@
 <div id="app" class="m-2">
     <h3>Cuadrar Productos en Sector</h3>
 
-    <!-- Input para ingresar el sector -->
+    <!-- Input único para ingresar sector y SuperID -->
     <div class="form-group">
-        <input type="text" id="sectorInput" class="form-control" v-model="sectorQuery" placeholder="Ingresa el sector (ej. G1-1)" @keyup.enter="buscarProductosSector" />
+        <input type="text" id="inputScanner" class="form-control" v-model="scannerInput" placeholder="Escanea el sector o el SuperID" @keyup.enter="procesarEntrada" />
     </div>
-
-    <!-- Botón para buscar productos en sector -->
-    <button class="btn btn-primary mt-3" @click="buscarProductosSector">Buscar Productos en el Sector</button>
 
     <!-- Indicador de carga -->
     <div v-if="loading" class="text-center mt-3">
@@ -20,7 +17,7 @@
 
     <!-- Tabla para mostrar los productos en el sector -->
     <div v-if="!loading && productosEnSector.length">
-        <h4>Productos en el sector {{ sectorQuery }}</h4>
+        <h4>Productos en el sector [[ sectorQuery ]]</h4>
         <table class="table table-striped table-hover mt-4">
             <thead>
                 <tr>
@@ -47,16 +44,8 @@
         </table>
     </div>
 
-    <!-- Input para ingresar los superids escaneados -->
-    <div class="form-group mt-3">
-        <input type="text" id="scanInput" class="form-control" v-model="superid" placeholder="Escanear o ingresar SuperID" @keyup.enter="agregarProductoEscaneado" />
-    </div>
-
-    <!-- Botón para cuadrar productos -->
-    <button class="btn btn-warning mt-3" @click="cuadrarProductos">Cuadrar Productos</button>
-
     <!-- Tabla para mostrar los productos escaneados -->
-    <div v-if="!loading && productosEscaneados.length">
+    <div v-if="productosEscaneados.length">
         <h4>Productos Escaneados</h4>
         <table class="table table-striped table-hover mt-4">
             <thead>
@@ -79,7 +68,7 @@
     </div>
 
     <!-- Mensajes de productos movidos a Narnia -->
-    <div v-if="!loading && productosMovidosNarnia.length">
+    <div v-if="productosMovidosNarnia.length">
         <h4>Productos movidos a Narnia</h4>
         <ul>
             <li v-for="producto in productosMovidosNarnia" :key="producto.superid">[[ producto.superid ]]</li>
@@ -91,120 +80,116 @@
 {% block js %}
 <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script> <!-- Importar SweetAlert -->
 
 <script>
-new Vue({
-    el: '#app',
-    delimiters: ['[[', ']]'],
-    data: {
-        sectorQuery: '',  // Sector actual
-        superid: '',  // SuperID actual (escaneado o ingresado)
-        productosEnSector: [],  // Productos en el sector
-        productosEscaneados: [],  // Productos escaneados (con detalles como superid, sku, nombre)
-        productosMovidosNarnia: [],  // Productos movidos a Narnia
-        loading: false,  // Indicador de carga
-    },
-    methods: {
-        // Buscar productos en el sector
-        buscarProductosSector() {
-            if (this.sectorQuery.trim() === '') {
-                Swal.fire('Error', 'Por favor, ingresa un sector.', 'error');
-                return;
-            }
-
-            this.loading = true;  // Iniciar indicador de carga
-            this.productosEnSector = [];  // Limpiar la lista
-
-            axios.post('/api/buscar-productos-sector/', {
-                searchTerm: this.sectorQuery
-            })
-            .then(response => {
-                this.loading = false;  // Detener indicador de carga
-                if (response.data.resp === 1) {
-                    this.productosEnSector = response.data.productos;
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            scannerInput: '',         // Input para escanear sector o SuperID
+            sectorQuery: '',          // Sector actual
+            previousSector: '',       // Almacena el sector anterior escaneado
+            productosEnSector: [],    // Productos en el sector actual
+            productosEscaneados: [],  // Productos escaneados
+            productosMovidosNarnia: [], // Productos movidos a Narnia
+            loading: false,           // Indicador de carga
+        },
+        methods: {
+            // Procesa el input de escaneo (sector o SuperID)
+            procesarEntrada() {
+                const input = this.scannerInput.trim();
+                
+                // Verificar si el input es un sector (B-)
+                if (input.startsWith('B-')) {
+                    // Verificar si el sector ya está escaneado
+                    if (input === this.previousSector) {
+                        this.cuadrarProductos(); // Cuadrar productos si es el mismo sector
+                    } else {
+                        this.sectorQuery = input;
+                        this.buscarProductosSector();
+                        this.previousSector = input; // Actualizar el sector previo
+                        this.productosEscaneados = []; // Limpiar la lista de escaneados
+                    }
                 } else {
-                    Swal.fire('Error', response.data.msg, 'error');
-                    this.productosEnSector = [];
+                    // Agregar SuperID escaneado
+                    this.agregarProductoEscaneado(input);
                 }
-            })
-            .catch(error => {
-                this.loading = false;
-                console.error('Error al buscar productos:', error);
-                Swal.fire('Error', 'Ocurrió un error al buscar productos.', 'error');
-            });
-        },
-
-        // Agregar el producto escaneado a la lista de escaneados
-        agregarProductoEscaneado() {
-            if (this.superid.trim() === '') {
-                Swal.fire('Error', 'Por favor, ingresa un SuperID.', 'error');
-                return;
-            }
-
-            const productoEnSector = this.productosEnSector.find(p => p.superid === this.superid);
-            if (!productoEnSector) {
-                Swal.fire('Error', 'El SuperID ingresado no pertenece al sector.', 'error');
-                return;
-            }
-
-            if (!this.productosEscaneados.some(p => p.superid === this.superid)) {
-                this.productosEscaneados.push({
-                    superid: productoEnSector.superid,
-                    sku: productoEnSector.sku,
-                    name: productoEnSector.name
-                });
-                this.superid = '';  // Limpiar el input después de agregar
-            } else {
-                Swal.fire('Advertencia', 'El SuperID ya ha sido escaneado.', 'warning');
-            }
-        },
-
-        // Cuadrar productos entre sector y escaneados
-        cuadrarProductos() {
-            if (this.productosEscaneados.length === 0) {
-                Swal.fire('Advertencia', 'Por favor, escanea o ingresa al menos un producto.', 'warning');
-                return;
-            }
-
-            this.loading = true;  // Iniciar indicador de carga
-
-            axios.post('/api/cuadrar-productos/', {
-                superids: this.productosEscaneados.map(p => p.superid),
-                sector_id: this.sectorQuery
-            })
-            .then(response => {
-                this.loading = false;
-                if (response.data.resp === 1) {
-                    this.productosMovidosNarnia = response.data.productos_faltantes;
-                    this.productosEscaneados = [];  // Limpiar productos escaneados
-
-                    Swal.fire({
-                        title: 'Cuadratura completada',
-                        text: 'Productos faltantes movidos a Narnia.',
-                        icon: 'success',
-                        confirmButtonText: 'OK'
-                    }).then(() => {
-                        this.productosEnSector = []; // Limpiar la lista actual
-                        // Volver a cargar los productos del sector después de cuadrar
-                        this.buscarProductosSector(); 
+                this.scannerInput = ''; // Limpiar el input
+            },
+    
+            // Buscar productos en el sector actual
+            buscarProductosSector() {
+                if (!this.sectorQuery) return;
+                this.loading = true;
+                this.productosEnSector = []; 
+    
+                axios.post('/api/buscar-productos-sector/', { searchTerm: this.sectorQuery })
+                    .then(response => {
+                        this.loading = false;
+                        this.productosEnSector = response.data.resp === 1 ? response.data.productos : [];
+                    })
+                    .catch(error => {
+                        this.loading = false;
+                        console.error('Error al buscar productos:', error);
+                        this.productosEnSector = [];  // Asegura que esté definido
                     });
-                } else {
-                    Swal.fire('Error', response.data.msg, 'error');
+            },
+    
+            // Agregar SuperID a la lista de productos escaneados
+            agregarProductoEscaneado(superid) {
+                const productoEnSector = this.productosEnSector ? this.productosEnSector.find(p => p.superid === superid) : null;
+                if (productoEnSector && !this.productosEscaneados.some(p => p.superid === superid)) {
+                    this.productosEscaneados.push({
+                        superid: productoEnSector.superid,
+                        sku: productoEnSector.sku,
+                        name: productoEnSector.name
+                    });
                 }
-            })
-            .catch(error => {
-                this.loading = false;
-                console.error('Error al cuadrar productos:', error);
-                Swal.fire('Error', 'Ocurrió un error al cuadrar productos.', 'error');
-            });
+            },
+    
+            // Cuadrar productos entre sector y escaneados
+            cuadrarProductos() {
+                if (this.productosEscaneados.length === 0) {
+                    alert("Escanea al menos un producto antes de cuadrar.");
+                    return;
+                }
+                this.loading = true;
+
+                axios.post('/api/cuadrar-productos/', {
+                    superids: this.productosEscaneados.map(p => p.superid),
+                    sector_id: this.sectorQuery
+                })
+                .then(response => {
+                    this.loading = false;
+                    if (response.data.resp === 1) {
+                        this.productosMovidosNarnia = response.data.productos_faltantes || [];
+                        this.productosEscaneados = [];  // Limpiar productos escaneados
+
+                        // Mostrar SweetAlert de éxito con duración de 2 segundos
+                        Swal.fire({
+                            title: 'Cuadratura completada',
+                            text: 'Productos faltantes movidos a Narnia.',
+                            icon: 'success',
+                            showConfirmButton: false,
+                            timer: 2000 // Duración de 2 segundos
+                        });
+
+                        this.buscarProductosSector(); // Refrescar productos del sector
+                    } else {
+                        console.error('Error en cuadratura:', response.data.msg);
+                    }
+                })
+                .catch(error => {
+                    this.loading = false;
+                    console.error('Error al cuadrar productos:', error);
+                    this.productosMovidosNarnia = [];  // Asegura que esté definido
+                });
+            }
+        },
+        mounted() {
+            // Colocar el foco en el input al cargar la página
+            this.$nextTick(() => document.getElementById('inputScanner').focus());
         }
-    },
-    mounted() {
-        this.$nextTick(() => {
-            document.getElementById('sectorInput').focus();
-        });
-    }
-});
-</script>
+    });
+    </script>
 {% endblock js %}
