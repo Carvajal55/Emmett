@@ -1,28 +1,122 @@
-{% extends 'partials/base.html' %}
+{% extends 'partials/base-fluid.html' %}
 {% load static %}
 
 {% block content %}
-<div id="app" class="m-2">
+<div id="app" class=" m-2">
     <h3>Agregar Recepción EMMETT [[ currentDate ]]</h3>
 
-    <div class="container-fluid">
+    <div class="">
+        <!-- Botones para crear proveedor y producto -->
+        <div class="mb-4">
+            <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modalCrearProveedor">
+                Crear Proveedor
+            </button>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalCrearProducto">
+                Crear Producto
+            </button>
+        </div>
+
+        <!-- Modal para Crear Proveedor -->
+        <div class="modal fade" id="modalCrearProveedor" tabindex="-1" aria-labelledby="modalProveedorLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalProveedorLabel">Crear Proveedor</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="rutProveedor" class="form-label">RUT Proveedor</label>
+                            <input type="text" class="form-control" v-model="nuevoProveedor.rut">
+                        </div>
+                        <div class="mb-3">
+                            <label for="nombreProveedor" class="form-label">Nombre Proveedor</label>
+                            <input type="text" class="form-control" v-model="nuevoProveedor.nombre">
+                        </div>
+                        <div class="mb-3">
+                            <label for="aliasProveedor" class="form-label">Alias</label>
+                            <input type="text" class="form-control" v-model="nuevoProveedor.alias">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" @click="crearProveedor">Crear Proveedor</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para Crear Producto -->
+        <div class="modal fade" id="modalCrearProducto" tabindex="-1" aria-labelledby="modalProductoLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalProductoLabel">Crear Producto</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label for="skuProducto" class="form-label">SKU</label>
+                                <input type="text" class="form-control" v-model="nuevoProducto.sku">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label for="nombreProducto" class="form-label">Nombre Producto</label>
+                                <input type="text" class="form-control" v-model="nuevoProducto.nombre">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label for="marcaProducto" class="form-label">Marca</label>
+                                <input type="text" class="form-control" v-model="nuevoProducto.marca">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label for="precioProducto" class="form-label">Precio</label>
+                                <input type="number" class="form-control" v-model="nuevoProducto.precio">
+                            </div>
+                            <div class="col-12 mb-3"></div>
+                                <label for="precioProducto" class="form-label">Descripción</label>
+                                <input type="text" class="form-control" v-model="nuevoProducto.descripcion">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary" @click="crearProducto">Crear Producto</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Selector de Proveedor -->
         <div>
             <!-- Campo de búsqueda de proveedor -->
             <input type="text" class="form-control" placeholder="Buscar proveedor por RUT o Nombre"
                    v-model="searchQuery" @input="searchProveedores" />
-
-            <!-- Selector de proveedores -->
-            <select class="form-select mt-3" v-model="form.proveedor" style="width: 100%">
-                <option v-for="proveedor in proveedores" :key="proveedor.id" :value="proveedor.id">
+        
+            <!-- Lista de resultados de búsqueda con scroll -->
+            <div v-if="proveedores.length" class="list-group mt-2" style="max-height: 150px; overflow-y: auto;">
+                <button v-for="proveedor in proveedores" :key="proveedor.id" 
+                        @click="seleccionarProveedor(proveedor)" 
+                        class="list-group-item list-group-item-action">
                     [[ proveedor.rutsupplier ]] - [[ proveedor.namesupplier ]]
-                </option>
-            </select>
+                </button>
+            </div>
+            
+            <!-- Mostrar mensaje cuando no hay resultados -->
+            <div v-else class="mt-2 text-muted">
+                No se encontraron proveedores.
+            </div>
+        
+            <!-- Datos del proveedor seleccionado -->
+            <div v-if="form.proveedor" class="mt-3">
+                <h5>Proveedor Seleccionado</h5>
+                <p>RUT: [[ form.rutProveedor ]]</p>
+                <p>Razón Social: [[ form.razonSocial ]]</p>
+            </div>
         </div>
 
         <!-- Datos del proveedor -->
-        <div class="row">
-            <div class="mb-3 col-3">
+        <div class="row mt-3">
+            <div class="mb-3  col-3">
                 <label for="txtRutSupplier2" class="form-label">RUT PROVEEDOR MTD2</label>
                 <input class="form-control form-control-md" type="text" v-model="form.rutProveedor">
             </div>
@@ -105,105 +199,83 @@
             <input class="form-control form-control-lg" v-model="form.observaciones">
         </div>
 
-        <!-- Botones de acción -->
-        <div class="btn-group mb-3" role="group">
-            <button class="btn btn-primary" @click="">Descargar Documentos</button>
-            <button class="btn btn-success" @click="">Guardar Documento</button>
-            <button class="btn btn-primary" @click="">Agregar Producto</button>
-            <button class="btn btn-primary" @click="limpiarCeldas">Limpiar Celdas</button>
-            <button class="btn btn-primary" @click="">Respaldar Factura</button>
-        </div>
+        <!-- Botones de acción omitidos por brevedad... -->
 
-        <!-- Tabla de Productos Disponibles (más pequeña) -->
-        <div class="mb-4">
-            <!-- Campo de búsqueda para los productos -->
-            <input type="text" class="form-control mb-3" placeholder="Buscar producto por SKU o Nombre"
-                   v-model="searchProduct" @input="searchProductos" />
-
-            <!-- Tabla para mostrar los productos disponibles -->
-            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                <table class="table table-striped table-hover fixed-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 5%;">#</th>
-                            <th style="width: 15%;">SKU</th>
-                            <th style="width: 25%;">Nombre</th>
-                            <th style="width: 15%;">Marca</th>
-                            <th style="width: 20%;">Código de Barras</th>
-                            <th style="width: 10%;">Precio</th>
-                            <th style="width: 10%;">Agregar</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(producto, index) in productos" :key="producto.id">
-                            <td>[[ index + 1 ]]</td>
-                            <td>[[ producto.sku ]]</td>
-                            <td class="text-truncate">[[ producto.nameproduct ]]</td>
-                            <td>[[ producto.brands ]]</td>
-                            <td>[[ producto.codebar ]]</td>
-                            <td>[[ formatCurrency(producto.lastprice) ]]</td>
-                            <td><button class="btn btn-primary btn-sm" @click="agregarProducto(producto)">Agregar</button></td>
-                        </tr>
-                    </tbody>
-                </table>
+        <!-- Contenido de las tablas -->
+        <div class="row">
+            <!-- Tabla de Productos en el Documento -->
+            <div class="col-6">
+                <h4>Productos en el Documento</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>MODELO</th>
+                                <th>SKU</th>
+                                <th>CANT</th>
+                                <th>COSTO</th>
+                                <th>DCTO</th>
+                                <th>SUBTOTAL</th>
+                                <th>ENTREGA</th>
+                                <th>ELIMINAR</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(producto, index) in productosDocumento" :key="producto.sku">
+                                <td>[[ index + 1 ]]</td>
+                                <td>[[ producto.model ]]</td>
+                                <td>[[ producto.sku ]]</td>
+                                <td><input class="form-control" v-model="producto.cantidad" type="number"></td>
+                                <td><input class="form-control" v-model="producto.costo" type="number"></td>
+                                <td><input class="form-control" v-model="producto.descuento" type="number"></td>
+                                <td>[[ formatCurrency(producto.costo * producto.cantidad) ]]</td>
+                                <td><input type="checkbox" v-model="producto.entrega"></td>
+                                <td><button class="btn btn-danger btn-sm" @click="eliminarProducto(producto.sku)">Eliminar</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            
-            <!-- Controles de paginación -->
-            <nav aria-label="Page navigation">
-                <ul class="pagination">
-                    <!-- Botón "Anterior" -->
-                    <li class="page-item" :class="{ 'disabled': pagination.current_page === 1 }">
-                        <button class="page-link" @click="changePage(pagination.current_page - 1)">Anterior</button>
-                    </li>
-            
-                    <!-- Botones de páginas -->
-                    <li class="page-item" v-for="page in paginatedPages()" :key="page" :class="{ 'active': page === pagination.current_page }">
-                        <button class="page-link" @click="changePage(page)">[[ page ]]</button>
-                    </li>
-            
-                    <!-- Botón "Siguiente" -->
-                    <li class="page-item" :class="{ 'disabled': pagination.current_page === pagination.total_pages }">
-                        <button class="page-link" @click="changePage(pagination.current_page + 1)">Siguiente</button>
-                    </li>
-                </ul>
-            </nav>
-        </div>
 
-        <!-- Tabla de Productos en el Documento -->
-        <div>
-            <h4>Productos en el Documento</h4>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>MODELO</th>
-                            <th>SKU</th>
-                            <th>CANT</th>
-                            <th>COSTO</th>
-                            <th>CÓD. BARRA</th>
-                            <th>DCTO</th>
-                            <th>SUBTOTAL</th>
-                            <th>ENTREGA</th>
-                            <th>ELIMINAR</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(producto, index) in productosDocumento" :key="producto.sku">
-                            <td>[[ index + 1 ]]</td>
-                            <td>[[ producto.model ]]</td>
-                            <td>[[ producto.sku ]]</td>
-                            <td><input class="form-control" v-model="producto.cantidad" type="number"></td>
-                            <td><input class="form-control" v-model="producto.costo" type="number"></td>
-                            <td><input class="form-control" v-model="producto.codebar" type="text"></td>
-                            <td><input class="form-control" v-model="producto.descuento" type="number"></td>
-                            <td>[[ formatCurrency(producto.costo * producto.cantidad) ]]</td>
-                            <td><input type="checkbox" v-model="producto.entrega"></td>
-                            <td><button class="btn btn-danger btn-sm" @click="eliminarProducto(producto.sku)">Eliminar</button></td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- Tabla de Productos Disponibles (más pequeña) -->
+            <div class="col-6 mb-4">
+                <h4>Buscar Productos</h4>
+                <!-- Campo de búsqueda para los productos -->
+                <input type="text" class="form-control mb-3" placeholder="Buscar producto por SKU o Nombre"
+                       v-model="searchProduct" @input="searchProductos" />
+
+                <!-- Tabla para mostrar los productos disponibles -->
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-striped table-hover fixed-table">
+                        <thead>
+                            <tr>
+                                <!-- <th style="width: 5%;">#</th> -->
+                                <th style="width: 10%;">SKU</th>
+                                <th style="width: 15%;">Nombre</th>
+                                <th style="width: 10%;">Marca</th>
+                                <!-- <th style="width: 20%;">Código de Barras</th> -->
+                                <th style="width: 10%;">Precio</th>
+                                <th style="width: 5%;">Agregar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(producto, index) in productos" :key="producto.id">
+                                <!-- <td>[[ index + 1 ]]</td> -->
+                                <td>[[ producto.sku ]]</td>
+                                <td class="text-truncate">[[ producto.nameproduct ]]</td>
+                                <td>[[ producto.brands ]]</td>
+                                <!-- <td>[[ producto.codebar ]]</td> -->
+                                <td>[[ formatCurrency(producto.lastprice) ]]</td>
+                                <td><button class="btn btn-primary btn-sm" @click="agregarProducto(producto)">Agregar</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
+   
+
+            <!-- Tabla de Productos Disponibles omitida por brevedad... -->
         </div>
     </div>
 </div>
@@ -243,14 +315,26 @@
             productosDocumento: [],
             productos: [],
             proveedores: [],
-            currentDate: new Date().toISOString().slice(0, 10)
+            currentDate: new Date().toISOString().slice(0, 10),
+            nuevoProveedor: {
+                rut: '',
+                nombre: '',
+                alias: ''
+            },
+            nuevoProducto: {
+                sku: '',
+                nombre: '',
+                marca: '',
+                precio: 0,
+                descripcion:''
+            },
         },
         methods: {
-            searchProductos(page = 1) {
+            searchProductos() {
                 axios.get('/api/get-products/', {
                     params: {
                         q: this.searchProduct,
-                        page: page
+                        page: 1
                     }
                 })
                 .then(response => {
@@ -351,11 +435,108 @@
                     console.error('Error al buscar proveedores:', error);
                 });
             },
+            seleccionarProveedor(proveedor) {
+                // Guardar los datos del proveedor seleccionado en el formulario
+                this.form.proveedor = proveedor.id;
+                this.form.rutProveedor = proveedor.rutsupplier;
+                this.form.razonSocial = proveedor.namesupplier;
+            },
             cargarProveedores() {
                 this.searchProveedores();
             },
             cargarProductos() {
                 this.searchProductos();
+            },
+            crearProveedor() {
+                // Crear un objeto FormData
+                let formData = new FormData();
+                formData.append('rut', this.nuevoProveedor.rut);
+                formData.append('nombre', this.nuevoProveedor.nombre);
+                formData.append('alias', this.nuevoProveedor.alias);
+
+                axios.post('/api/create-supplier/', formData)
+                    .then(response => {
+                        Swal.fire('Éxito', 'Proveedor creado correctamente.', 'success');
+                        this.nuevoProveedor = { rut: '', nombre: '', alias: '' };
+                        this.searchProveedores();
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'No se pudo crear el proveedor.', 'error');
+                    });
+            },
+            crearProducto() {
+                // Crear un objeto FormData
+                let formData = new FormData();
+                formData.append('sku', this.nuevoProducto.sku);
+                formData.append('nombre', this.nuevoProducto.nombre);
+                formData.append('marca', this.nuevoProducto.marca);
+                formData.append('precio', this.nuevoProducto.precio);
+                axios.post('/api/create-product/', formData)
+                    .then(response => {
+                        Swal.fire('Éxito', 'Producto creado correctamente.', 'success');
+                        this.nuevoProducto = { sku: '', nombre: '', marca: '', precio: 0 };
+                        this.searchProductos();
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'No se pudo crear el producto.', 'error');
+                    });
+            },
+            enviarDatos() {
+                // Preparar los datos para el archivo JSON
+                const jsonData = {
+                    headers: {
+                        supplier: this.form.proveedor,
+                        typeDocument: this.form.tipoDocumento,
+                        nDocument: this.form.numeroDocumento,
+                        dcto: this.form.descuentoGeneral,
+                        datePurchase: this.form.fechaEmision,
+                        dateExpired: this.form.fechaVencimiento,
+                        observation: this.form.observaciones,
+                        typePay: this.form.tipoPago,
+                        nCheque: this.form.numeroCheque,
+                        qtyCheque: this.form.cantidadCheque,
+                        subtotal: this.form.subtotal,
+                        urlPDF: "", // Esto puede ajustarse o calcularse en el backend
+                        urlJson: "", // Esto también podría ajustarse en el backend
+                        dateReception: this.currentDate,
+                        userProcess: "Nombre Usuario", // Sustituye con el nombre real del usuario
+                        urlImg: "" // Esto puede ajustarse o calcularse en el backend
+                    },
+                    details: this.productosDocumento.map(producto => ({
+                        qty: producto.cantidad,
+                        cost: producto.costo,
+                        codeBar: producto.codebar || '',
+                        dctoItem: producto.descuento,
+                        subtotalItem: producto.costo * producto.cantidad,
+                        deliveryItem: producto.entrega,
+                        checkItem: producto.entrega ? "true" : "false",
+                        sku: producto.sku,
+                        idERP: "", // Puedes agregar este campo si está disponible en el frontend
+                        model: producto.model,
+                        idPro: "" // Agrega este campo si tienes la información
+                    })),
+                    type: "1" // Puedes ajustar este campo según sea necesario
+                };
+
+                // Enviar los datos al backend
+                axios.post('/api/generar-json/', jsonData)
+                    .then(response => {
+                        Swal.fire({
+                            title: 'Éxito',
+                            text: 'El archivo JSON se ha generado correctamente.',
+                            icon: 'success',
+                            confirmButtonText: 'OK'
+                        });
+                    })
+                    .catch(error => {
+                        console.error("Error al enviar los datos:", error);
+                        Swal.fire({
+                            title: 'Error',
+                            text: 'Hubo un problema al generar el archivo JSON.',
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        });
+                    });
             }
         },
         mounted() {
@@ -365,3 +546,9 @@
     });
 </script>
 {% endblock js %}
+
+
+
+
+
+

@@ -1,0 +1,49 @@
+{
+    "headers": {
+        "supplier": 1,
+        "typeDocument": "33",
+        "nDocument": "333",
+        "dcto": 0,
+        "datePurchase": "2024-10-28",
+        "dateExpired": "2024-10-28",
+        "observation": "Prueba",
+        "typePay": "2",
+        "nCheque": "1",
+        "qtyCheque": "2",
+        "subtotal": "400000",
+        "urlPDF": "",
+        "urlJson": "",
+        "dateReception": "2024-10-28",
+        "userProcess": "Nombre Usuario",
+        "urlImg": ""
+    },
+    "details": [
+        {
+            "qty": 1,
+            "cost": "40000",
+            "codeBar": "",
+            "dctoItem": 0,
+            "subtotalItem": 40000,
+            "deliveryItem": false,
+            "checkItem": "false",
+            "sku": "AUD20635",
+            "idERP": "100215",
+            "model": "A10L4 USB",
+            "idPro": ""
+        },
+        {
+            "qty": 1,
+            "cost": "40000",
+            "codeBar": "",
+            "dctoItem": 0,
+            "subtotalItem": 40000,
+            "deliveryItem": false,
+            "checkItem": "false",
+            "sku": "ILU20984",
+            "idERP": "102690",
+            "model": "64514 120v 300w",
+            "idPro": ""
+        }
+    ],
+    "type": "1"
+}

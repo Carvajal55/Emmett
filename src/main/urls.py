@@ -34,7 +34,7 @@ urlpatterns = [
     path('ingresar_documentos/', core_views.ingresar_documentos, name='ingresar_documentos'), 
     path('anadir_psector/', core_views.anadir_psector, name='anadir_psector'), # URL que apunta al HTML
     path('cuadrar_sector/', core_views.cuadrar_sector_view, name='cuadrar_sector'), # URL que apunta al HTML
-
+    path('despacho/', core_views.despacho, name='despacho'),
 
 
 
@@ -55,7 +55,12 @@ urlpatterns = [
     path('api/aprobar-factura/', core_views.aprobar_factura, name='aprobar_factura'),
     path('api/obtener_factura/', core_views.obtener_factura, name='obtener_factura'),
     path('factura/aprobar/<int:id>/', core_views.factura_aprobar_view, name='factura_aprobar'),
+    #Imprimir etiquetas
+    path('api/imprimir-etiqueta/', core_views.imprimir_etiqueta, name='imprimir_etiqueta'),
     #Ingresar Documentos
+    path('api/create-supplier/', core_views.create_supplier, name='create_supplier'),
+    path('api/create-product/', core_views.create_product, name='create_product'),
+    path('api/generar-json/', core_views.generar_json, name='generar_json'),
     path('api/get-suppliers/', core_views.get_suppliers, name='get_suppliers'),
     path('api/get-products/', core_views.get_products, name='get_products'),
     path('api/add-purchase/', core_views.add_purchase, name='add_purchase'),
@@ -64,6 +69,8 @@ urlpatterns = [
     path('api/load-xml/', core_views.load_xml, name='load_xml'),
     path('api/get-document-lines/<int:document_id>/', core_views.get_document_lines, name='get_document_lines'),
     path('api/save-document-lines/', core_views.save_document_lines, name='save_document_lines'),
+    path('api/actualizar_precio/', core_views.actualizar_precio, name='actualizar_precio'),
+
     # Sectorizar 
     path('api/consultar-productos-sector/', core_views.consultar_productos_sector, name='consultar_productos_sector'),
     path('api/buscar-productos-por-sector/', core_views.buscar_productos_por_sector, name='buscar_productos_por_sector'),
@@ -79,6 +86,17 @@ urlpatterns = [
     path('api/sincronizar-producto/<str:sku>/', core_views.sincronizar_producto, name='sincronizar_producto_por_sku'),
     path('api/recepcion-stock/<str:sku>/', core_views.registrar_recepcion_stock, name='registrar_recepcion_stock'),
 
+    #Despacho
+   path('api/current-dispatch/', core_views.current_dispatch, name='current_dispatch'),
+   path('api/details-document/', core_views.details_document, name='details_document'),
+   #path('api/dispatch-product/', core_views.dispatch_product, name='dispatch_product'),
+   path('api/dispatch-consumption/', core_views.dispatch_consumption, name='dispatch_consumption'),
+   path('api/consult-bsale-document/', core_views.get_unique_document, name='get_unique_document'),
+   path('api/validate-superid/', core_views.validate_superid_simplified, name='validate_superid'),
+   path('api/dispatch-product/', core_views.validate_superid_simplified, name='dispatch_product'),
+
+   path('api/comparar-stock-bsale/', core_views.comparar_stock_bsale, name='comparar_stock_bsale'),
+   path('api/actualizar-stock-local/', core_views.actualizar_stock_local, name='actualizar_stock_local'),
 
 ]
 

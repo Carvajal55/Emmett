@@ -205,4 +205,13 @@ class Bodega(models.Model):
 
     def __str__(self):
         return self.name
+    
+
+class Dispatch(models.Model):
+    sid = models.CharField(max_length=50)
+    code = models.CharField(max_length=50)
+    description = models.CharField(max_length=255)
+    total_unit_value = models.FloatField()
+    quantity = models.IntegerField()
+    count = models.IntegerField(default=0)
 

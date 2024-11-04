@@ -1,0 +1,63 @@
+{
+    "headers": {
+        "supplier": "Alfonso Flores Lillo",
+        "supplierName": "1111 - Franky Amps",
+        "typeDocument": "33",
+        "nDocument": "989",
+        "dcto": "0",
+        "datePurchase": "2024-10-25",
+        "dateExpired": "2024-10-31",
+        "observation": "",
+        "typePay": "8",
+        "nCheque": "0",
+        "qtyCheque": "0",
+        "subtotal": "60000",
+        "urlPDF": "",
+        "urlJson": "\/models\/invoices\/json\/s_Alfonso Flores Lillot_33f_989.json",
+        "dateReception": "2024-10-25",
+        "userProcess": "Boris Fuentes",
+        "urlImg": "\/file\/img\/invoice-purchase\/s_Alfonso Flores Lillot_33f_989"
+    },
+    "details": [
+        {
+            "qty": "1",
+            "cost": "20000",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "",
+            "deliveryItem": "",
+            "checkItem": "false",
+            "sku": "AUD20635",
+            "idERP": "100215",
+            "model": "A10L4 USB",
+            "idPro": "7155"
+        },
+        {
+            "qty": "1",
+            "cost": "20000",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "",
+            "deliveryItem": "",
+            "checkItem": "false",
+            "sku": "ILU20984",
+            "idERP": "102690",
+            "model": "64514 120v 300w",
+            "idPro": "7509"
+        },
+        {
+            "qty": "1",
+            "cost": "20000",
+            "codeBar": "",
+            "dctoItem": "",
+            "subtotalItem": "",
+            "deliveryItem": "",
+            "checkItem": "false",
+            "sku": "MUS15932",
+            "idERP": "95032",
+            "model": "EXL110 ",
+            "idPro": "2213"
+        }
+    ],
+    "type": "1"
+}

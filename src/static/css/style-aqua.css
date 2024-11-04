@@ -22657,11 +22657,13 @@ html[dir=rtl] .timeline-widget .timeline-item .timeline-time {
   position: relative;
 }
 .body-wrapper > .container-fluid, .body-wrapper > .container-sm, .body-wrapper > .container-md, .body-wrapper > .container-lg, .body-wrapper > .container-xl, .body-wrapper > .container-xxl {
-  max-width: 1200px;
+  max-width: 4900px;
   margin: 0 auto;
   padding: 24px;
   transition: 0.2s ease-in;
 }
+
+
 
 @media (max-width: 767.98px) {
   .body-wrapper > .container-fluid, .body-wrapper > .container-sm, .body-wrapper > .container-md, .body-wrapper > .container-lg, .body-wrapper > .container-xl, .body-wrapper > .container-xxl {

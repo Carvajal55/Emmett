@@ -1,0 +1,155 @@
+{% extends 'partials/base.html' %}
+{% load static %}
+
+{% block content %}
+<body class="" >
+    <head>
+        <meta charset="utf-8">
+        <title>Despacho</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    </head>
+    <body>
+        <div id="app" class="container">
+            <div>
+                <label for="cbCompany">Compañía</label>
+                <select id="cbCompany" v-model="company" class="form-select">
+                    <option value="1">EMMETT</option>
+                    <option value="2">SOUNDSTORE</option>
+                    <option value="3">GROBEN</option>
+                </select>
+            </div>
+            <div>
+                <label for="cbTypeDocument">Tipo Documento</label>
+                <select id="cbTypeDocument" v-model="typeDocument" class="form-select">
+                    <option value="39">BOLETA</option>
+                    <option value="33">FACTURA</option>
+                    <option value="52">GUIA</option>
+                </select>
+            </div>
+            <div>
+                <label for="nDocument">N° Documento</label>
+                <input id="nDocument" type="number" v-model="nDocument" @change="fetchDetails" class="form-control">
+            </div>   
+            <div>
+                <label for="sidProduct">ID Producto</label>
+                <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid" class="form-control">
+            </div>       
+            
+            <button @click="dispatchConsumption" class="mt-3 btn btn-success">Despachar</button>
+            
+            <table class="table mt-3">
+                <thead>
+                    <tr>
+                        <th>SKU</th>
+                        <th>Producto</th>
+                        <th>Precio</th>
+                        <th>Cantidad</th>
+                        <th>Escaneado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="product in products" :key="product.code">
+                        <td>[[ product.code ]]</td>
+                        <td>[[ product.description ]]</td>
+                        <td>[[ product.totalAmount ]]</td>
+                        <td>[[ product.quantity ]]</td>
+                        <td>[[ product.count || 0 ]]</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+</body>
+{% endblock %}
+
+{% block js %}
+<script>
+    new Vue({
+    el: '#app',
+    delimiters: ['[[', ']]'],
+    data: {
+        company: 1,
+        typeDocument: 39,
+        nDocument: null,
+        sid: null,
+        products: [],
+        superidMap: {} // Almacena los superid vinculados a los SKUs
+    },
+    methods: {
+        fetchDetails() {
+            // Limpia los datos previos
+            this.products = [];
+            this.superidMap = {};
+
+            // Realiza la solicitud GET para obtener detalles del documento
+            axios.get('/api/consult-bsale-document/', {
+                params: { number: this.nDocument, type: this.typeDocument }
+            }).then(response => {
+                // Asume que el endpoint devuelve un array con los productos relevantes
+                this.products = response.data.map(product => ({
+                    code: product.code,
+                    description: product.description,
+                    totalAmount: product.totalAmount,
+                    quantity: product.quantity,
+                    count: 0 // Inicia el conteo en cero
+                }));
+            }).catch(error => {
+                Swal.fire('Error', 'No se pudieron obtener los detalles del documento.', 'error');
+                console.error(error);
+            });
+        },
+        validateAndLinkSuperid() {
+            // Verifica el superid y vincula con el SKU
+            axios.post('/api/validate-superid/', {
+                sid: this.sid,
+                document_products: this.products.map(product => product.code)
+            }).then(response => {
+                if (response.data.icon === 'success') {
+                    // Encuentra el producto en la lista si existe
+                    const productInList = this.products.find(product => product.code === response.data.sku);
+                    if (productInList && productInList.count < productInList.quantity) {
+                        productInList.count += 1;
+                        this.superidMap[response.data.sku] = this.sid; // Almacena el superid asociado al SKU
+                        this.sid = ''; // Limpia el campo de entrada después de la validación
+                    } else {
+                        Swal.fire('Advertencia', 'No se puede escanear más de la cantidad total.', 'warning');
+                    }
+                } else {
+                    Swal.fire('Error', response.data.title, response.data.icon);
+                }
+            }).catch(error => {
+                Swal.fire('Error', 'Error al validar el SuperID.', 'error');
+                console.error(error);
+            });
+        },
+        dispatchConsumption() {
+            // Crea un payload con la información de los productos, superid y cantidades
+            const payload = this.products.map(product => ({
+                code: product.code,
+                quantity: product.count,
+                superid: this.superidMap[product.code] || null // Vincula el superid si existe
+            }));
+
+            // Realiza la solicitud POST para despachar los productos
+            axios.post('/api/dispatch-consumption/', {
+                nDocument: this.nDocument,
+                typeDocument: this.typeDocument,
+                company: this.company,
+                products: payload
+            }).then(response => {
+                if (response.data.icon === 'success') {
+                    Swal.fire('Éxito', 'Productos despachados con éxito.', 'success');
+                } else {
+                    Swal.fire('Error', response.data.title, response.data.icon);
+                }
+            }).catch(error => {
+                Swal.fire('Error', 'Error al despachar los productos.', 'error');
+                console.error(error);
+            });
+        }
+    }
+});
+</script>
+{% endblock js %}

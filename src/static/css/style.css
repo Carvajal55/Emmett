@@ -22658,7 +22658,7 @@ html[dir=rtl] .timeline-widget .timeline-item .timeline-time {
   position: relative;
 }
 .body-wrapper > .container-fluid, .body-wrapper > .container-sm, .body-wrapper > .container-md, .body-wrapper > .container-lg, .body-wrapper > .container-xl, .body-wrapper > .container-xxl {
-  max-width: 1500px;
+  max-width: 1900px;
   margin: 0 auto;
   padding: 24px;
   transition: 0.2s ease-in;

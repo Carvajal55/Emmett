@@ -98,7 +98,7 @@
                             <td>[[ detalle.model ]]</td>
                             <td>[[ detalle.qty ]]</td>
                             <td>
-                                <button @click="imprimirDetalle(detalle)" class="btn btn-success btn-sm">Imprimir</button>
+                                <button @click="imprimirDetalle(detalle)" class="btn btn-success btn-sm">ImprimirEti</button>
                             </td>
                         </tr>
                     </tbody>
@@ -167,14 +167,61 @@
                     });
             },
             // Imprimir un detalle de la factura
-            imprimirDetalle(detalle) {
-                console.log("Imprimiendo detalle:", detalle);
-                // Lógica para la impresión del detalle
-            },
+            
             formatCurrency(value) {
             return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
+            imprimirDetalle(detalle) {
+                console.log("Imprimiendo detalleeeee:", detalle);
+
+                // Crear el formulario con los datos necesarios para la impresión
+                let formData = new FormData();
+                formData.append('sku', detalle.sku);
+                formData.append('model', detalle.model);
+                formData.append('qty', detalle.qty);
+                formData.append('codebar', detalle.codebar || '');
+
+                console.log("Datos enviados a la API:", {
+                    sku: detalle.sku,
+                    model: detalle.model,
+                    qty: detalle.qty,
+                    codebar: detalle.codebar || ''
+                });
+
+                // Enviar la solicitud al backend para generar la etiqueta
+                axios.post('/api/imprimir-etiqueta/', formData)
+                    .then(response => {
+                        console.log("Respuesta del servidor:", response.data);
+                        if (response.data.urlPdf) {
+                            // Abrir el archivo PDF generado en una nueva pestaña del navegador
+                            window.open(response.data.urlPdf, '_blank');
+                            Swal.fire({
+                                title: 'Etiqueta Generada',
+                                text: 'La etiqueta se ha generado correctamente.',
+                                icon: 'success',
+                                confirmButtonText: 'OK'
+                            });
+                        } else {
+                            Swal.fire({
+                                title: 'Error',
+                                text: 'No se pudo generar la etiqueta.',
+                                icon: 'error',
+                                confirmButtonText: 'OK'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error al generar la etiqueta:', error);
+                        Swal.fire({
+                            title: 'Error',
+                            text: 'Hubo un problema al generar la etiqueta.',
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        });
+                    });
+            },
         },
+        
         mounted() {
             this.fetchFacturas();  // Cargar las facturas al montar la página
         }

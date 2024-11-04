@@ -31,6 +31,9 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.core.mail import send_mail
 from django.utils import timezone  # Para obtener la fecha y hora actual
+from django.views.decorators.http import require_GET
+from django.db import transaction
+from django.views.decorators.http import require_POST
 
 
 
@@ -75,6 +78,10 @@ def anadir_psector(request):
 @login_required(login_url='login_view')
 def cuadrar_sector_view(request):
     return render(request, 'cuadrar_sector.html')
+
+@login_required(login_url='login_view')
+def despacho(request):
+    return render(request, 'despacho.html')
 
 
 """ 
@@ -355,7 +362,78 @@ def producto_detalles(request, product_id):
 
 
 
+#FACTURAS
+@csrf_exempt
+@require_POST
+def actualizar_precio(request):
+    try:
+        # Cargar los datos enviados por el frontend
+        data = json.loads(request.body)
 
+        id_erp = data.get('idERP')
+        sku = data.get('sku')
+        b_price = data.get('bPrice')
+        type = data.get('type')
+
+        # Validar los datos recibidos
+        if not id_erp or not sku or not b_price or not type:
+            return JsonResponse({'error': 'Datos incompletos'}, status=400)
+
+        # Paso 1: Construir el URL para obtener los costos en Bsale
+        url_costs = f"{BSALE_API_URL}/price_lists/{type}/details.json?variantid={id_erp}"
+        headers = {
+            'access_token': BSALE_TOKEN,  # Usar 'access_token' en lugar de 'Authorization'
+            'Content-Type': 'application/json'
+        }
+
+        # Realizar la solicitud GET para obtener información del documento
+        response = requests.get(url_costs, headers=headers)
+
+        # Verificar el estado de la respuesta
+        if response.status_code != 200:
+            return JsonResponse({'error': 'Error al obtener datos de Bsale', 'detalle': response.text}, status=response.status_code)
+
+        # Procesar los datos recibidos de Bsale
+        bsale_data = response.json()
+        items = bsale_data.get('items', [])
+        if items:
+            product_id = items[0].get('id')
+            print(f"ID del producto en el primer ítem: {product_id}")
+        else:
+            print("No se encontraron ítems en la respuesta de Bsale")
+            return JsonResponse({'error': 'No se encontró ningún ítem en la respuesta de Bsale'}, status=404)
+
+        # Paso 2: Construir la URL para actualizar el precio en Bsale
+        url_update_price = f"{BSALE_API_URL}/price_lists/{type}/details/{product_id}.json"
+        print(url_update_price)
+
+        # Paso 3: Calcular el precio base sin IVA
+        variant_value = float(b_price) / 1.19  # Convertir b_price a float antes de dividir
+        update_data = {
+            'variantValue': variant_value,
+            "id":product_id
+        }
+
+        # Paso 4: Realizar la solicitud PUT para actualizar el precio
+        put_response = requests.put(url_update_price, headers=headers, json=update_data)
+
+        # Verificar el estado de la solicitud PUT
+        if put_response.status_code != 200:
+            return JsonResponse({'error': 'Error al actualizar el precio en Bsale', 'detalle': put_response.text}, status=put_response.status_code)
+
+        # Obtener la respuesta de la actualización y devolver el resultado
+        updated_data = put_response.json()
+
+        return JsonResponse({
+            'message': 'Precio actualizado correctamente en Bsale',
+            'bsale_data': bsale_data,
+            'updated_data': updated_data
+        }, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Datos inválidos'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 def listar_compras(request):
     # Obtener parámetros de filtro y paginación desde el request
@@ -520,32 +598,39 @@ def aprobar_factura(request):
 
 @csrf_exempt
 def obtener_factura(request):
-    print("HOLAA")
     if request.method == 'POST':
         # Obtener el ID de la factura desde el POST
         id_factura = request.POST.get('id')
         print("ID de la factura recibido:", id_factura)
+        
         # Buscar la factura correspondiente en la base de datos
         factura = get_object_or_404(Purchase, id=id_factura)
+        
+        # Imprimir todos los atributos de la factura para depuración
+        print("Contenido completo del objeto Purchase:")
+        print(factura.__dict__)
 
         # Obtener la URL del archivo JSON desde la factura
-        url_json = factura.urljson  # Campo con la ruta del archivo JSON
+        url_json = factura.urljson.strip('/')  # Asegurarse de eliminar cualquier barra invertida al inicio
 
         # Generar la ruta completa del archivo JSON
-        json_file_path = os.path.join(settings.BASE_DIR, url_json.strip('/'))
+        json_file_path = os.path.join(settings.BASE_DIR, url_json)
+        print(f"Ruta completa del archivo JSON: {json_file_path}")
 
         # Verificar si el archivo JSON existe y obtener los detalles
         detalles = []
         try:
             if os.path.exists(json_file_path):
-                with open(json_file_path, 'r') as file:
+                with open(json_file_path, 'r', encoding='utf-8') as file:
                     json_data = json.load(file)
                     detalles = json_data.get('details', [])
                     if detalles is None:
                         detalles = []  # Asegurarse de que sea una lista vacía si no existen detalles
             else:
+                print("Archivo JSON no encontrado en la ruta especificada.")
                 return JsonResponse({'error': 'Archivo JSON de detalles no encontrado.'}, status=404)
         except json.JSONDecodeError:
+            print("Error al decodificar el archivo JSON.")
             return JsonResponse({'error': 'Error al decodificar el archivo JSON.'}, status=500)
 
         # Preparar los datos para la respuesta en JSON
@@ -582,8 +667,118 @@ def obtener_factura(request):
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-
 """ Ingresar Documentos """
+@csrf_exempt
+def create_supplier(request):
+    if request.method == 'POST':
+        # Obtener los datos del proveedor desde la solicitud
+        rut_supplier = request.POST.get('rut', '')
+        name_supplier = request.POST.get('nombre', '')
+        alias_supplier = request.POST.get('alias', '')
+        print(rut_supplier,name_supplier,alias_supplier,"AAAAAA")
+        if not rut_supplier or not name_supplier:
+            return JsonResponse({'error': 'Datos incompletos para crear el proveedor.'}, status=400)
+
+        # Crear un nuevo proveedor
+        try:
+            supplier = Supplier.objects.create(
+                rutsupplier=rut_supplier,
+                namesupplier=name_supplier,
+                alias=alias_supplier
+            )
+            return JsonResponse({'message': 'Proveedor creado correctamente.', 'id': supplier.id}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+
+@csrf_exempt
+def create_product(request):
+    if request.method == 'POST':
+        # Obtener los datos del producto desde la solicitud
+        sku = request.POST.get('sku', '')
+        name_product = request.POST.get('nombre', '')
+        brand = request.POST.get('marca', '')
+        price = request.POST.get('precio', 0)
+        descripcion = request.POST.get('precio', 0)
+
+        if not sku or not name_product:
+            return JsonResponse({'error': 'Datos incompletos para crear el producto.'}, status=400)
+
+        # Crear un nuevo producto
+        try:
+            product = Products.objects.create(
+                sku=sku,
+                nameproduct=name_product,
+                brands=brand,
+                lastprice=int(price),
+                description = descripcion,
+            )
+            return JsonResponse({'message': 'Producto creado correctamente.', 'id': product.id}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+@csrf_exempt
+def generar_json(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+
+        # Obtener los datos necesarios del encabezado para el modelo Purchase
+        supplier = data['headers'].get('supplier', '')
+        supplier_name = data['headers'].get('supplierName', '')
+        type_document = data['headers'].get('typeDocument', None)
+        number_document = data['headers'].get('nDocument', None)
+        observation = data['headers'].get('observation', '')
+        date_purchase = data['headers'].get('datePurchase', None)
+        subtotal = data['headers'].get('subtotal', 0)
+        url_img = data['headers'].get('urlImg', '')
+
+        # Crear el nombre del archivo basado en los datos del encabezado
+        file_name = f"s_{supplier}t_{type_document}f_{number_document}.json"
+
+        # Construir la ruta relativa de guardado
+        relative_file_path = os.path.join('models', 'invoices', 'json', file_name)
+        absolute_file_path = os.path.join(settings.BASE_DIR, relative_file_path)
+
+        # Crear las carpetas si no existen
+        os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+
+        # Iterar sobre los detalles de la factura para asignar el `idERP` a cada SKU
+        for detalle in data['details']:
+            sku = detalle.get('sku', '')
+            # Buscar el producto por su SKU en el modelo Products
+            try:
+                producto = Products.objects.get(sku=sku)
+                detalle['idERP'] = producto.iderp  # Asignar el valor de `idERP`
+            except Products.DoesNotExist:
+                detalle['idERP'] = None  # Si no se encuentra el SKU, asignar None o algún valor predeterminado
+
+        # Guardar el JSON en el archivo especificado
+        with open(absolute_file_path, 'w', encoding='utf-8') as json_file:
+            json.dump(data, json_file, ensure_ascii=False, indent=4)
+
+        # Crear el registro en la base de datos
+        purchase = Purchase.objects.create(
+            supplier=supplier,
+            suppliername=supplier_name,
+            typedoc=type_document,
+            number=number_document,
+            observation=observation,
+            dateadd=timezone.now(),
+            dateproccess=date_purchase,
+            subtotal=subtotal,
+            urljson=relative_file_path,  # Guardar solo la ruta relativa en la base de datos
+            urlimg=url_img,
+            status=0,  # Por defecto, puede ajustarse
+        )
+
+        # Devolver la ruta del archivo creada y un mensaje de éxito
+        return JsonResponse({'message': 'Archivo JSON y registro creados correctamente', 'urlJson': relative_file_path, 'purchaseId': purchase.id})
+    
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
 
 def get_suppliers(request):
     # Obtiene el parámetro de búsqueda (si existe)
@@ -1491,3 +1686,596 @@ def registrar_recepcion_stock(request, sku):
             return JsonResponse({'resp': 3, 'msg': 'Error inesperado en la recepción de stock.'}, status=500)
 
     return JsonResponse({'resp': 3, 'msg': 'Método no permitido.'}, status=405)
+
+
+
+""" APIS PARA DESPACHO DE PRODUCTOS """
+
+# Funciones Mock (puedes reemplazar por la lógica real)
+def get_unique_document_bll(type, number):
+    # Lógica para obtener los detalles de un documento específico
+    # Aquí puedes filtrar según los detalles que necesites.
+    
+    # Ejemplo para obtener todos los productos (puedes ajustar esto a tu estructura de documentos):
+    products = Products.objects.filter(sku=number)  # Filtrando por un SKU como número del documento (ajustar según tus datos)
+    
+    details = []
+    for product in products:
+        details.append({
+            'code': product.sku,
+            'description': product.nameproduct,
+            'quantity': 5,  # Asignar cantidad específica según lógica
+            'total_unit_value': product.lastprice or 0  # Precio unitario (ajustar lógica si hay más cálculos involucrados)
+        })
+    
+    return details
+def get_product_by_sid(sid):
+    # Buscar el producto por SID (Super ID) en la tabla de productos únicos
+    unique_product = Uniqueproducts.objects.filter(superid=sid).select_related('product').first()
+    
+    if unique_product:
+        return {
+            'idERP': unique_product.product.iderp,  # ID de ERP del producto relacionado
+            'sku': unique_product.product.sku
+        }
+    else:
+        return {'error': 'Producto no encontrado'}
+
+def dispatch_sid_bll(data):
+    try:
+        with transaction.atomic():
+            # Obtener el producto único por su SID
+            unique_product = Uniqueproducts.objects.filter(superid=data['sid']).first()
+            
+            if not unique_product:
+                return {'error': 'Producto no encontrado'}
+            
+            # Verificar y actualizar stock
+            if unique_product.state == 1:  # Ejemplo de verificación de estado
+                return {'error': 'Producto ya descontado'}
+            
+            # Simula la lógica para "descontar" el producto
+            unique_product.state = 1  # Actualizar el estado del producto como descontado
+            unique_product.save()
+            
+            return {'rows': 1}  # Devolver la cantidad de productos actualizados
+    except Exception as e:
+        return {'error': str(e)}
+
+def post_consumption_bll(data):
+    # Simulación de actualización en Bsale o sistemas externos
+    return {'error': ''}
+
+def get_pass_consumption_bll():
+    return {'passConsumption': 'mypassword'}
+
+# API Endpoints
+@csrf_exempt
+def current_dispatch(request):
+    if request.method == "GET":
+        dispatches = list(Dispatch.objects.values())
+        return JsonResponse({'data': dispatches})
+
+@csrf_exempt
+def details_document(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        type = data.get('type')
+        number = data.get('number')
+        details = get_unique_document_bll(type, number)
+        formatted_details = format_table(details)
+        request.session['currentDispatch'] = formatted_details
+        return JsonResponse({'data': formatted_details})
+
+def format_table(details):
+    formatted = []
+    for item in details:
+        formatted.append({
+            'quantity': item['quantity'],
+            'code': item['code'],
+            'description': item['description'],
+            'total_unit_value': item['total_unit_value'],
+            'count': 0
+        })
+    return formatted
+
+@csrf_exempt
+def dispatch_consumption(request):
+    if request.method == "POST":
+        try:
+            # Obtener los datos del request
+            data = json.loads(request.body)
+            n_document = data.get('nDocument')
+            type_document = data.get('typeDocument')
+            company = data.get('company')
+            products = data.get('products', [])
+
+            # Procesar cada producto para el consumo en Bsale
+            for product in products:
+                superid = product.get('superid')
+                cantidad = int(product.get('quantity', 1))  # Cantidad a descontar (1 por defecto)
+
+                # Mostrar SuperID y cantidad recibida
+                print(f"SuperID recibido: {superid}, Cantidad recibida: {cantidad}")
+
+                # Verificar si el superid existe en Uniqueproducts
+                unique_product = Uniqueproducts.objects.select_related('product').filter(superid=superid).first()
+
+                if not unique_product:
+                    print(f"SuperID {superid} no encontrado en la base de datos.")
+                    return JsonResponse({'title': 'SuperID no encontrado', 'icon': 'error', 'row': 0})
+
+                # Mostrar detalles del UniqueProduct encontrado
+                print(f"Detalles de UniqueProduct: {unique_product.__dict__}")
+
+                # Obtener el `iderp` del producto relacionado
+                product_instance = unique_product.product
+                associated_sku = product_instance.sku
+                iderp = product_instance.iderp
+
+                print(f"Producto asociado: {product_instance}")
+                print(f"SKU asociado: {associated_sku}, ID ERP asociado: {iderp}")
+
+                if not iderp:
+                    return JsonResponse({'title': 'El producto asociado no tiene un ID ERP válido', 'icon': 'error', 'row': 0})
+
+                # Mover el producto a la bodega "Despachados"
+                despachados_bodega, created = Bodega.objects.get_or_create(
+                    name="Despachados",
+                    defaults={
+                        "description": "Bodega para productos despachados",
+                        "address": "Dirección ficticia para despachos",
+                        "latitude": -33.4489,
+                        "longitude": -70.6693,
+                        "country": "Chile",
+                        "city": "Santiago",
+                        "state": 1,
+                        "emailStore": "despachos@example.com"
+                    }
+                )
+
+                # Actualizar la información del producto en la base de datos local
+                unique_product.location = despachados_bodega.idoffice
+                unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
+                unique_product.typedocout = type_document
+                unique_product.ndocout = n_document
+                unique_product.datelastinventory = timezone.now()
+                unique_product.state = 1  # Estado de "descontado"
+                unique_product.ncompany = company
+                unique_product.save()
+
+                # Preparar los datos para enviar a Bsale
+                print(f"Despachando ID ERP {iderp} con cantidad {cantidad}")
+
+                # Lógica para realizar el consumo en Bsale con `iderp` y cantidad
+                data_bsale = {
+                    "note": f"Despacho desde empresa {company}",
+                    "officeId": 1,  # ID de la oficina o bodega (asumido como 1 por defecto)
+                    "details": [
+                        {
+                            "quantity": cantidad,
+                            "variantId": iderp  # Usar `iderp` para el consumo en Bsale
+                        }
+                    ]
+                }
+
+                # Aquí iría la llamada a Bsale para consumir en el sistema externo
+                # response = consumir_en_bsale(data_bsale)
+                # if response.status_code not in [200, 201]:
+                #     raise Exception("Error al consumir en Bsale")
+
+            return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
+
+        except Exception as e:
+            print(f"Error inesperado: {str(e)}")
+            return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
+
+    return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
+
+
+BSALE_API_URL = "https://api.bsale.cl/v1"  # URL base de Bsale
+BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
+
+
+@csrf_exempt
+def get_unique_document(request):
+    type_document = request.GET.get('type')
+    number = request.GET.get('number')
+
+    if not type_document or not number:
+        print("Error: Faltan parámetros de tipo de documento o número")
+        return JsonResponse({'error': 'Faltan parámetros de tipo de documento o número'}, status=400)
+
+    # Construir la URL inicial para obtener el ID del documento
+    url_costs = f"{BSALE_API_URL}/documents/costs.json?codesii={type_document}&number={number}"
+    headers = {
+        'access_token': BSALE_TOKEN,  # Usar 'access_token' en lugar de 'Authorization'
+        'Content-Type': 'application/json'
+    }
+
+    print(f"Construyendo URL para obtener ID del documento: {url_costs}")
+
+    try:
+        # Realizar la primera solicitud para obtener la información básica del documento
+        response = requests.get(url_costs, headers=headers)
+        print(f"Respuesta de la API para obtener ID del documento: {response.status_code} - {response.text}")
+
+        if response.status_code == 401:
+            print("Error de autenticación: Verifica tu token o permisos de acceso")
+            return JsonResponse({'error': 'Error de autenticación: Verifica tu token o permisos de acceso'}, status=401)
+
+        if response.status_code != 200:
+            print(f"Error al obtener el ID del documento: {response.status_code}")
+            return JsonResponse({'error': 'Error al obtener el ID del documento'}, status=response.status_code)
+
+        # Obtener el ID del documento desde la respuesta
+        info = response.json()
+        document_id = info.get('id')
+        if not document_id:
+            print("Error: No se encontró el ID del documento en la respuesta")
+            return JsonResponse({'error': 'No se encontró el ID del documento'}, status=404)
+
+        print(f"ID del documento obtenido: {document_id}")
+
+        # Extraer los detalles de la respuesta
+        products = []
+        for detail in info.get('cost_detail', []):
+            variant = detail.get('variant', {})
+            shipping_detail = detail.get('shipping_detail', {})
+
+            product_data = {
+                'code': variant.get('code'),
+                'description': variant.get('description'),
+                'quantity': shipping_detail.get('quantity'),
+                'totalAmount': shipping_detail.get('variantTotalCost')
+            }
+            print(f"Producto procesado: {product_data}")
+            products.append(product_data)
+
+        # Devolver la información de los productos como respuesta
+        print("Devolviendo la información de los productos correctamente")
+        return JsonResponse(products, safe=False)
+
+    except requests.RequestException as e:
+        print(f"Error en la comunicación con la API: {str(e)}")
+        return JsonResponse({'error': 'Error en la comunicación con la API', 'details': str(e)}, status=500)
+    
+@csrf_exempt
+def validate_superid(request):
+    if request.method == "POST":
+        try:
+            # Intenta decodificar el cuerpo de la solicitud como JSON
+            data = json.loads(request.body.decode('utf-8'))
+            superid = data.get('superid')
+
+            if not superid:
+                return JsonResponse({"error": "Missing superid"}, status=400)
+
+            # Buscar el superid en la tabla Uniqueproducts
+            unique_product = Uniqueproducts.objects.filter(superid=superid).first()
+
+            if not unique_product:
+                return JsonResponse({"error": "Superid not found"}, status=404)
+
+            # Verificar que el producto asociado al superid tenga un SKU válido
+            associated_product = unique_product.product  # Relación ForeignKey con Products
+
+            if not associated_product or not associated_product.sku:
+                return JsonResponse({"error": "No SKU associated with this superid"}, status=404)
+
+            # Respuesta exitosa con los datos necesarios
+            return JsonResponse({
+                "message": "Superid validated successfully",
+                "superid": superid,
+                "sku": associated_product.sku,
+                "description": associated_product.nameproduct,
+                "quantity": unique_product.correlative
+            }, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON payload"}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Only POST method is allowed"}, status=405)
+
+
+@csrf_exempt
+def validate_superid_simplified(request):
+    if request.method == "POST":
+        try:
+            # Obtener los datos desde la solicitud JSON
+            body = json.loads(request.body)
+            sid = body.get('sid')
+            document_products = body.get('document_products', [])
+
+            # Imprimir los datos recibidos para depuración
+            print(f"SuperID recibido: {sid}")
+            print(f"Productos recibidos del documento (SKUs): {document_products}")
+
+            # Verificar si el `superid` existe en `Uniqueproducts`
+            unique_product = Uniqueproducts.objects.select_related('product').filter(superid=sid).first()
+
+            if not unique_product:
+                print("SuperID no encontrado en la base de datos.")
+                return JsonResponse({'error': 'SuperID no encontrado'}, status=404)
+
+            # Imprimir los datos completos del registro encontrado
+            print(f"Datos del Uniqueproduct encontrado: {unique_product.__dict__}")
+
+            # Verificar si el producto asociado existe y tiene un SKU
+            associated_sku = unique_product.product.sku if unique_product.product else None
+            print(f"Producto asociado: {unique_product.product}")
+            print(f"SKU asociado encontrado: {associated_sku}")
+
+            if not associated_sku:
+                print("Producto asociado no tiene un SKU válido.")
+                return JsonResponse({'error': 'Producto asociado no tiene un SKU válido'}, status=400)
+
+            # Verificar si el SKU asociado está en la lista de productos del documento
+            if associated_sku not in document_products:
+                print("El SKU asociado no coincide con los productos del documento.")
+                return JsonResponse({'error': 'El SKU asociado no coincide con los productos del documento'}, status=400)
+
+            # Respuesta exitosa
+            return JsonResponse({
+                'row': 1,
+                'title': 'SuperID y SKU validados correctamente',
+                'icon': 'success',
+                'sku': associated_sku
+            })
+
+        except Exception as e:
+            print(f"Error inesperado: {str(e)}")
+            return JsonResponse({'error': 'Error inesperado en la operación'}, status=500)
+
+    return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
+
+
+"""Imprimir Etiquetas"""
+from reportlab.pdfgen import canvas
+from django.views.decorators.csrf import csrf_exempt
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import mm
+from reportlab.graphics.barcode import code128
+
+
+@csrf_exempt
+def imprimir_etiqueta(request):
+    if request.method == 'POST':
+        # Obtener los datos enviados desde el front-end
+        sku = request.POST.get('sku')
+        model = request.POST.get('model')
+        qty = int(request.POST.get('qty', 1))
+        codebar = request.POST.get('codebar', '')
+
+        # Verificar que el SKU y la cantidad sean válidos
+        if not sku or qty <= 0:
+            return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
+
+        # Obtener el producto correspondiente del modelo Products
+        try:
+            producto = Products.objects.get(sku=sku)
+        except Products.DoesNotExist:
+            return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
+
+        # Crear el nombre y la ruta del archivo PDF en la carpeta mediafiles
+        pdf_filename = f'etiqueta_{sku}.pdf'
+        relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
+        absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
+
+        # Crear las carpetas si no existen
+        os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+
+        # Obtener el último correlativo y superID para el producto
+        last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
+        current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
+        base_superid = last_unique_product.superid[:-len(str(last_unique_product.correlative))] if last_unique_product else sku
+
+        # Crear el PDF con ReportLab, tamaño de página 10.2 cm x 5 cm
+        page_width, page_height = 102 * mm, 50 * mm  # Dimensiones solicitadas
+        pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
+
+        super_ids = []
+        for i in range(qty):
+            # Calcular el superID y actualizar el correlativo
+            super_id = f"{base_superid}{current_correlative}"
+            super_ids.append(super_id)
+
+            if i % 2 == 0:
+                # **Mitad izquierda**
+                # SKU en horizontal
+                x_sku, y_sku = 5 * mm, 35 * mm  # Posición del código de barras SKU en la mitad izquierda
+                barcode_sku = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
+                barcode_sku.drawOn(pdf, x_sku, y_sku)
+
+                # Texto debajo del SKU
+                # Mover el texto debajo del SKU hacia la derecha
+                #pdf.setFont("Helvetica", 6)
+                #pdf.drawString(x_sku + 8 * mm, y_sku - 4 * mm, f"{sku}")  # Incrementar x_sku para mover a la derecha
+
+
+                # Mover el texto del modelo hacia la derecha
+                #pdf.drawString(x_sku + 8 * mm, y_sku - 8 * mm, model)  # Incrementar x_sku para mover a la derecha
+
+                # SuperID en vertical (rotado)
+                pdf.saveState()
+                pdf.rotate(90)
+                x_superid_rotated, y_superid_rotated = 10 * mm, -3 * mm  # Coordenadas ajustadas para el código de barras vertical
+                barcode_superid = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
+                barcode_superid.drawOn(pdf, y_superid_rotated, -x_superid_rotated)
+                pdf.restoreState()
+
+                # Texto debajo del SuperID
+                #pdf.drawString(5 * mm, 5 * mm, f"{super_id}")
+
+            else:
+                # **Mitad derecha**
+                #Horizontal
+                x_sku_right, y_sku_right = 60 * mm, 35 * mm  # Posición del código de barras SKU en la mitad derecha
+                barcode_sku_right = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
+                barcode_sku_right.drawOn(pdf, x_sku_right, y_sku_right)
+
+                # Texto debajo del SKU
+                #pdf.setFont("Helvetica", 6)
+                #pdf.drawString(x_sku + 58 * mm, y_sku - 8 * mm, f"{sku}")
+                #pdf.drawString(x_sku_right, y_sku_right - 4 * mm, f"{sku}")
+
+                # Modelo
+                #pdf.drawString(x_sku_right, y_sku_right - 8 * mm, model)
+                #pdf.drawString(x_sku + 58 * mm, y_sku - 12 * mm, model)
+
+                # SuperID en vertical (rotado)
+                pdf.saveState()
+                pdf.rotate(90)
+                x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -3 * mm  # Coordenadas ajustadas para el código de barras vertical derecho
+                barcode_superid_right = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
+                barcode_superid_right.drawOn(pdf, y_superid_rotated_right, -x_superid_rotated_right)
+                pdf.restoreState()
+
+                # Texto debajo del SuperID
+                #pdf.drawString(55 * mm, 5 * mm, f"{super_id}")
+
+            # Guardar el nuevo UniqueProduct
+            Uniqueproducts.objects.create(
+                product=producto,
+                superid=super_id,
+                correlative=current_correlative,
+                state=0,
+                cost=producto.lastcost,
+                locationname="Almacen",
+                observation="Etiqueta generada automáticamente"
+            )
+
+            # Incrementar el correlativo para el siguiente
+            current_correlative += 1
+
+            # Añadir una nueva página solo si es necesario (después de imprimir ambos productos en la página actual)
+            if i % 2 == 1 and i < qty - 1:
+                pdf.showPage()
+
+        pdf.save()
+
+        # Devolver la ruta del archivo creada y un mensaje de éxito
+        pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
+        return JsonResponse({'urlPdf': pdf_url, 'superid': super_ids, 'sku': sku})
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+from tqdm import tqdm
+from django.db.models import Count
+import sys
+CHUNK_SIZE = 50  # Número de elementos por solicitud
+
+
+@csrf_exempt
+def comparar_stock_bsale(request):
+    # URL base de Bsale y headers para la solicitud
+    bsale_url = f'{BSALE_API_URL}/stocks.json'
+    headers = {
+        'access_token': BSALE_TOKEN
+    }
+
+    print("| Inicio del proceso de comparación de stock entre Bsale y el inventario local.")
+
+    # Obtener todos los productos locales con sus idERP y currentstock
+    print("| Obteniendo datos de productos locales con stock actual...")
+    productos_locales = Products.objects.values('sku', 'iderp', 'currentstock')
+
+    # Crear un diccionario de productos locales por idERP para acceso rápido
+    productos_local_dict = {producto['iderp']: producto for producto in productos_locales}
+    print(f"| Total de productos locales obtenidos: {len(productos_local_dict)}")
+
+    # Inicialización para el progreso
+    total_items = 0
+    processed_items = 0
+
+    next_url = bsale_url
+    diferencias = []
+
+    print("| Iniciando obtención de datos de Bsale...")
+
+    while next_url:
+        response = requests.get(next_url, headers=headers)
+        if response.status_code != 200:
+            print(f"Error al obtener datos de Bsale: {response.status_code} - {response.text}")
+            return JsonResponse({'error': 'Error al obtener datos de Bsale'}, status=response.status_code)
+        
+        data = response.json()
+        items = data.get('items', [])
+        total_items += len(items)  # Actualizar el total de productos
+
+        for item in items:
+            bsale_id = item['id']
+            bsale_stock = item['quantity']
+            iderp = item['variant']['id']  # Este es el ID que corresponde al idERP local
+            
+            # Buscar el producto local por idERP
+            producto_local = productos_local_dict.get(iderp)
+
+            if producto_local:
+                # Comparar stock de Bsale con el stock local
+                resultado = {
+                    "sku": producto_local['sku'],
+                    "iderp": iderp,
+                    "stock_local": producto_local['currentstock'],
+                    "stock_bsale": bsale_stock,
+                    "diferencia": bsale_stock - producto_local['currentstock']
+                }
+            else:
+                # Producto no encontrado en local
+                resultado = {
+                    "sku": "0",
+                    "iderp": iderp,
+                    "stock_local": 0,
+                    "stock_bsale": bsale_stock,
+                    "diferencia": None
+                }
+
+            # Añadir resultado a la lista de diferencias y print detallado
+            diferencias.append(resultado)
+            print(f"| Comparación - SKU: {resultado['sku']}, IDERP: {resultado['iderp']}, "
+                  f"Stock Local: {resultado['stock_local']}, Stock Bsale: {resultado['stock_bsale']}, "
+                  f"Diferencia: {resultado['diferencia']}")
+
+            # Actualizar y mostrar barra de progreso
+            processed_items += 1
+            progress = (processed_items / total_items) * 100
+            sys.stdout.write(f"\r| Progreso: [{processed_items}/{total_items}] {progress:.2f}% completado")
+            sys.stdout.flush()
+
+        # Continuar con la siguiente página de Bsale
+        next_url = data.get('next')
+        print("\n| Página siguiente de Bsale cargada." if next_url else "\n| No hay más páginas en Bsale.")
+
+    print(f"\n| Comparación completada. Total de productos comparados: {len(diferencias)}")
+
+    return JsonResponse({'diferencias': diferencias})
+
+@csrf_exempt
+def actualizar_stock_local(request):
+    # Definir ubicaciones que cuentan como "Narnia"
+    narnia_locations = ['XT99-99', 'NRN1-1']
+
+    # Obtiene todos los productos con sus unique_products asociados
+    productos = Products.objects.all().prefetch_related('unique_products')
+    total_productos = productos.count()
+
+    # Configura la barra de progreso
+    print("Actualizando stock local...")
+
+    for idx, producto in enumerate(tqdm(productos, total=total_productos), start=1):
+        # Contar los Uniqueproducts que están en stock, excluyendo las ubicaciones de "Narnia" y considerando solo state=0
+        stock_local = producto.unique_products.filter(
+            state=0
+        ).exclude(locationname__in=narnia_locations).count()
+
+        # Actualizar el campo `currentstock` con el conteo obtenido
+        producto.currentstock = stock_local
+        producto.save()
+
+        # Mostrar progreso en la consola
+        print(f"Progreso: {idx}/{total_productos} productos actualizados (SKU: {producto.sku}, Stock actualizado: {stock_local})")
+
+    print("Actualización de stock local completada.")
+    return JsonResponse({'message': 'Actualización de stock local completada.'}, status=200)

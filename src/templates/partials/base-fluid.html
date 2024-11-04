@@ -1,0 +1,177 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!--  Title -->
+  <title>Emmett ERP</title>
+  <!--  Required Meta Tag -->
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="handheldfriendly" content="true" />
+  <meta name="MobileOptimized" content="width" />
+  <meta name="description" content="Mordenize" />
+  <meta name="author" content="" />
+  <meta name="keywords" content="Mordenize" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <!--  Favicon -->
+  <link rel="shortcut icon" type="image/png" href="{% static 'images/logos/emmett-fav.png' %}" />
+<!-- <script src="http://localhost:8081/integration/7fa3efbf-c308-46e2-b13f-2e24300bdd44/aurora-chat-plugin.js"></script> -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+
+  <!-- Core Css -->
+  <link id="themeColors" rel="stylesheet" href="{% static 'css/style.css' %}" />
+  <link rel="stylesheet" href="{% static 'libs/sweetalert2/dist/sweetalert2.min.css' %}" />
+  
+
+  {% block css %}
+
+  {% endblock css %}
+</head>
+
+<body>
+  <!-- Preloader -->
+  <div class="preloader">
+    <img src="{% static 'images/logos/emmett-fav.png' %}" alt="loader" class="lds-ripple img-fluid" />
+  </div>
+  <!-- Preloader -->
+  <div class="preloader">
+    <img src="{% static 'images/logos/emmett-fav.png' %}" alt="loader" class="lds-ripple img-fluid" />
+  </div>
+  <!--  Body Wrapper -->
+  <div class="page-wrapper" id="main-wrapper" data-theme="blue_theme" data-layout="vertical" data-sidebartype="full"
+    data-sidebar-position="fixed" data-header-position="fixed">
+    {% include 'partials/sidebar.html' %}
+    <!--  Main wrapper -->
+    <div class="body-wrapper">
+      {% include 'partials/header.html' %}
+      <div class="container-fluid">
+        {% block content %}
+
+
+
+
+        {% endblock content %}
+      </div>
+    </div>
+  </div>
+
+  <!--  Search Bar -->
+  <div class="modal fade" id="exampleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+      <div class="modal-content rounded-1">
+        <div class="modal-header border-bottom">
+          <input type="search" class="form-control fs-3" placeholder="Search here" id="search" />
+          <span data-bs-dismiss="modal" class="lh-1 cursor-pointer">
+            <i class="ti ti-x fs-5 ms-3"></i>
+          </span>
+        </div>
+        <div class="modal-body message-body" data-simplebar="">
+          <h5 class="mb-0 fs-5 p-1">Quick Page Links</h5>
+          <ul class="list mb-0 py-2">
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Modern</span>
+                <span class="fs-3 text-muted d-block">/dashboards/dashboard1</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Dashboard</span>
+                <span class="fs-3 text-muted d-block">/dashboards/dashboard2</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Contacts</span>
+                <span class="fs-3 text-muted d-block">/apps/contacts</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Posts</span>
+                <span class="fs-3 text-muted d-block">/apps/blog/posts</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Detail</span>
+                <span
+                  class="fs-3 text-muted d-block">/apps/blog/detail/streaming-video-way-before-it-was-cool-go-dark-tomorrow</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Shop</span>
+                <span class="fs-3 text-muted d-block">/apps/ecommerce/shop</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Modern</span>
+                <span class="fs-3 text-muted d-block">/dashboards/dashboard1</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Dashboard</span>
+                <span class="fs-3 text-muted d-block">/dashboards/dashboard2</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Contacts</span>
+                <span class="fs-3 text-muted d-block">/apps/contacts</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Posts</span>
+                <span class="fs-3 text-muted d-block">/apps/blog/posts</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Detail</span>
+                <span
+                  class="fs-3 text-muted d-block">/apps/blog/detail/streaming-video-way-before-it-was-cool-go-dark-tomorrow</span>
+              </a>
+            </li>
+            <li class="p-1 mb-1 bg-hover-light-black">
+              <a href="#">
+                <span class="fs-3 text-black fw-normal d-block">Shop</span>
+                <span class="fs-3 text-muted d-block">/apps/ecommerce/shop</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!--  Import Js Files -->
+  <script src="{% static 'libs/jquery/dist/jquery.min.js' %}"></script>
+  <script src="{% static 'libs/simplebar/dist/simplebar.min.js' %}"></script>
+  <script src="{% static 'libs/bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+  <!--  core files -->
+  <script src="{% static 'js/app.min.js' %}"></script>
+  <script src="{% static 'js/app.init.js' %}"></script>
+  <script src="{% static 'js/app-style-switcher.js' %}"></script>
+  <script src="{% static 'js/sidebarmenu.js' %}"></script>
+  <script src="{% static 'js/custom.js' %}"></script>
+  <script src="{% static 'libs/sweetalert2/dist/sweetalert2.min.js' %}"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.3.4/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.7.14/dist/vue.js"></script>
+
+
+
+ 
+
+  {% block js %}
+
+  {% endblock js %}
+</body>
+
+</html>

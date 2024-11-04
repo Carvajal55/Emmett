@@ -49,3 +49,4 @@ qrcode
 chartjs
 django-humanize
 WeasyPrint
+reportlab
