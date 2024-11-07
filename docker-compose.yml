@@ -1,3 +1,5 @@
+version: '3'
+
 services:
 
   db:
@@ -7,7 +9,8 @@ services:
     ports:
       - "33006:3306"
     volumes:
-      - dbdata_baseproyecto:/var/lib/mysql
+      - dbdata_baseproyecto:/var/lib/mysql  # Volumen para persistir datos de MySQL
+      - ./backup.sql:/docker-entrypoint-initdb.d/backup.sql  # Montar el archivo SQL para restauración automática
     command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
     networks:
       - baseproyecto_net
@@ -29,9 +32,6 @@ services:
       - ./conf/.env
     networks:
       - baseproyecto_net
-
-  
-
 
 networks:
   baseproyecto_net:
