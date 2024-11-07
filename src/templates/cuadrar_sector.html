@@ -174,7 +174,10 @@
                             timer: 2000 // Duración de 2 segundos
                         });
 
-                        this.buscarProductosSector(); // Refrescar productos del sector
+                        // Limpiar el sector, sector previo, y productos en el sector
+                        this.sectorQuery = '';
+                        this.previousSector = '';
+                        this.productosEnSector = [];  // Limpiar productos en el sector para vaciar la tabla
                     } else {
                         console.error('Error en cuadratura:', response.data.msg);
                     }

@@ -13,10 +13,10 @@
         "qtyCheque": "0",
         "subtotal": "100000",
         "urlPDF": "",
-        "urlJson": "\/models\/invoices\/json\/s_77491084-0t_33f_999999.json",
+        "urlJson": "/models/invoices/json/s_77491084-0t_33f_999999.json",
         "dateReception": "2024-09-12",
         "userProcess": "Boris Fuentes",
-        "urlImg": "\/file\/img\/invoice-purchase\/s_77491084-0t_33f_999999"
+        "urlImg": "/file/img/invoice-purchase/s_77491084-0t_33f_999999"
     },
     "details": [
         {
@@ -30,7 +30,8 @@
             "sku": "MUS20086",
             "idERP": "98032",
             "model": "MEDIANO 25CM",
-            "idPro": "6612"
+            "idPro": "6612",
+            "printed": false
         },
         {
             "qty": "1",
@@ -43,8 +44,10 @@
             "sku": "AUD26369",
             "idERP": "157067",
             "model": "xxx3",
-            "idPro": "12870"
+            "idPro": "12870",
+            "printed": false
         }
     ],
-    "type": "1"
+    "type": "1",
+    "invoice_printed": false
 }

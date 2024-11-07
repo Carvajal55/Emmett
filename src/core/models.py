@@ -53,7 +53,7 @@ class Productconfig(models.Model):
 
 class Products(models.Model):
     sku = models.CharField(max_length=45, blank=True, null=True)
-    nameproduct = models.CharField(db_column='nameProduct', max_length=250, blank=True, null=True)  # Field name made lowercase.
+    nameproduct = models.CharField(max_length=250, blank=True, null=True)  # Field name made lowercase.
     prefixed = models.CharField(max_length=500, blank=True, null=True)
     brands = models.CharField(max_length=100, blank=True, null=True)
     codebar = models.CharField(max_length=45, blank=True, null=True)
@@ -214,4 +214,5 @@ class Dispatch(models.Model):
     total_unit_value = models.FloatField()
     quantity = models.IntegerField()
     count = models.IntegerField(default=0)
+
 

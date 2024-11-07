@@ -12,11 +12,11 @@
         "nCheque": "0",
         "qtyCheque": "0",
         "subtotal": "10000",
-        "urlPDF": "http:\/\/dte.bsale.cl\/get_dte\/49147872?sign=191c7e30a06abaff",
-        "urlJson": "\/models\/invoices\/json\/s_17834900t_33f_9944.json",
+        "urlPDF": "http://dte.bsale.cl/get_dte/49147872?sign=191c7e30a06abaff",
+        "urlJson": "/models/invoices/json/s_17834900t_33f_9944.json",
         "dateReception": "2024-09-12",
         "userProcess": "Boris Fuentes",
-        "urlImg": "\/file\/img\/invoice-purchase\/s_17834900t_33f_9944"
+        "urlImg": "/file/img/invoice-purchase/s_17834900t_33f_9944"
     },
     "details": [
         {
@@ -29,7 +29,8 @@
             "checkItem": "true",
             "sku": "AUD20635",
             "idERP": "100215",
-            "model": "A10L4 USB"
+            "model": "A10L4 USB",
+            "printed": false
         },
         {
             "qty": "5",
@@ -41,7 +42,8 @@
             "checkItem": "true",
             "sku": "ILU20984",
             "idERP": "102690",
-            "model": "64514 120v 300w"
+            "model": "64514 120v 300w",
+            "printed": false
         },
         {
             "qty": "50",
@@ -53,7 +55,8 @@
             "checkItem": "true",
             "sku": "MUS15932",
             "idERP": "95032",
-            "model": "EXL110 "
+            "model": "EXL110 ",
+            "printed": false
         },
         {
             "qty": "70",
@@ -65,7 +68,8 @@
             "checkItem": "true",
             "sku": "MUS20086",
             "idERP": "98032",
-            "model": "MEDIANO 25CM"
+            "model": "MEDIANO 25CM",
+            "printed": false
         },
         {
             "qty": "600",
@@ -78,8 +82,10 @@
             "sku": "AUD25648",
             "idERP": "148712",
             "model": "WH950NB BLACK",
-            "idPro": "12106"
+            "idPro": "12106",
+            "printed": false
         }
     ],
-    "type": "1"
+    "type": "1",
+    "invoice_printed": false
 }

@@ -487,7 +487,6 @@ def listar_compras(request):
 @csrf_exempt
 def resumen_factura(request):
     if request.method == 'POST':
-        # Imprimir el contenido de la solicitud POST para depuración
         print("Payload recibido:", request.POST)
 
         # Obtener el campo `urlJson` del payload
@@ -504,11 +503,27 @@ def resumen_factura(request):
             with open(json_file_path, 'r') as file:
                 json_data = json.load(file)
                 
-                # Extraer el detalle del JSON
+                # Extraer el detalle de la factura
                 detalles = json_data.get('details', [])
 
-                # Enviar los detalles como respuesta
-                return JsonResponse({'details': detalles})
+                # Añadir el campo `printed` si no existe en cada detalle
+                for detalle in detalles:
+                    if 'printed' not in detalle:
+                        detalle['printed'] = False
+
+                # Determinar si la factura completa está marcada como impresa
+                json_data['invoice_printed'] = all(detalle.get('printed', False) for detalle in detalles)
+
+                # Guardar los cambios en el archivo JSON para que persista la estructura
+                with open(json_file_path, 'w') as file:
+                    json.dump(json_data, file, indent=4)
+
+                # Enviar los detalles y la URL del JSON como respuesta
+                return JsonResponse({
+                    'details': detalles,
+                    'invoice_printed': json_data['invoice_printed'],
+                    'urlJson': url_json  # Incluye la URL del JSON en la respuesta
+                })
         else:
             return JsonResponse({'error': 'Archivo JSON no encontrado.'}, status=404)
     else:
@@ -1630,11 +1645,11 @@ def sincronizar_producto(request, sku):
     return JsonResponse({'resp': 3, 'msg': 'Método no permitido.'}, status=405)
 
 @csrf_exempt
-def registrar_recepcion_stock(request, sku):
+def registrar_recepcion_stock(request, sku, qty):
     if request.method in ['POST', 'PUT']:
         try:
             producto = Products.objects.get(sku=sku)
-            stock_local = calcular_stock_local(sku)
+            stock_local = qty  # Usamos qty como la cantidad de stock a registrar
 
             variant_id = producto.iderp
             office_id = 1
@@ -1663,21 +1678,14 @@ def registrar_recepcion_stock(request, sku):
             url = f"{BSALE_API_URL}/stocks/receptions.json"
             response = requests.post(url, json=data, headers=headers)
 
-            # Si la respuesta es 200, se considera exitosa
-            if response.status_code == 200 or response.status_code == 201:
+            if response.status_code in [200, 201]:
                 return JsonResponse({'resp': 1, 'msg': f'Stock del SKU {sku} registrado en Bsale con éxito.'})
             else:
-                # Si el stock está efectivamente actualizado, mostrar un mensaje de éxito
-                if response.status_code == 404:
-                    print(f"Error en respuesta: {response.status_code}, pero el stock parece haberse actualizado.")
-                    return JsonResponse({'resp': 1, 'msg': f'Stock del SKU {sku} registrado en Bsale con éxito, pero se recibió un error de respuesta.'})
-                else:
-                    print(f"Error en respuesta: {response.status_code}, Detalles: {response.text}")
-                    return JsonResponse({
-                        'resp': 3,
-                        'msg': f'Error al registrar recepción del SKU {sku} en Bsale.',
-                        'detalle_error': response.text
-                    }, status=response.status_code)
+                return JsonResponse({
+                    'resp': 3,
+                    'msg': f'Error al registrar recepción del SKU {sku} en Bsale.',
+                    'detalle_error': response.text
+                }, status=response.status_code)
 
         except Products.DoesNotExist:
             return JsonResponse({'resp': 3, 'msg': f'Producto con SKU {sku} no encontrado.'}, status=404)
@@ -1703,7 +1711,7 @@ def get_unique_document_bll(type, number):
     for product in products:
         details.append({
             'code': product.sku,
-            'description': product.nameproduct,
+            'name': product.nameproduct,
             'quantity': 5,  # Asignar cantidad específica según lógica
             'total_unit_value': product.lastprice or 0  # Precio unitario (ajustar lógica si hay más cálculos involucrados)
         })
@@ -1795,9 +1803,6 @@ def dispatch_consumption(request):
                 superid = product.get('superid')
                 cantidad = int(product.get('quantity', 1))  # Cantidad a descontar (1 por defecto)
 
-                # Mostrar SuperID y cantidad recibida
-                print(f"SuperID recibido: {superid}, Cantidad recibida: {cantidad}")
-
                 # Verificar si el superid existe en Uniqueproducts
                 unique_product = Uniqueproducts.objects.select_related('product').filter(superid=superid).first()
 
@@ -1805,16 +1810,19 @@ def dispatch_consumption(request):
                     print(f"SuperID {superid} no encontrado en la base de datos.")
                     return JsonResponse({'title': 'SuperID no encontrado', 'icon': 'error', 'row': 0})
 
-                # Mostrar detalles del UniqueProduct encontrado
-                print(f"Detalles de UniqueProduct: {unique_product.__dict__}")
+                # Obtener el `Sectoroffice` relacionado usando el `location` de `unique_product`
+                sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
+                if not sector:
+                    print(f"Sector no encontrado para el Location ID {unique_product.location}")
+                    return JsonResponse({'title': 'Sector no encontrado para el producto', 'icon': 'error'})
 
-                # Obtener el `iderp` del producto relacionado
+                idoffice = sector.idoffice
+                print(f"ID de Oficina obtenido: {idoffice}")
+
+                # Obtener el `iderp` del producto asociado
                 product_instance = unique_product.product
-                associated_sku = product_instance.sku
-                iderp = product_instance.iderp
-
-                print(f"Producto asociado: {product_instance}")
-                print(f"SKU asociado: {associated_sku}, ID ERP asociado: {iderp}")
+                iderp = product_instance.iderp  # Aquí se obtiene el `iderp`
+                print(f"Producto asociado: {product_instance}, SKU: {product_instance.sku}, ID ERP: {iderp}")
 
                 if not iderp:
                     return JsonResponse({'title': 'El producto asociado no tiene un ID ERP válido', 'icon': 'error', 'row': 0})
@@ -1830,7 +1838,8 @@ def dispatch_consumption(request):
                         "country": "Chile",
                         "city": "Santiago",
                         "state": 1,
-                        "emailStore": "despachos@example.com"
+                        "emailStore": "despachos@example.com",
+                        "idoffice": idoffice  # Usa el `idoffice` obtenido de Sectoroffice
                     }
                 )
 
@@ -1845,12 +1854,9 @@ def dispatch_consumption(request):
                 unique_product.save()
 
                 # Preparar los datos para enviar a Bsale
-                print(f"Despachando ID ERP {iderp} con cantidad {cantidad}")
-
-                # Lógica para realizar el consumo en Bsale con `iderp` y cantidad
                 data_bsale = {
                     "note": f"Despacho desde empresa {company}",
-                    "officeId": 1,  # ID de la oficina o bodega (asumido como 1 por defecto)
+                    "officeId": idoffice,  # ID de la oficina actual
                     "details": [
                         {
                             "quantity": cantidad,
@@ -1859,10 +1865,18 @@ def dispatch_consumption(request):
                     ]
                 }
 
-                # Aquí iría la llamada a Bsale para consumir en el sistema externo
-                # response = consumir_en_bsale(data_bsale)
-                # if response.status_code not in [200, 201]:
-                #     raise Exception("Error al consumir en Bsale")
+                # Hacer la solicitud POST a Bsale usando la URL de consumo correcta
+                headers = {
+                    "access_token": BSALE_TOKEN,
+                    "Content-Type": "application/json"
+                }
+
+                response = requests.post("https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale)
+                
+                # Verificar si la respuesta de Bsale es exitosa
+                if response.status_code not in [200, 201]:
+                    print(f"Error al consumir en Bsale: {response.status_code} - {response.text}")
+                    return JsonResponse({'title': 'Error al consumir en Bsale', 'icon': 'error', 'message': response.text}, status=response.status_code)
 
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
@@ -1871,7 +1885,6 @@ def dispatch_consumption(request):
             return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
-
 
 BSALE_API_URL = "https://api.bsale.cl/v1"  # URL base de Bsale
 BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
@@ -1889,14 +1902,14 @@ def get_unique_document(request):
     # Construir la URL inicial para obtener el ID del documento
     url_costs = f"{BSALE_API_URL}/documents/costs.json?codesii={type_document}&number={number}"
     headers = {
-        'access_token': BSALE_TOKEN,  # Usar 'access_token' en lugar de 'Authorization'
+        'access_token': BSALE_TOKEN,
         'Content-Type': 'application/json'
     }
 
     print(f"Construyendo URL para obtener ID del documento: {url_costs}")
 
     try:
-        # Realizar la primera solicitud para obtener la información básica del documento
+        # Realizar la solicitud para obtener la información básica del documento
         response = requests.get(url_costs, headers=headers)
         print(f"Respuesta de la API para obtener ID del documento: {response.status_code} - {response.text}")
 
@@ -1917,14 +1930,20 @@ def get_unique_document(request):
 
         print(f"ID del documento obtenido: {document_id}")
 
-        # Extraer los detalles de la respuesta
+        # Extraer los detalles de los productos y consultar el nombre en el modelo Products
         products = []
         for detail in info.get('cost_detail', []):
             variant = detail.get('variant', {})
             shipping_detail = detail.get('shipping_detail', {})
 
+            sku = variant.get('code')
+            # Consulta el producto por SKU
+            product = Products.objects.filter(sku=sku).first()
+            name = product.nameproduct if product else "Nombre no encontrado"
+
             product_data = {
-                'code': variant.get('code'),
+                'code': sku,
+                'name': name,
                 'description': variant.get('description'),
                 'quantity': shipping_detail.get('quantity'),
                 'totalAmount': shipping_detail.get('variantTotalCost')
@@ -1932,7 +1951,6 @@ def get_unique_document(request):
             print(f"Producto procesado: {product_data}")
             products.append(product_data)
 
-        # Devolver la información de los productos como respuesta
         print("Devolviendo la información de los productos correctamente")
         return JsonResponse(products, safe=False)
 
@@ -2059,12 +2077,10 @@ def imprimir_etiqueta(request):
         except Products.DoesNotExist:
             return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
 
-        # Crear el nombre y la ruta del archivo PDF en la carpeta mediafiles
+        # Crear el nombre y la ruta del archivo PDF
         pdf_filename = f'etiqueta_{sku}.pdf'
         relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
         absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
-
-        # Crear las carpetas si no existen
         os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
         # Obtener el último correlativo y superID para el producto
@@ -2072,8 +2088,8 @@ def imprimir_etiqueta(request):
         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
         base_superid = last_unique_product.superid[:-len(str(last_unique_product.correlative))] if last_unique_product else sku
 
-        # Crear el PDF con ReportLab, tamaño de página 10.2 cm x 5 cm
-        page_width, page_height = 102 * mm, 50 * mm  # Dimensiones solicitadas
+        # Crear el PDF con tamaño 10.2 cm x 5 cm
+        page_width, page_height = 102 * mm, 50 * mm
         pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
 
         super_ids = []
@@ -2082,59 +2098,40 @@ def imprimir_etiqueta(request):
             super_id = f"{base_superid}{current_correlative}"
             super_ids.append(super_id)
 
-            if i % 2 == 0:
-                # **Mitad izquierda**
-                # SKU en horizontal
-                x_sku, y_sku = 5 * mm, 35 * mm  # Posición del código de barras SKU en la mitad izquierda
-                barcode_sku = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
-                barcode_sku.drawOn(pdf, x_sku, y_sku)
+            # Parte izquierda de la etiqueta
+            x_sku_left, y_sku_left = 5 * mm, 35 * mm
+            barcode_sku_left = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
+            barcode_sku_left.drawOn(pdf, x_sku_left, y_sku_left)
+            pdf.setFont("Helvetica", 6)
+            #pdf.drawString(x_sku_left, y_sku_left - 10, f"SKU: {sku}")
 
-                # Texto debajo del SKU
-                # Mover el texto debajo del SKU hacia la derecha
-                #pdf.setFont("Helvetica", 6)
-                #pdf.drawString(x_sku + 8 * mm, y_sku - 4 * mm, f"{sku}")  # Incrementar x_sku para mover a la derecha
+            # SuperID en vertical (rotado)
+            pdf.saveState()
+            pdf.rotate(90)
+            x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -2 * mm
+            barcode_superid_left = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
+            barcode_superid_left.drawOn(pdf, y_superid_rotated_left, -x_superid_rotated_left)
+            pdf.restoreState()
 
+            # Texto debajo del SuperID
+            pdf.setFont("Helvetica", 6)
+            #pdf.drawString(10 * mm, 5 * mm, f"SuperID: {super_id}")
 
-                # Mover el texto del modelo hacia la derecha
-                #pdf.drawString(x_sku + 8 * mm, y_sku - 8 * mm, model)  # Incrementar x_sku para mover a la derecha
-
-                # SuperID en vertical (rotado)
-                pdf.saveState()
-                pdf.rotate(90)
-                x_superid_rotated, y_superid_rotated = 10 * mm, -3 * mm  # Coordenadas ajustadas para el código de barras vertical
-                barcode_superid = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
-                barcode_superid.drawOn(pdf, y_superid_rotated, -x_superid_rotated)
-                pdf.restoreState()
-
-                # Texto debajo del SuperID
-                #pdf.drawString(5 * mm, 5 * mm, f"{super_id}")
-
-            else:
-                # **Mitad derecha**
-                #Horizontal
-                x_sku_right, y_sku_right = 60 * mm, 35 * mm  # Posición del código de barras SKU en la mitad derecha
+            # Parte derecha de la etiqueta (si se requiere más de un elemento por página)
+            if i % 2 == 1:
+                x_sku_right, y_sku_right = 60 * mm, 35 * mm
                 barcode_sku_right = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
                 barcode_sku_right.drawOn(pdf, x_sku_right, y_sku_right)
+                pdf.setFont("Helvetica", 6)
+                #pdf.drawString(x_sku_right, y_sku_right - 10, f"SKU: {sku}")
 
-                # Texto debajo del SKU
-                #pdf.setFont("Helvetica", 6)
-                #pdf.drawString(x_sku + 58 * mm, y_sku - 8 * mm, f"{sku}")
-                #pdf.drawString(x_sku_right, y_sku_right - 4 * mm, f"{sku}")
-
-                # Modelo
-                #pdf.drawString(x_sku_right, y_sku_right - 8 * mm, model)
-                #pdf.drawString(x_sku + 58 * mm, y_sku - 12 * mm, model)
-
-                # SuperID en vertical (rotado)
                 pdf.saveState()
                 pdf.rotate(90)
-                x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -3 * mm  # Coordenadas ajustadas para el código de barras vertical derecho
+                x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -2 * mm
                 barcode_superid_right = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
                 barcode_superid_right.drawOn(pdf, y_superid_rotated_right, -x_superid_rotated_right)
                 pdf.restoreState()
-
-                # Texto debajo del SuperID
-                #pdf.drawString(55 * mm, 5 * mm, f"{super_id}")
+                #pdf.drawString(60 * mm, 5 * mm, f"SuperID: {super_id}")
 
             # Guardar el nuevo UniqueProduct
             Uniqueproducts.objects.create(
@@ -2156,9 +2153,24 @@ def imprimir_etiqueta(request):
 
         pdf.save()
 
+       # Llamar a `registrar_recepcion_stock` con `sku` y `qty`
+        response_stock = registrar_recepcion_stock(request, sku, qty)
+
+        # Verificar el estado de la respuesta para mostrar en el mensaje final
+        if response_stock.status_code == 200:
+            msg_stock = "Stock registrado en Bsale con éxito."
+        else:
+            msg_stock = f"Error al registrar stock en Bsale: {response_stock.json().get('msg', 'Error desconocido')}"
+
         # Devolver la ruta del archivo creada y un mensaje de éxito
+        # Devolver la URL del archivo creada, superid, y el estado de la recepción de stock
         pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
-        return JsonResponse({'urlPdf': pdf_url, 'superid': super_ids, 'sku': sku})
+        return JsonResponse({
+            'urlPdf': pdf_url,
+            'superid': super_ids,
+            'sku': sku,
+            'msg_stock': msg_stock
+        })
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
@@ -2279,3 +2291,54 @@ def actualizar_stock_local(request):
 
     print("Actualización de stock local completada.")
     return JsonResponse({'message': 'Actualización de stock local completada.'}, status=200)
+
+
+BSALE_API_URLID = "https://api.bsale.io/v1/variants.json"
+
+@csrf_exempt
+def actualizar_iderp(request):
+    if request.method == 'GET':
+        productos = Products.objects.all()  # Obtener todos los productos en la base de datos
+        total_productos = productos.count()
+        actualizados = 0
+        eliminados = 0
+
+        for producto in productos:
+            sku = producto.sku
+            url = f"{BSALE_API_URLID}?code={sku}"
+            headers = {
+                'access_token': BSALE_TOKEN,
+                'Accept': 'application/json'
+            }
+
+            response = requests.get(url, headers=headers)
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("count", 0) > 0:
+                    id_bsale = data["items"][0]["id"]
+                    # Actualizar el campo iderp en el producto
+                    producto.iderp = id_bsale
+                    producto.save()
+                    actualizados += 1
+                    print(f"Actualizado SKU: {sku} con iderp: {id_bsale} ({actualizados}/{total_productos})")
+                else:
+                    # Si no se encuentra el SKU, eliminar el producto y sus relaciones
+                    with transaction.atomic():
+                        producto.delete()  # Esto elimina el producto y, por cascading, sus relaciones
+                    eliminados += 1
+                    print(f"SKU {sku} no encontrado en Bsale. Producto eliminado ({eliminados}/{total_productos})")
+            else:
+                print(f"Error al consultar SKU {sku} en Bsale: {response.status_code} ({actualizados}/{total_productos})")
+
+            # Opcional: Pausar ligeramente entre cada solicitud para evitar saturar el API
+
+        print("Proceso de actualización completado.")
+        return JsonResponse({
+            "msg": "Proceso de actualización completado", 
+            "total_actualizados": actualizados,
+            "total_eliminados": eliminados
+        })
+
+    return JsonResponse({'msg': 'Método no permitido'}, status=405)
+

@@ -53,7 +53,7 @@
                 <tbody>
                     <tr v-for="product in products" :key="product.code">
                         <td>[[ product.code ]]</td>
-                        <td>[[ product.description ]]</td>
+                        <td>[[ product.name ]]</td>
                         <td>[[ product.totalAmount ]]</td>
                         <td>[[ product.quantity ]]</td>
                         <td>[[ product.count || 0 ]]</td>
@@ -67,89 +67,97 @@
 {% block js %}
 <script>
     new Vue({
-    el: '#app',
-    delimiters: ['[[', ']]'],
-    data: {
-        company: 1,
-        typeDocument: 39,
-        nDocument: null,
-        sid: null,
-        products: [],
-        superidMap: {} // Almacena los superid vinculados a los SKUs
-    },
-    methods: {
-        fetchDetails() {
-            // Limpia los datos previos
-            this.products = [];
-            this.superidMap = {};
-
-            // Realiza la solicitud GET para obtener detalles del documento
-            axios.get('/api/consult-bsale-document/', {
-                params: { number: this.nDocument, type: this.typeDocument }
-            }).then(response => {
-                // Asume que el endpoint devuelve un array con los productos relevantes
-                this.products = response.data.map(product => ({
-                    code: product.code,
-                    description: product.description,
-                    totalAmount: product.totalAmount,
-                    quantity: product.quantity,
-                    count: 0 // Inicia el conteo en cero
-                }));
-            }).catch(error => {
-                Swal.fire('Error', 'No se pudieron obtener los detalles del documento.', 'error');
-                console.error(error);
-            });
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            company: 1,
+            typeDocument: 39,
+            nDocument: null,
+            sid: null,
+            products: []
         },
-        validateAndLinkSuperid() {
-            // Verifica el superid y vincula con el SKU
-            axios.post('/api/validate-superid/', {
-                sid: this.sid,
-                document_products: this.products.map(product => product.code)
-            }).then(response => {
-                if (response.data.icon === 'success') {
-                    // Encuentra el producto en la lista si existe
-                    const productInList = this.products.find(product => product.code === response.data.sku);
-                    if (productInList && productInList.count < productInList.quantity) {
-                        productInList.count += 1;
-                        this.superidMap[response.data.sku] = this.sid; // Almacena el superid asociado al SKU
-                        this.sid = ''; // Limpia el campo de entrada después de la validación
+        watch: {
+            typeDocument() {
+                if (this.nDocument) this.fetchDetails();
+            },
+            company() {
+                if (this.nDocument) this.fetchDetails();
+            }
+        },
+        methods: {
+            fetchDetails() {
+                // Limpia los datos previos
+                this.products = [];
+
+                // Realiza la solicitud GET para obtener detalles del documento
+                axios.get('/api/consult-bsale-document/', {
+                    params: { number: this.nDocument, type: this.typeDocument }
+                }).then(response => {
+                    // Asume que el endpoint devuelve un array con los productos relevantes
+                    this.products = response.data.map(product => ({
+                        code: product.code,
+                        description: product.description,
+                        totalAmount: product.totalAmount,
+                        quantity: product.quantity,
+                        count: 0, // Inicia el conteo en cero
+                        name : product.name,
+                        superid: null  // Inicializa el superid como null
+                    }));
+                }).catch(error => {
+                    Swal.fire('Error', 'No se pudieron obtener los detalles del documento.', 'error');
+                    console.error(error);
+                });
+            },
+            validateAndLinkSuperid() {
+                // Verifica el superid y vincula con el SKU
+                axios.post('/api/validate-superid/', {
+                    sid: this.sid,
+                    document_products: this.products.map(product => product.code)
+                }).then(response => {
+                    if (response.data.icon === 'success') {
+                        // Encuentra el producto en la lista si existe
+                        const productInList = this.products.find(product => product.code === response.data.sku);
+                        if (productInList && productInList.count < productInList.quantity) {
+                            productInList.count += 1;
+                            productInList.superid = this.sid;  // Vincula el superid directamente al producto
+                            this.sid = ''; // Limpia el campo de entrada después de la validación
+                        } else {
+                            Swal.fire('Advertencia', 'No se puede escanear más de la cantidad total.', 'warning');
+                        }
                     } else {
-                        Swal.fire('Advertencia', 'No se puede escanear más de la cantidad total.', 'warning');
+                        Swal.fire('Error', response.data.title, response.data.icon);
                     }
-                } else {
-                    Swal.fire('Error', response.data.title, response.data.icon);
-                }
-            }).catch(error => {
-                Swal.fire('Error', 'Error al validar el SuperID.', 'error');
-                console.error(error);
-            });
-        },
-        dispatchConsumption() {
-            // Crea un payload con la información de los productos, superid y cantidades
-            const payload = this.products.map(product => ({
-                code: product.code,
-                quantity: product.count,
-                superid: this.superidMap[product.code] || null // Vincula el superid si existe
-            }));
+                }).catch(error => {
+                    Swal.fire('Error', 'Error al validar el SuperID.', 'error');
+                    console.error(error);
+                });
+            },
+            dispatchConsumption() {
+                // Crea un payload con la información de los productos, incluyendo el superid y cantidades
+                const payload = this.products.map(product => ({
+                    code: product.code,
+                    quantity: product.count,
+                    superid: product.superid  // Usa el superid almacenado en cada producto
+                }));
 
-            // Realiza la solicitud POST para despachar los productos
-            axios.post('/api/dispatch-consumption/', {
-                nDocument: this.nDocument,
-                typeDocument: this.typeDocument,
-                company: this.company,
-                products: payload
-            }).then(response => {
-                if (response.data.icon === 'success') {
-                    Swal.fire('Éxito', 'Productos despachados con éxito.', 'success');
-                } else {
-                    Swal.fire('Error', response.data.title, response.data.icon);
-                }
-            }).catch(error => {
-                Swal.fire('Error', 'Error al despachar los productos.', 'error');
-                console.error(error);
-            });
+                // Realiza la solicitud POST para despachar los productos
+                axios.post('/api/dispatch-consumption/', {
+                    nDocument: this.nDocument,
+                    typeDocument: this.typeDocument,
+                    company: this.company,
+                    products: payload
+                }).then(response => {
+                    if (response.data.icon === 'success') {
+                        Swal.fire('Éxito', 'Productos despachados con éxito.', 'success');
+                    } else {
+                        Swal.fire('Error', response.data.title, response.data.icon);
+                    }
+                }).catch(error => {
+                    Swal.fire('Error', 'Error al despachar los productos.', 'error');
+                    console.error(error);
+                });
+            }
         }
-    }
-});
+    });
 </script>
 {% endblock js %}

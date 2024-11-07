@@ -76,40 +76,41 @@
 
         <!-- Modal para mostrar los detalles -->
         <div class="modal fade" id="detallesModal" tabindex="-1" aria-labelledby="detallesModalLabel" aria-hidden="true">
-          <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title" id="detallesModalLabel">Detalles de la Factura</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <table class="table table-striped">
+            <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="detallesModalLabel">Detalles de la Factura</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <table class="table table-striped">
                     <thead>
-                        <tr>
-                            <th>SKU</th>
-                            <th>Modelo</th>
-                            <th>Cantidad</th>
-                            <th>Acción</th>
-                        </tr>
+                      <tr>
+                        <th>SKU</th>
+                        <th>Modelo</th>
+                        <th>Cantidad</th>
+                        <th>Acción</th>
+                      </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="detalle in detallesFactura" :key="detalle.sku">
-                            <td>[[ detalle.sku ]]</td>
-                            <td>[[ detalle.model ]]</td>
-                            <td>[[ detalle.qty ]]</td>
-                            <td>
-                                <button @click="imprimirDetalle(detalle)" class="btn btn-success btn-sm">ImprimirEti</button>
-                            </td>
-                        </tr>
+                      <!-- Filtrar los detalles para que solo muestre aquellos con `printed: false` -->
+                      <tr v-for="detalle in detallesFactura.filter(item => item.printed === false)" :key="detalle.sku">
+                        <td>[[ detalle.sku ]]</td>
+                        <td>[[ detalle.model ]]</td>
+                        <td>[[ detalle.qty ]]</td>
+                        <td>
+                          <button @click="imprimirDetalle(detalle)" class="btn btn-success btn-sm">Imprimir Etiqueta</button>
+                        </td>
+                      </tr>
                     </tbody>
-                </table>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                  </table>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
     </div>
 </div>
 {% endblock content %}
@@ -152,13 +153,23 @@
             // Mostrar los detalles de la factura en el modal
             printLabelUnique(urlJson) {
                 console.log('URL JSON enviada:', urlJson);
+                
                 let formData = new FormData();
                 formData.append('urlJson', urlJson);
 
                 axios.post('/api/resumen-facturas/', formData)
                     .then(response => {
-                        console.log('Detalles de la factura:', response.data.details);
-                        this.detallesFactura = response.data.details;
+                        console.log('Detalles de la factura:', response.data);
+
+                        // Guardar toda la respuesta en una variable para acceder a `details` y `urlJson`
+                        this.facturaCompleta = response.data;
+                        
+                        // Asignar `urlJson` a cada detalle
+                        this.detallesFactura = this.facturaCompleta.details.map(detalle => {
+                            return { ...detalle, urlJson: this.facturaCompleta.urlJson };
+                        });
+
+                        // Mostrar el modal
                         let modal = new bootstrap.Modal(document.getElementById('detallesModal'));
                         modal.show();
                     })
@@ -172,7 +183,7 @@
             return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
             imprimirDetalle(detalle) {
-                console.log("Imprimiendo detalleeeee:", detalle);
+                console.log("Imprimiendo detalle:", detalle);
 
                 // Crear el formulario con los datos necesarios para la impresión
                 let formData = new FormData();
@@ -180,12 +191,14 @@
                 formData.append('model', detalle.model);
                 formData.append('qty', detalle.qty);
                 formData.append('codebar', detalle.codebar || '');
+                formData.append('urlJson', detalle.urlJson); // Asegurarse de incluir urlJson
 
                 console.log("Datos enviados a la API:", {
                     sku: detalle.sku,
                     model: detalle.model,
                     qty: detalle.qty,
-                    codebar: detalle.codebar || ''
+                    codebar: detalle.codebar || '',
+                    urlJson: detalle.urlJson // Mostrar también urlJson en el log para verificación
                 });
 
                 // Enviar la solicitud al backend para generar la etiqueta
@@ -219,7 +232,7 @@
                             confirmButtonText: 'OK'
                         });
                     });
-            },
+            }
         },
         
         mounted() {

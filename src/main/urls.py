@@ -98,6 +98,13 @@ urlpatterns = [
    path('api/comparar-stock-bsale/', core_views.comparar_stock_bsale, name='comparar_stock_bsale'),
    path('api/actualizar-stock-local/', core_views.actualizar_stock_local, name='actualizar_stock_local'),
 
+
+   path('api/actualizar_iderp/', core_views.actualizar_iderp, name='actualizar_iderp'),
+
+
+
+
+
 ]
 
 if settings.DEBUG:

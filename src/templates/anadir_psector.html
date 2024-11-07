@@ -189,6 +189,40 @@
                     console.error('Error al agregar productos:', error);
                     this.playSound('error');
                 });
+            },addProductsToSector() {
+                if (!this.sectorSeleccionado) {
+                    console.error('Selecciona un sector antes de agregar productos.');
+                    this.playSound('error');
+                    return;
+                }
+                if (this.productosParaAgregar.length === 0) {
+                    console.error('No hay productos para agregar.');
+                    this.playSound('error');
+                    return;
+                }
+
+                axios.post('/api/anadir-producto-sector/', {
+                    productos: this.productosParaAgregar.map(p => ({ superid: p.superid })),
+                    sector: this.sectorSeleccionado
+                })
+                .then(response => {
+                    if (response.data.resp === 1) {
+                        console.log('Productos añadidos correctamente al sector.');
+                        this.productosParaAgregar = [];  // Limpia la lista de productos para agregar
+                        this.buscarProductos();  // Refresca la lista de productos en el sector
+                        this.playSound('success');
+
+                        // Limpiar el sector seleccionado para permitir ingresar uno nuevo
+                        this.sectorSeleccionado = '';
+                    } else {
+                        console.error(response.data.msg);
+                        this.playSound('error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al agregar productos:', error);
+                    this.playSound('error');
+                });
             },
 
             changePage(page) {

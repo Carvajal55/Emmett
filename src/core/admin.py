@@ -59,3 +59,13 @@ class UniqueproductsAdmin(admin.ModelAdmin):
 class PurchaseAdmin(admin.ModelAdmin):
     list_display = ('iddocument','number', 'idpurchase')
     search_fields = ('id','iddocument','number', 'idpurchase')
+
+@admin.register(Bodega)
+class Bodega(admin.ModelAdmin):
+    list_display = ('idoffice','name')
+    search_fields = ('idoffice','name')
+
+@admin.register(Sectoroffice)
+class Sectoroffice(admin.ModelAdmin):
+    list_display = ('idsectoroffice','idoffice','zone','floor','section','namesector')
+    search_fields = ('idsectoroffice','idoffice','zone','floor','section','namesector')

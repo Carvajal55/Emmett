@@ -13,10 +13,10 @@
         "qtyCheque": "0",
         "subtotal": "1500",
         "urlPDF": "",
-        "urlJson": "\/models\/invoices\/json\/s_96689310-9t_33f_99.json",
+        "urlJson": "/models/invoices/json/s_96689310-9t_33f_99.json",
         "dateReception": "2024-08-31",
         "userProcess": "Boris Fuentes",
-        "urlImg": "\/file\/img\/invoice-purchase\/s_96689310-9t_33f_99"
+        "urlImg": "/file/img/invoice-purchase/s_96689310-9t_33f_99"
     },
     "details": [
         {
@@ -30,8 +30,10 @@
             "sku": "AUD20635",
             "idERP": "100215",
             "model": "A10L4 USB",
-            "idPro": "7155"
+            "idPro": "7155",
+            "printed": false
         }
     ],
-    "type": "1"
+    "type": "1",
+    "invoice_printed": false
 }
