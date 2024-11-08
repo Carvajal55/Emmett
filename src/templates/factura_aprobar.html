@@ -51,7 +51,6 @@
                 <th>SKU</th>
                 <th>PRODUCTO</th>
                 <th>CANTIDAD</th>
-                <th>STOCK</th>
                 <th>COSTO</th>
                 <th>COSTO C/DCTO</th>
                 <th>TOTAL</th>
@@ -66,7 +65,6 @@
                 <td>[[ detalle.sku ]]</td>
                 <td>[[ detalle.model ]]</td>
                 <td>[[ detalle.qty ]]</td>
-                <td>[[ detalle.stock || 'N/A' ]]</td>
                 <td>[[ formatCurrency(detalle.cost) ]]</td>
                 <td>
                     [[ formatCurrency(calcularCostoConDescuento(detalle.cost, detalle.dctoItem)) ]] 

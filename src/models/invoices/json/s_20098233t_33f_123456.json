@@ -1,0 +1,37 @@
+{
+    "headers": {
+        "supplier": "20098233",
+        "supplierName": "Cristian Prueba",
+        "typeDocument": "33",
+        "nDocument": "123456",
+        "dcto": 0,
+        "datePurchase": "2024-11-08",
+        "dateExpired": "2024-11-08",
+        "observation": "Prueba",
+        "typePay": 1,
+        "nCheque": 0,
+        "qtyCheque": 0,
+        "subtotal": 30000,
+        "urlPDF": "",
+        "urlJson": "",
+        "dateReception": "2024-11-08",
+        "userProcess": "Nombre Usuario",
+        "urlImg": ""
+    },
+    "details": [
+        {
+            "qty": 2,
+            "cost": 15000,
+            "codeBar": "",
+            "dctoItem": 0,
+            "subtotalItem": 30000,
+            "deliveryItem": false,
+            "checkItem": "false",
+            "sku": "ILU20984",
+            "idERP": "161208",
+            "model": "64514 120v 300w",
+            "idPro": ""
+        }
+    ],
+    "type": "1"
+}

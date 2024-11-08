@@ -5,7 +5,7 @@
 <div id="app" class="m-2">
     <h3>Cuadrar Productos en Sector</h3>
 
-    <!-- Input único para ingresar sector y SuperID -->
+    <!-- Input para ingresar sector o SuperID -->
     <div class="form-group">
         <input type="text" id="inputScanner" class="form-control" v-model="scannerInput" placeholder="Escanea el sector o el SuperID" @keyup.enter="procesarEntrada" />
     </div>
@@ -25,23 +25,34 @@
                     <th>SuperID</th>
                     <th>SKU</th>
                     <th>Nombre</th>
-                    <th>Descripción</th>
-                    <th>Precio</th>
-                    <th>Stock</th>
+                    
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="(producto, index) in productosEnSector" :key="producto.superid">
-                    <td>[[ index + 1 ]]</td>
+                <tr v-for="(producto, index) in paginatedProducts" :key="producto.superid">
+                    <td>[[ index + 1 + (currentPage - 1) * itemsPerPage ]]</td>
                     <td>[[ producto.superid ]]</td>
                     <td>[[ producto.sku ]]</td>
                     <td>[[ producto.name ]]</td>
-                    <td>[[ producto.description ]]</td>
-                    <td>[[ producto.price ]]</td>
-                    <td>[[ producto.stock ]]</td>
+                    
                 </tr>
             </tbody>
         </table>
+
+        <!-- Controles de paginación -->
+        <nav aria-label="Paginación de productos">
+            <ul class="pagination">
+                <li class="page-item" :class="{ 'disabled': currentPage === 1 }">
+                    <a class="page-link" href="#" @click.prevent="changePage(currentPage - 1)">Anterior</a>
+                </li>
+                <li class="page-item" v-for="page in totalPages" :key="page" :class="{ 'active': currentPage === page }">
+                    <a class="page-link" href="#" @click.prevent="changePage(page)">[[ page ]]</a>
+                </li>
+                <li class="page-item" :class="{ 'disabled': currentPage === totalPages }">
+                    <a class="page-link" href="#" @click.prevent="changePage(currentPage + 1)">Siguiente</a>
+                </li>
+            </ul>
+        </nav>
     </div>
 
     <!-- Tabla para mostrar los productos escaneados -->
@@ -67,7 +78,7 @@
         </table>
     </div>
 
-    <!-- Mensajes de productos movidos a Narnia -->
+    <!-- Lista de productos movidos a Narnia -->
     <div v-if="productosMovidosNarnia.length">
         <h4>Productos movidos a Narnia</h4>
         <ul>
@@ -80,34 +91,55 @@
 {% block js %}
 <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
     new Vue({
         el: '#app',
         delimiters: ['[[', ']]'],
         data: {
-            scannerInput: '',         // Input para escanear sector o SuperID
-            sectorQuery: '',          // Sector actual
-            previousSector: '',       // Almacena el sector anterior escaneado
-            productosEnSector: [],    // Productos en el sector actual
-            productosEscaneados: [],  // Productos escaneados
-            productosMovidosNarnia: [], // Productos movidos a Narnia
-            loading: false,           // Indicador de carga
+            scannerInput: '',               // Input para escanear sector o SuperID
+            sectorQuery: '',                // Sector actual
+            previousSector: '',             // Almacena el sector anterior escaneado
+            productosEnSector: [],          // Productos en el sector actual
+            productosEscaneados: [],        // Productos escaneados
+            productosMovidosNarnia: [],     // Productos movidos a Narnia
+            loading: false,                 // Indicador de carga
+            currentPage: 1,                 // Página actual para paginación
+            itemsPerPage: 10                // Productos por página
+        },
+        computed: {
+            // Cálculo de productos para mostrar en la página actual
+            paginatedProducts() {
+                const start = (this.currentPage - 1) * this.itemsPerPage;
+                const end = start + this.itemsPerPage;
+                return this.productosEnSector.slice(start, end);
+            },
+            // Número total de páginas
+            totalPages() {
+                return Math.ceil(this.productosEnSector.length / this.itemsPerPage);
+            }
         },
         methods: {
-            // Procesa el input de escaneo (sector o SuperID)
+            // Procesa la entrada de escaneo (sector o SuperID)
             procesarEntrada() {
                 const input = this.scannerInput.trim();
                 
-                // Verificar si el input es un sector (B-)
                 if (input.startsWith('B-')) {
-                    // Verificar si el sector ya está escaneado
+                    // Verificar si hay un sector abierto y si el nuevo input es diferente
+                    if (this.previousSector && input !== this.previousSector) {
+                        alert("Debes cerrar el sector actual antes de abrir uno nuevo.");
+                        return;
+                    }
+
+                    // Si el sector es el mismo que el abierto, ejecutar cuadratura
                     if (input === this.previousSector) {
                         this.cuadrarProductos(); // Cuadrar productos si es el mismo sector
                     } else {
+                        // Si es un nuevo sector, limpiar y buscar productos
                         this.sectorQuery = input;
                         this.buscarProductosSector();
-                        this.previousSector = input; // Actualizar el sector previo
+                        this.previousSector = input; // Guardar el nuevo sector como el actual
                         this.productosEscaneados = []; // Limpiar la lista de escaneados
                     }
                 } else {
@@ -116,7 +148,7 @@
                 }
                 this.scannerInput = ''; // Limpiar el input
             },
-    
+
             // Buscar productos en el sector actual
             buscarProductosSector() {
                 if (!this.sectorQuery) return;
@@ -127,17 +159,18 @@
                     .then(response => {
                         this.loading = false;
                         this.productosEnSector = response.data.resp === 1 ? response.data.productos : [];
+                        this.currentPage = 1; // Reinicia la paginación al cargar nuevos productos
                     })
                     .catch(error => {
                         this.loading = false;
                         console.error('Error al buscar productos:', error);
-                        this.productosEnSector = [];  // Asegura que esté definido
+                        this.productosEnSector = [];
                     });
             },
-    
+
             // Agregar SuperID a la lista de productos escaneados
             agregarProductoEscaneado(superid) {
-                const productoEnSector = this.productosEnSector ? this.productosEnSector.find(p => p.superid === superid) : null;
+                const productoEnSector = this.productosEnSector.find(p => p.superid === superid);
                 if (productoEnSector && !this.productosEscaneados.some(p => p.superid === superid)) {
                     this.productosEscaneados.push({
                         superid: productoEnSector.superid,
@@ -146,7 +179,14 @@
                     });
                 }
             },
-    
+
+            // Cambiar página
+            changePage(page) {
+                if (page > 0 && page <= this.totalPages) {
+                    this.currentPage = page;
+                }
+            },
+
             // Cuadrar productos entre sector y escaneados
             cuadrarProductos() {
                 if (this.productosEscaneados.length === 0) {
@@ -165,19 +205,19 @@
                         this.productosMovidosNarnia = response.data.productos_faltantes || [];
                         this.productosEscaneados = [];  // Limpiar productos escaneados
 
-                        // Mostrar SweetAlert de éxito con duración de 2 segundos
+                        // Mostrar SweetAlert de éxito
                         Swal.fire({
                             title: 'Cuadratura completada',
                             text: 'Productos faltantes movidos a Narnia.',
                             icon: 'success',
                             showConfirmButton: false,
-                            timer: 2000 // Duración de 2 segundos
+                            timer: 2000
                         });
 
-                        // Limpiar el sector, sector previo, y productos en el sector
+                        // Limpiar sector y productos en el sector
                         this.sectorQuery = '';
                         this.previousSector = '';
-                        this.productosEnSector = [];  // Limpiar productos en el sector para vaciar la tabla
+                        this.productosEnSector = [];
                     } else {
                         console.error('Error en cuadratura:', response.data.msg);
                     }
@@ -185,7 +225,7 @@
                 .catch(error => {
                     this.loading = false;
                     console.error('Error al cuadrar productos:', error);
-                    this.productosMovidosNarnia = [];  // Asegura que esté definido
+                    this.productosMovidosNarnia = [];
                 });
             }
         },
@@ -194,5 +234,5 @@
             this.$nextTick(() => document.getElementById('inputScanner').focus());
         }
     });
-    </script>
+</script>
 {% endblock js %}

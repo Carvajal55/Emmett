@@ -41,9 +41,6 @@
                     <th>Super ID</th>
                     <th>SKU</th>
                     <th>Nombre del Producto</th>
-                    <th>Descripción</th>
-                    <th>Precio</th>
-                    <th>Stock</th>
                 </tr>
             </thead>
             <tbody>
@@ -52,9 +49,6 @@
                     <td>[[ producto.superid ]]</td>
                     <td>[[ producto.sku ]]</td>
                     <td>[[ producto.name ]]</td>
-                    <td>[[ producto.description ]]</td>
-                    <td>[[ producto.price ]]</td>
-                    <td>[[ producto.stock ]]</td>
                 </tr>
             </tbody>
         </table>
@@ -110,18 +104,27 @@
         methods: {
             procesarInput() {
                 const valor = this.inputValue.trim();
+
                 if (valor.startsWith('B-')) {
+                    // Si se ingresa el mismo sector, limpiar y permitir seleccionar uno nuevo
                     if (this.sectorSeleccionado === valor) {
-                        this.addProductsToSector();
+                        this.limpiarSeleccion();  // Cierra el sector y limpia la data
+                        alert("Sector cerrado. Ahora puedes seleccionar uno nuevo.");
                     } else {
+                        // Si es un sector diferente y hay uno abierto, mostrar advertencia
+                        if (this.sectorSeleccionado) {
+                            alert("Ya hay un sector abierto. Cierra el sector actual antes de abrir uno nuevo.");
+                            return;
+                        }
+
+                        // Selecciona el nuevo sector y carga los productos
                         this.sectorSeleccionado = valor;
-                        this.productosParaAgregar = [];
                         this.buscarProductos();
-                        console.log(`Sector ${valor} seleccionado. Escanea productos para agregar.`);
                     }
                 } else {
                     this.agregarProductoPorSuperID(valor);
                 }
+
                 this.inputValue = '';
             },
 
@@ -131,8 +134,8 @@
                 })
                 .then(response => {
                     if (response.data.resp === 1) {
-                        this.productos = response.data.productos;
-                        this.currentPage = 1;
+                        this.productos = response.data.productos; // Actualiza la lista de productos
+                        this.currentPage = 1; // Reinicia la paginación
                         this.playSound('success');
                     } else {
                         console.error(response.data.msg);
@@ -152,9 +155,7 @@
                     this.playSound('error');
                     return;
                 }
-
                 this.productosParaAgregar.push({ superid });
-                console.log(`Producto ${superid} añadido a la lista para el sector ${this.sectorSeleccionado}.`);
                 this.playSound('success');
             },
 
@@ -176,44 +177,9 @@
                 })
                 .then(response => {
                     if (response.data.resp === 1) {
-                        console.log('Productos añadidos correctamente al sector.');
                         this.productosParaAgregar = [];
-                        this.buscarProductos();
+                        this.buscarProductos(); // Refresca la lista de productos en el sector
                         this.playSound('success');
-                    } else {
-                        console.error(response.data.msg);
-                        this.playSound('error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error al agregar productos:', error);
-                    this.playSound('error');
-                });
-            },addProductsToSector() {
-                if (!this.sectorSeleccionado) {
-                    console.error('Selecciona un sector antes de agregar productos.');
-                    this.playSound('error');
-                    return;
-                }
-                if (this.productosParaAgregar.length === 0) {
-                    console.error('No hay productos para agregar.');
-                    this.playSound('error');
-                    return;
-                }
-
-                axios.post('/api/anadir-producto-sector/', {
-                    productos: this.productosParaAgregar.map(p => ({ superid: p.superid })),
-                    sector: this.sectorSeleccionado
-                })
-                .then(response => {
-                    if (response.data.resp === 1) {
-                        console.log('Productos añadidos correctamente al sector.');
-                        this.productosParaAgregar = [];  // Limpia la lista de productos para agregar
-                        this.buscarProductos();  // Refresca la lista de productos en el sector
-                        this.playSound('success');
-
-                        // Limpiar el sector seleccionado para permitir ingresar uno nuevo
-                        this.sectorSeleccionado = '';
                     } else {
                         console.error(response.data.msg);
                         this.playSound('error');
@@ -235,17 +201,18 @@
                 this.sectorSeleccionado = '';
                 this.productosParaAgregar = [];
                 this.productos = [];
-                console.log('Sector y lista de productos reiniciados.');
+                this.currentPage = 1;
+                console.log("Selección limpiada, puedes ingresar un nuevo sector.");
             },
 
             playSound(type) {
                 const audioElement = type === 'success' ? document.getElementById('successSound') : document.getElementById('errorSound');
-                audioElement.currentTime = 0;  // Reinicia el sonido para que se reproduzca desde el inicio
+                audioElement.currentTime = 0;
                 audioElement.play();
             }
         }
     });
-    //document.getElementById('successSound').play();
-    //B-1-G1-1
 </script>
 {% endblock js %}
+
+<!-- B-1-G1-1 -->

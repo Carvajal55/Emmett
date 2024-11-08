@@ -534,8 +534,8 @@ def listar_facturas_pendientes(request):
     query = request.GET.get('q', '')
     page = request.GET.get('page', 1)
 
-    # Filtrar facturas pendientes (status = 0)
-    facturas = Purchase.objects.filter(status=0)
+    # Filtrar facturas pendientes (status = 0) y ordenar por fecha de adición descendente
+    facturas = Purchase.objects.filter(status=0).order_by('-dateadd')
     
     # Filtrar por número de folio si se introduce una búsqueda
     if query:
@@ -739,62 +739,70 @@ def create_product(request):
 @csrf_exempt
 def generar_json(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
+        try:
+            data = json.loads(request.body)
 
-        # Obtener los datos necesarios del encabezado para el modelo Purchase
-        supplier = data['headers'].get('supplier', '')
-        supplier_name = data['headers'].get('supplierName', '')
-        type_document = data['headers'].get('typeDocument', None)
-        number_document = data['headers'].get('nDocument', None)
-        observation = data['headers'].get('observation', '')
-        date_purchase = data['headers'].get('datePurchase', None)
-        subtotal = data['headers'].get('subtotal', 0)
-        url_img = data['headers'].get('urlImg', '')
+            # Obtener los datos necesarios del encabezado para el modelo Purchase
+            headers = data.get('headers', {})
+            supplier = headers.get('supplier', '')
+            supplier_name = headers.get('supplierName', '')
+            type_document = headers.get('typeDocument', None)
+            number_document = headers.get('nDocument', None)
+            observation = headers.get('observation', '')
+            date_purchase = headers.get('datePurchase', None)
+            subtotal = headers.get('subtotal', 0)
+            url_img = headers.get('urlImg', '')
 
-        # Crear el nombre del archivo basado en los datos del encabezado
-        file_name = f"s_{supplier}t_{type_document}f_{number_document}.json"
+            # Crear el nombre del archivo basado en los datos del encabezado
+            file_name = f"s_{supplier}t_{type_document}f_{number_document}.json"
 
-        # Construir la ruta relativa de guardado
-        relative_file_path = os.path.join('models', 'invoices', 'json', file_name)
-        absolute_file_path = os.path.join(settings.BASE_DIR, relative_file_path)
+            # Construir la ruta relativa de guardado
+            relative_file_path = os.path.join('models', 'invoices', 'json', file_name)
+            absolute_file_path = os.path.join(settings.BASE_DIR, relative_file_path)
 
-        # Crear las carpetas si no existen
-        os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+            # Crear las carpetas si no existen
+            os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
-        # Iterar sobre los detalles de la factura para asignar el `idERP` a cada SKU
-        for detalle in data['details']:
-            sku = detalle.get('sku', '')
-            # Buscar el producto por su SKU en el modelo Products
-            try:
-                producto = Products.objects.get(sku=sku)
-                detalle['idERP'] = producto.iderp  # Asignar el valor de `idERP`
-            except Products.DoesNotExist:
-                detalle['idERP'] = None  # Si no se encuentra el SKU, asignar None o algún valor predeterminado
+            # Iterar sobre los detalles de la factura para asignar el `idERP` a cada SKU
+            for detalle in data.get('details', []):
+                sku = detalle.get('sku', '')
+                try:
+                    producto = Products.objects.get(sku=sku)
+                    detalle['idERP'] = producto.iderp  # Asignar el valor de `idERP`
+                except Products.DoesNotExist:
+                    detalle['idERP'] = None  # Si no se encuentra el SKU, asignar None
 
-        # Guardar el JSON en el archivo especificado
-        with open(absolute_file_path, 'w', encoding='utf-8') as json_file:
-            json.dump(data, json_file, ensure_ascii=False, indent=4)
+            # Guardar el JSON en el archivo especificado
+            with open(absolute_file_path, 'w', encoding='utf-8') as json_file:
+                json.dump(data, json_file, ensure_ascii=False, indent=4)
 
-        # Crear el registro en la base de datos
-        purchase = Purchase.objects.create(
-            supplier=supplier,
-            suppliername=supplier_name,
-            typedoc=type_document,
-            number=number_document,
-            observation=observation,
-            dateadd=timezone.now(),
-            dateproccess=date_purchase,
-            subtotal=subtotal,
-            urljson=relative_file_path,  # Guardar solo la ruta relativa en la base de datos
-            urlimg=url_img,
-            status=0,  # Por defecto, puede ajustarse
-        )
+            # Crear el registro en la base de datos
+            purchase = Purchase.objects.create(
+                supplier=supplier,
+                suppliername=supplier_name,
+                typedoc=type_document,
+                number=number_document,
+                observation=observation,
+                dateadd=timezone.now(),
+                dateproccess=date_purchase,
+                subtotal=subtotal,
+                urljson=relative_file_path,  # Guardar solo la ruta relativa en la base de datos
+                urlimg=url_img,
+                status=0,  # Estado predeterminado
+            )
 
-        # Devolver la ruta del archivo creada y un mensaje de éxito
-        return JsonResponse({'message': 'Archivo JSON y registro creados correctamente', 'urlJson': relative_file_path, 'purchaseId': purchase.id})
-    
+            # Devolver la ruta del archivo creada y un mensaje de éxito
+            return JsonResponse({
+                'message': 'Archivo JSON y registro creados correctamente',
+                'urlJson': relative_file_path,
+                'purchaseId': purchase.id
+            }, status=201)
+
+        except Exception as e:
+            print("Error:", e)
+            return JsonResponse({'error': str(e)}, status=400)
+
     return JsonResponse({'error': 'Método no permitido'}, status=405)
-
 def get_suppliers(request):
     # Obtiene el parámetro de búsqueda (si existe)
     query = request.GET.get('q', '')
@@ -1082,53 +1090,55 @@ def buscar_productos_por_sector(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
+
 @csrf_exempt
 def search_products_by_sector(request):
     if request.method == 'POST':
-        # Verificar si los datos vienen en formato JSON
+        # Parse the JSON body
         try:
-            body = json.loads(request.body)  # Decodificar el cuerpo JSON
-            term = body.get('searchTerm', '')  # Obtener el searchTerm del JSON
+            body = json.loads(request.body)
+            term = body.get('searchTerm', '')
         except json.JSONDecodeError:
-            return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON'})
+            return JsonResponse({'resp': 3, 'msg': 'Error decoding JSON'})
 
-        # Imprimir el término recibido para depuración
-        print(f"Término de búsqueda recibido: '{term}'")
+        print(f"Search term received: '{term}'")
 
-        # Verificar si el término contiene 'B-' y luego procesarlo
-        if 'B-' in term:
+        # Verificar si el término tiene el formato correcto, comenzando con 'B-'
+        if term.startswith('B-'):
             parts = term.split('-')
             if len(parts) == 4:
-                id_office = parts[1]  # Extraer el idOffice
-                name_sector = parts[2] + '-' + parts[3]  # Combinar zona, piso, sección (ej: G1-1)
+                # Extraer id_office y name_sector a partir del término
+                id_office = parts[1]
+                name_sector = parts[2] + '-' + parts[3]
+                
+                print(f"Office ID: {id_office}, Sector Name: {name_sector}")
 
-                print(f"ID de Oficina: {id_office}, Nombre del Sector: {name_sector}")
-
-                # Buscar en la tabla sectorOffice usando idOffice y nameSector
+                # Buscar el sector en la base de datos
                 sector = Sectoroffice.objects.filter(namesector=name_sector, idoffice=id_office).first()
 
                 if sector:
-                    print(f"Sector encontrado: {sector.namesector} con id {sector.idsectoroffice}")
+                    print(f"Sector found: {sector.namesector} with id {sector.idsectoroffice}")
 
-                    # Ahora buscamos los productos en Uniqueproducts asociados al sector
+                    # Buscar productos en Uniqueproducts asociados al sector encontrado
                     productos = Uniqueproducts.objects.filter(location=sector.idsectoroffice)
-
-                    # Si hay productos, los listamos en el JSON de respuesta
                     productos_data = []
+
                     for producto in productos:
-                        productos_data.append({
-                            'superid': producto.superid,  # Agregar el superid del producto
-                            'sku': producto.product.sku,  # Ajusta esto según los campos de tu modelo
-                            'name': producto.product.nameproduct,  # Ajusta según tu modelo
-                            'description': producto.product.description,  # Ajusta según tu modelo
-                            'price': producto.product.lastprice,  # Ajusta según tu modelo
-                            'stock': producto.product.currentstock  # Ajusta según tu modelo
-                        })
+                        try:
+                            # Intentar acceder al producto relacionado
+                            productos_data.append({
+                                'superid': producto.superid,
+                                'sku': producto.product.sku if producto.product else "N/A",
+                                'name': producto.product.nameproduct if producto.product else "N/A"
+                            })
+                        except Products.DoesNotExist:
+                            print(f"No related Product found for Uniqueproduct with superid {producto.superid}")
+                            continue  # Ignorar este producto si no tiene un producto relacionado
 
                     # Generar la respuesta
                     response_data = {
                         'resp': 1,
-                        'msg': 'SECTOR SELECCIONADO',
+                        'msg': 'Sector seleccionado',
                         'idSector': sector.idsectoroffice,
                         'cantProd': len(productos_data),
                         'terminoScaneado': term,
@@ -1137,6 +1147,8 @@ def search_products_by_sector(request):
                     }
                     return JsonResponse(response_data)
                 else:
+                    # Sector no encontrado
+                    print(f"Sector '{name_sector}' no encontrado en oficina '{id_office}'")
                     return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado en oficina "{id_office}"'})
             else:
                 print(f"Formato de término incorrecto, partes encontradas: {parts}")
@@ -1145,8 +1157,8 @@ def search_products_by_sector(request):
             print(f"El término no contiene 'B-': {term}")
             return JsonResponse({'resp': 3, 'msg': 'El término de búsqueda no contiene el formato esperado.'})
 
+    # Responder si el método no es POST
     return JsonResponse({'resp': 3, 'msg': 'Método no permitido'})
-
 
 @csrf_exempt
 def add_product_to_sector(request):
