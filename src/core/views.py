@@ -42,6 +42,8 @@ from reportlab.graphics.barcode import code128
 import random
 import string
 import datetime
+from django.utils.crypto import get_random_string
+
 
 
 
@@ -87,11 +89,8 @@ def ingresar_documentos(request):
 @login_required(login_url='login_view')
 def anadir_psector(request):
     # Asegurarse de que el usuario tiene un objeto `usuario` con un rol
-    user_role = request.user.usuario.rol if hasattr(request.user, 'usuario') else None
-    context = {
-        'user_role': user_role
-    }
-    return render(request, 'anadir_psector.html', context)
+    
+    return render(request, 'anadir_psector.html')
 
 @login_required(login_url='login_view')
 def cuadrar_sector_view(request):
@@ -739,7 +738,6 @@ def create_supplier(request):
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-from django.utils.crypto import get_random_string
 
 # Función principal para crear un producto en Bsale y en la base de datos local
 @csrf_exempt

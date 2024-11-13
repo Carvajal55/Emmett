@@ -23,9 +23,7 @@
     <nav class="sidebar-nav scroll-sidebar" data-simplebar>
       <ul id="sidebarnav">
         
-        <!-- Opciones exclusivas para ADMIN y BODEGA -->
         {% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
-        
         <!-- Ingresar Documento -->
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'ingresar_documentos' %}">
@@ -50,6 +48,14 @@
           </a>
         </li>
 
+        
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'anadir_psector' %}">
+            <span><i class="ti ti-plus"></i></span>
+            <span class="hide-menu">Agregar Productos a Sector</span>
+          </a>
+        </li>
+        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'BODEGA' or request.user.usuario.rol == 'VENTAS' %}
         <!-- Cuadrar Sector -->
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'cuadrar_sector' %}">
@@ -57,26 +63,18 @@
             <span class="hide-menu">Cuadrar Sector</span>
           </a>
         </li>
+        {% endif %}
 
-        <!-- Crear Sectores -->
-        <li class="sidebar-item">
+         <!-- Cuadrar Sector -->
+         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'crear_sector' %}">
             <span><i class="ti ti-plus"></i></span>
             <span class="hide-menu">Crear Sectores</span>
           </a>
         </li>
-        
         {% endif %}
 
-        <!-- Agregar Productos a Sector - Permitido para ADMIN, BODEGA y VENTAS -->
-        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'BODEGA' or request.user.usuario.rol == 'VENTAS' %}
-        <li class="sidebar-item">
-          <a class="sidebar-link" href="{% url 'anadir_psector' %}">
-            <span><i class="ti ti-plus"></i></span>
-            <span class="hide-menu">Agregar Productos a Sector</span>
-          </a>
-        </li>
-        {% endif %}
+       
 
         <!-- Buscar Productos - Permitido para ADMIN, VENTAS y BODEGA -->
         {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'VENTAS' or request.user.usuario.rol == 'BODEGA' %}
@@ -107,7 +105,6 @@
           </a>
         </li>
         {% endif %}
-        
       </ul>
     </nav>
     <!-- End Sidebar navigation -->

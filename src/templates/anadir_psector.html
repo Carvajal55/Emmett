@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<div id="app" class="m-2" v-if="accesoPermitido">
+<div id="app" class="m-2">
     <audio id="successSound" src="{% static 'sounds/success.mp3' %}" preload="auto"></audio>
     <h3>Gestión de Productos por Sector</h3>
 
@@ -16,23 +16,7 @@
         <h5 class="mt-3">Sector actual: [[ sectorSeleccionado ]]</h5>
     </div>
 
-    <!-- Lista de productos que se van a agregar -->
-    <div v-if="productosParaAgregar.length">
-        <h5 class="mt-3">Productos para agregar</h5>
-        <ul class="list-group">
-            <li v-for="(producto, index) in productosParaAgregar" :key="index" class="list-group-item">
-                [[ producto.superid ]]
-            </li>
-        </ul>
-    </div>
-
-    <!-- Botón para confirmar agregar productos al sector -->
-    <button class="btn btn-primary mt-3" @click="addProductsToSector" :disabled="productosParaAgregar.length === 0">Confirmar Agregar Productos al Sector</button>
-
-    <!-- Botón para limpiar la selección de sector y productos -->
-    <button class="btn btn-secondary mt-3 ms-3" @click="limpiarSeleccion">Limpiar Selección</button>
-
-    <!-- Tabla para mostrar los productos con paginación -->
+    <!-- Tabla para mostrar los productos en el sector con paginación -->
     <div v-if="productos.length">
         <table class="table table-striped table-hover mt-4">
             <thead>
@@ -68,23 +52,10 @@
             </ul>
         </nav>
     </div>
-</div>
 
-<!-- Modal para Clave Dinámica -->
-<div class="modal fade" id="dynamicKeyModal" tabindex="-1" aria-labelledby="dynamicKeyModalLabel" aria-hidden="true" v-if="userRole === 'VENTAS' && !accesoPermitido">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="dynamicKeyModalLabel">Acceso al Sector</h5>
-            </div>
-            <div class="modal-body">
-                <input type="text" v-model="dynamicKey" placeholder="Ingrese la clave de acceso" class="form-control" />
-            </div>
-            <div class="modal-footer">
-                <button type="button" @click="validateDynamicKey" class="btn btn-primary">Ingresar</button>
-            </div>
-        </div>
-    </div>
+    <!-- Elementos de audio para sonidos de éxito y error -->
+    <audio id="successSound" src="{% static 'sounds/success.mp3' %}"></audio>
+    <audio id="errorSound" src="{% static 'sounds/error.mp3' %}"></audio>
 </div>
 {% endblock content %}
 
@@ -97,15 +68,11 @@
         el: '#app',
         delimiters: ['[[', ']]'],
         data: {
-            dynamicKey: '',           // Clave ingresada por el usuario
-            accesoPermitido: false,   // Estado de acceso
-            userRole: '{{ user_role }}',     // Estado de acceso
-            inputValue: '',              // Valor del input para sector o Super ID
-            sectorSeleccionado: '',      // Sector actualmente seleccionado
-            productos: [],               // Lista de productos en el sector
-            currentPage: 1,              // Página actual
-            itemsPerPage: 10,            // Productos por página
-            productosParaAgregar: []     // Lista de productos a agregar
+            inputValue: '',  // Valor del input para sector o Super ID
+            sectorSeleccionado: '',  // Sector actualmente seleccionado
+            productos: [],  // Lista de productos en el sector
+            currentPage: 1,  // Página actual
+            itemsPerPage: 10  // Productos por página
         },
         computed: {
             paginatedProducts() {
@@ -118,29 +85,17 @@
             }
         },
         mounted() {
-            // Mostrar el modal de clave al cargar la página solo si el usuario es de Ventas
-            if (this.userRole === 'VENTAS' && !this.accesoPermitido) {
-                new bootstrap.Modal(document.getElementById('dynamicKeyModal')).show();
-            }
+            this.setFocus();
         },
         methods: {
-            validateDynamicKey() {
-                axios.post('/api/validate-dynamic-key/', { key: this.dynamicKey })
-                    .then(response => {
-                        if (response.data.valid) {
-                            this.accesoPermitido = true;
-                            new bootstrap.Modal(document.getElementById('dynamicKeyModal')).hide();
-                        } else {
-                            Swal.fire('Error', 'Clave no válida o expirada.', 'error');
-                        }
-                    })
-                    .catch(error => {
-                        Swal.fire('Error', 'No se pudo validar la clave.', 'error');
-                        console.error(error);
-                    });
+            setFocus() {
+                this.$nextTick(() => {
+                    document.getElementById("sectorOrProductInput").focus();
+                });
             },
             procesarInput() {
                 const valor = this.inputValue.trim();
+
                 if (valor.startsWith('B-')) {
                     if (this.sectorSeleccionado === valor) {
                         this.limpiarSeleccion();
@@ -156,8 +111,11 @@
                 } else {
                     this.agregarProductoPorSuperID(valor);
                 }
+
                 this.inputValue = '';
+                this.setFocus();  // Asegura que el foco vuelva al input después de procesar
             },
+
             buscarProductos() {
                 axios.post('/api/buscar-productos-sector/', {
                     searchTerm: this.sectorSeleccionado
@@ -166,61 +124,71 @@
                     if (response.data.resp === 1) {
                         this.productos = response.data.productos;
                         this.currentPage = 1;
+                        this.playSound('success');
                     } else {
                         console.error(response.data.msg);
                         this.productos = [];
+                        this.playSound('error');
                     }
+                    this.setFocus();  // Vuelve el foco al input después de la búsqueda
                 })
                 .catch(error => {
                     console.error('Error al buscar productos:', error);
+                    this.playSound('error');
+                    this.setFocus();  // Asegura el foco en caso de error
                 });
             },
+
             agregarProductoPorSuperID(superid) {
-                if (this.productosParaAgregar.some(producto => producto.superid === superid)) {
-                    console.warn('Este producto ya está en la lista.');
-                    return;
-                }
-                this.productosParaAgregar.push({ superid });
-            },
-            addProductsToSector() {
                 if (!this.sectorSeleccionado) {
-                    console.error('Selecciona un sector antes de agregar productos.');
-                    return;
-                }
-                if (this.productosParaAgregar.length === 0) {
-                    console.error('No hay productos para agregar.');
+                    alert('Selecciona un sector antes de agregar productos.');
+                    this.playSound('error');
                     return;
                 }
 
                 axios.post('/api/anadir-producto-sector/', {
-                    productos: this.productosParaAgregar.map(p => ({ superid: p.superid })),
+                    productos: [{ superid }],
                     sector: this.sectorSeleccionado
                 })
                 .then(response => {
                     if (response.data.resp === 1) {
-                        this.productosParaAgregar = [];
-                        this.buscarProductos();
+                        this.buscarProductos(); // Refresca la lista de productos en el sector
+                        this.playSound('success');
                     } else {
                         console.error(response.data.msg);
+                        this.playSound('error');
                     }
+                    this.setFocus();  // Vuelve el foco al input después de agregar productos
                 })
                 .catch(error => {
-                    console.error('Error al agregar productos:', error);
+                    console.error('Error al agregar producto:', error);
+                    this.playSound('error');
+                    this.setFocus();  // Asegura el foco en caso de error
                 });
             },
+
             changePage(page) {
                 if (page > 0 && page <= this.totalPages) {
                     this.currentPage = page;
                 }
+                this.setFocus();  // Asegura el foco al cambiar de página
             },
+
             limpiarSeleccion() {
                 this.sectorSeleccionado = '';
-                this.productosParaAgregar = [];
                 this.productos = [];
                 this.currentPage = 1;
                 console.log("Selección limpiada, puedes ingresar un nuevo sector.");
+                this.setFocus();  // Foco después de limpiar
+            },
+
+            playSound(type) {
+                const audioElement = type === 'success' ? document.getElementById('successSound') : document.getElementById('errorSound');
+                audioElement.currentTime = 0;
+                audioElement.play();
             }
         }
     });
 </script>
 {% endblock js %}
+<!-- B-1-G1-1 -->
