@@ -33,7 +33,9 @@ urlpatterns = [
     path('recepciones_pendientes/', core_views.recepciones_pendientes, name='recepciones_pendientes'),  # URL que apunta al HTML
     path('ingresar_documentos/', core_views.ingresar_documentos, name='ingresar_documentos'), 
     path('anadir_psector/', core_views.anadir_psector, name='anadir_psector'), # URL que apunta al HTML
-    path('cuadrar_sector/', core_views.cuadrar_sector_view, name='cuadrar_sector'), # URL que apunta al HTML
+    path('cuadrar_sector/', core_views.cuadrar_sector_view, name='cuadrar_sector'), 
+    path('crear_sector/', core_views.crear_sector, name='crear_sector'), # URL que apunta al HTML
+    # URL que apunta al HTML
     path('despacho/', core_views.despacho, name='despacho'),
 
 
@@ -47,7 +49,7 @@ urlpatterns = [
     #BUSCAR PRODUCTOS
     path('api/buscar-productos/', core_views.buscar_productosAPI, name='buscar_productosAPI'),
     path('api/producto-detalles/<int:product_id>/', core_views.producto_detalles, name='producto_detalles'),
-    path('api/listar-bodegas/', core_views.listar_bodegas, name='crear_producto'),
+    path('api/listar-bodegas/', core_views.listar_bodegas, name='listar_bodegas'),
     path('api/listar-compras/', core_views.listar_compras, name='listar_compras'),
     path('api/resumen-facturas/', core_views.resumen_factura, name='resumen_factura'),
     path('api/listar-facturas-pendientes/', core_views.listar_facturas_pendientes, name='listar_facturas_pendientes'),
@@ -59,7 +61,7 @@ urlpatterns = [
     path('api/imprimir-etiqueta/', core_views.imprimir_etiqueta, name='imprimir_etiqueta'),
     #Ingresar Documentos
     path('api/create-supplier/', core_views.create_supplier, name='create_supplier'),
-    path('api/create-product/', core_views.create_product, name='create_product'),
+    path('api/create-product/', core_views.crear_producto, name='crear_producto'),
     path('api/generar-json/', core_views.generar_json, name='generar_json'),
     path('api/get-suppliers/', core_views.get_suppliers, name='get_suppliers'),
     path('api/get-products/', core_views.get_products, name='get_products'),
@@ -71,14 +73,15 @@ urlpatterns = [
     path('api/save-document-lines/', core_views.save_document_lines, name='save_document_lines'),
     path('api/actualizar_precio/', core_views.actualizar_precio, name='actualizar_precio'),
 
+
     # Sectorizar 
     path('api/consultar-productos-sector/', core_views.consultar_productos_sector, name='consultar_productos_sector'),
-    path('api/buscar-productos-por-sector/', core_views.buscar_productos_por_sector, name='buscar_productos_por_sector'),
+    #path('api/buscar-productos-por-sector/', core_views.buscar_productos_por_sector, name='buscar_productos_por_sector'),
     path('api/buscar-productos-sector/', core_views.search_products_by_sector, name='buscar_productos_sector'),
     path('api/anadir-producto-sector/', core_views.add_product_to_sector, name='anadir_producto_al_sector'),  
     path('api/buscar-producto-superid/', core_views.buscar_producto_superid, name='buscar_producto_superid'),
     path('api/mover-productos/', core_views.move_products_to_sector, name='mover_productos'),
-    path('api/anadir-producto-sector/', core_views.anadir_producto_sector, name='anadir_producto_sector'),
+    #path('api/anadir-producto-sector/', core_views.anadir_producto_sector, name='anadir_producto_sector'),
     #Cuadrar Sector
     path('api/cuadrar-productos/', core_views.cuadrar_productos, name='cuadrar_productos'),
 
@@ -89,6 +92,8 @@ urlpatterns = [
     #Despacho
    path('api/current-dispatch/', core_views.current_dispatch, name='current_dispatch'),
    path('api/details-document/', core_views.details_document, name='details_document'),
+    path('api/generate-dynamic-key/', core_views.generate_dynamic_key, name='generate_dynamic_key'),
+    path('api/validate-dynamic-key/', core_views.validate_dynamic_key, name='validate_dynamic_key'),
    #path('api/dispatch-product/', core_views.dispatch_product, name='dispatch_product'),
    path('api/dispatch-consumption/', core_views.dispatch_consumption, name='dispatch_consumption'),
    path('api/consult-bsale-document/', core_views.get_unique_document, name='get_unique_document'),

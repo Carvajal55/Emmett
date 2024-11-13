@@ -7,7 +7,7 @@
     <!-- Botón de Toggle siempre visible -->
     <div class="d-flex justify-content-end p-2">
       <button class="btn btn-toggle" id="toggleSidebar">
-        <i class="ti ti-menu fs-5"></i> <!-- Icono de hamburguesa -->
+        <i class="ti ti-menu fs-5"></i>
       </button>
     </div>
     
@@ -22,55 +22,92 @@
     <!-- Sidebar navigation-->
     <nav class="sidebar-nav scroll-sidebar" data-simplebar>
       <ul id="sidebarnav">
-        <!-- Opciones del menú lateral -->
+        
+        <!-- Opciones exclusivas para ADMIN y BODEGA -->
+        {% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
+        
+        <!-- Ingresar Documento -->
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'ingresar_documentos' %}">
             <span><i class="ti ti-plus"></i></span>
             <span class="hide-menu">Ingresar Documento</span>
           </a>
         </li>
+
+        <!-- Autorizar Documento -->
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'recepciones_pendientes' %}">
             <span><i class="ti ti-file-check"></i></span>
             <span class="hide-menu">Autorizar Documento</span>
           </a>
         </li>
+
+        <!-- Imprimir Etiquetas -->
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'recepciones_aceptadas' %}">
             <span><i class="ti ti-printer"></i></span>
             <span class="hide-menu">Imprimir Etiquetas</span>
           </a>
         </li>
-        <li class="sidebar-item">
-          <a class="sidebar-link" href="{% url 'anadir_psector' %}">
-            <span><i class="ti ti-plus"></i></span>
-            <span class="hide-menu">Agregar Productos a Sector</span>
-          </a>
-        </li>
+
+        <!-- Cuadrar Sector -->
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'cuadrar_sector' %}">
             <span><i class="ti ti-plus"></i></span>
             <span class="hide-menu">Cuadrar Sector</span>
           </a>
         </li>
+
+        <!-- Crear Sectores -->
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'crear_sector' %}">
+            <span><i class="ti ti-plus"></i></span>
+            <span class="hide-menu">Crear Sectores</span>
+          </a>
+        </li>
+        
+        {% endif %}
+
+        <!-- Agregar Productos a Sector - Permitido para ADMIN, BODEGA y VENTAS -->
+        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'BODEGA' or request.user.usuario.rol == 'VENTAS' %}
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'anadir_psector' %}">
+            <span><i class="ti ti-plus"></i></span>
+            <span class="hide-menu">Agregar Productos a Sector</span>
+          </a>
+        </li>
+        {% endif %}
+
+        <!-- Buscar Productos - Permitido para ADMIN, VENTAS y BODEGA -->
+        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'VENTAS' or request.user.usuario.rol == 'BODEGA' %}
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'buscar_productos' %}">
             <span><i class="ti ti-search"></i></span>
             <span class="hide-menu">Buscar Productos</span>
           </a>
         </li>
+        {% endif %}
+
+        <!-- Despachar Productos - Permitido para ADMIN, VENTAS y BODEGA -->
+        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'VENTAS' or request.user.usuario.rol == 'BODEGA' %}
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'despacho' %}">
             <span><i class="ti ti-truck"></i></span>
             <span class="hide-menu">Despachar Productos</span>
           </a>
         </li>
+        {% endif %}
+
+        <!-- Crear Usuarios - Solo para ADMIN -->
+        {% if request.user.usuario.rol == 'ADMIN' %}
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'crear_usuarios_view' %}">
             <span><i class="ti ti-user-plus"></i></span>
             <span class="hide-menu">Crear Usuarios</span>
           </a>
         </li>
+        {% endif %}
+        
       </ul>
     </nav>
     <!-- End Sidebar navigation -->
@@ -78,57 +115,3 @@
   <!-- End Sidebar scroll-->
 </aside>
 <!-- Sidebar End -->
-
-<!-- Estilos CSS para el Sidebar -->
-<style>
-  /* Estilo para el sidebar cuando está colapsado */
-  .left-sidebar.collapsed {
-    width: 0;
-    overflow: hidden;
-    transition: width 0.3s ease;
-  }
-
-  /* Estilo del sidebar cuando está expandido */
-  .left-sidebar {
-    width: 250px;
-    transition: width 0.3s ease;
-  }
-
-  /* Ajuste para el contenido principal cuando el sidebar está colapsado */
-  .main-content {
-    margin-left: 250px;
-    transition: margin-left 0.3s ease;
-  }
-
-  .main-content.collapsed {
-    margin-left: 0;
-  }
-
-  /* Opciones ocultas en el sidebar colapsado */
-  .left-sidebar.collapsed .hide-menu {
-    display: none;
-  }
-
-  /* Botón de menú en posición fija para fácil acceso */
-  #toggleSidebar {
-    position: fixed;
-    top: 15px;
-    left: 15px;
-    z-index: 1000;
-  }
-</style>
-
-<!-- JavaScript para el Toggle del Sidebar -->
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const sidebar = document.getElementById("sidebar");
-    const toggleButton = document.getElementById("toggleSidebar");
-    const mainContent = document.querySelector(".main-content");
-
-    toggleButton.addEventListener("click", function () {
-      // Cambia las clases para mostrar u ocultar el sidebar
-      sidebar.classList.toggle("collapsed");
-      mainContent.classList.toggle("collapsed");
-    });
-  });
-</script>

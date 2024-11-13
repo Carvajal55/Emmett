@@ -6,6 +6,9 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
+
 
 import uuid
 
@@ -14,14 +17,16 @@ class Usuario(models.Model):
         ('ADMIN', 'Administrador'),
         ('VENTAS', 'Ventas'),
         ('BODEGA', 'Bodega'),
+        ('SADMIN','SuperAdmin')
     )
 
+    user = models.OneToOneField(User, on_delete=models.CASCADE,null=True,blank=True)  # Relación con el modelo User de Django
     nombres_apellidos = models.CharField(max_length=255, blank=True, null=True)
     rut = models.CharField(max_length=12, blank=True, null=True)
     telefono = models.CharField(max_length=15, blank=True, null=True)
-    correo = models.EmailField(unique=True)  # El correo será único y obligatorio
+    correo = models.EmailField(unique=True,null=True,blank=True)  # Correo único
     clave = models.CharField(max_length=100, default='40emmett90')  # Clave por defecto
-    rol = models.CharField(max_length=10, choices=ROLES, default='VENTAS')  # Campo de elección de roles
+    rol = models.CharField(max_length=10, choices=ROLES, default='VENTAS')  # Rol de usuario
 
     def __str__(self):
         return f"{self.nombres_apellidos} ({self.rol})"
@@ -72,9 +77,8 @@ class Products(models.Model):
     idmelimain = models.CharField(db_column='IDMELIMAIN', max_length=100, blank=True, null=True)  # Field name made lowercase.
     idproduct = models.IntegerField(db_column='idProduct', blank=True, null=True)  # Field name made lowercase.
     meliprice_s1 = models.IntegerField(db_column='meliPrice_s1', blank=True, null=True)  # Field name made lowercase.
-
+    uniquecodebar = models.BooleanField(default=False, blank=True, null=True)  # Nuevo campo
     class Meta:
-        managed = False
         db_table = 'products'
 
 
@@ -215,4 +219,10 @@ class Dispatch(models.Model):
     quantity = models.IntegerField()
     count = models.IntegerField(default=0)
 
+class DynamicKey(models.Model):
+    key = models.CharField(max_length=6, unique=True)
+    expiration_time = models.DateTimeField()
+
+    def is_valid(self):
+        return timezone.now() <= self.expiration_time
 

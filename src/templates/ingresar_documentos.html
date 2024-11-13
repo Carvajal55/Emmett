@@ -46,7 +46,7 @@
             </div>
         </div>
 
-       <!-- Formulario de Crear Producto -->
+      <!-- Formulario de Crear Producto -->
         <div class="modal fade" id="modalCrearProducto" tabindex="-1" aria-labelledby="modalProductoLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
@@ -57,10 +57,7 @@
                     <div class="modal-body">
                         <div class="row">
                             <!-- SKU -->
-                            <div class="col-6 mb-3">
-                                <label for="skuProducto" class="form-label">SKU</label>
-                                <input type="text" class="form-control" v-model="nuevoProducto.sku">
-                            </div>
+                            
                             <!-- Nombre Producto -->
                             <div class="col-6 mb-3">
                                 <label for="nombreProducto" class="form-label">Nombre Producto</label>
@@ -71,11 +68,7 @@
                                 <label for="marcaProducto" class="form-label">Marca</label>
                                 <input type="text" class="form-control" v-model="nuevoProducto.marca">
                             </div>
-                            <!-- Precio -->
-                            <div class="col-6 mb-3">
-                                <label for="precioProducto" class="form-label">Precio</label>
-                                <input type="number" class="form-control" v-model="nuevoProducto.precio">
-                            </div>
+                           
                             <!-- Proveedor -->
                             <div class="col-6 mb-3">
                                 <label for="proveedorProducto" class="form-label">Proveedor</label>
@@ -85,11 +78,20 @@
                                     </option>
                                 </select>
                             </div>
-                            <!-- Codigo Barra -->
+                            <!-- Categoría -->
                             <div class="col-6 mb-3">
-                                <label for="codigoBarra" class="form-label">Codigo de Barra</label>
-                                <input type="number" class="form-control" >
+                                <label for="categoriaProducto" class="form-label">Categoría</label>
+                                <select class="form-select" v-model="nuevoProducto.categoria">
+                                    <option value="audio">Audio</option>
+                                    <option value="instrumentos">Instrumentos Musicales</option>
+                                    <option value="estudio">Estudio</option>
+                                    <option value="iluminacion">Iluminación</option>
+                                    <option value="electronica">Electrónica y Computación</option>
+                                    <option value="otros">Otros</option>
+                                </select>
                             </div>
+                            <!-- Código de Barra -->
+                            
                             <!-- Medidas y Peso -->
                             <div class="col-3 mb-3">
                                 <label for="altoProducto" class="form-label">Alto (cm)</label>
@@ -108,67 +110,6 @@
                                 <input type="number" class="form-control" v-model="nuevoProducto.peso" placeholder="kg">
                             </div>
                         </div>
-
-                        <!-- Categorías con Checkboxes -->
-                        <div class="mb-3">
-                            <label class="form-label">Categorías Principales</label>
-
-                            <!-- Audio -->
-                            <div>
-                                <input type="checkbox" v-model="menu.audio" @change="seleccionarCategoria('audio')"> Audio
-                                <div v-if="menu.audio" class="ms-3">
-                                    <input type="checkbox" v-model="menu.pruebaAudio"> Prueba
-                                    <div v-if="menu.pruebaAudio" class="ms-3">
-                                        <input type="checkbox" v-model="menu.checkboxFinalAudio"> Checkbox Final
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Instrumentos Musicales -->
-                            <div>
-                                <input type="checkbox" v-model="menu.instrumentos" @change="seleccionarCategoria('instrumentos')"> Instrumentos Musicales
-                                <div v-if="menu.instrumentos" class="ms-3">
-                                    <input type="checkbox" v-model="menu.pruebaInstrumentos"> Prueba
-                                    <div v-if="menu.pruebaInstrumentos" class="ms-3">
-                                        <input type="checkbox" v-model="menu.checkboxFinalInstrumentos"> Checkbox Final
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Estudio -->
-                            <div>
-                                <input type="checkbox" v-model="menu.estudio" @change="seleccionarCategoria('estudio')"> Estudio
-                                <div v-if="menu.estudio" class="ms-3">
-                                    <input type="checkbox" v-model="menu.pruebaEstudio"> Prueba
-                                    <div v-if="menu.pruebaEstudio" class="ms-3">
-                                        <input type="checkbox" v-model="menu.checkboxFinalEstudio"> Checkbox Final
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Iluminación -->
-                            <div>
-                                <input type="checkbox" v-model="menu.iluminacion" @change="seleccionarCategoria('iluminacion')"> Iluminación
-                                <div v-if="menu.iluminacion" class="ms-3">
-                                    <input type="checkbox" v-model="menu.pruebaIluminacion"> Prueba
-                                    <div v-if="menu.pruebaIluminacion" class="ms-3">
-                                        <input type="checkbox" v-model="menu.checkboxFinalIluminacion"> Checkbox Final
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Electrónica y Computación -->
-                            <div>
-                                <input type="checkbox" v-model="menu.electronica" @change="seleccionarCategoria('electronica')"> Electrónica y Computación
-                                <div v-if="menu.electronica" class="ms-3">
-                                    <input type="checkbox" v-model="menu.pruebaElectronica"> Prueba
-                                    <div v-if="menu.pruebaElectronica" class="ms-3">
-                                        <input type="checkbox" v-model="menu.checkboxFinalElectronica"> Checkbox Final
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -639,35 +580,42 @@
                     });
             },
             crearProducto() {
-                // Crear un objeto FormData
-                let formData = new FormData();
-                formData.append('sku', this.nuevoProducto.sku);
-                formData.append('nombre', this.nuevoProducto.nombre);
-                formData.append('marca', this.nuevoProducto.marca);
-                formData.append('precio', this.nuevoProducto.precio);
-                formData.append('descripcion', this.nuevoProducto.descripcion);
-                formData.append('categoria', this.nuevoProducto.categoria);
-                formData.append('codigoBarra', this.nuevoProducto.codigoBarra);
-                formData.append('proveedor', this.nuevoProducto.proveedor);
+                // Construimos el objeto nuevoProducto con todos los datos del formulario
+                const nuevoProducto = {
+                    sku: this.nuevoProducto.sku,            // SKU generado o ingresado
+                    nombre: this.nuevoProducto.nombre,      // Nombre del producto
+                    marca: this.nuevoProducto.marca,        // Marca del producto
+                    precio: this.nuevoProducto.precio,      // Precio del producto
+                    proveedor: this.nuevoProducto.proveedor, // ID del proveedor seleccionado
+                    categoria: this.nuevoProducto.categoria, // Categoría seleccionada (para generar el SKU)
+                    codigoBarra: this.nuevoProducto.codigoBarra, // Código de barras
+                    alto: this.nuevoProducto.alto,          // Dimensiones del producto
+                    largo: this.nuevoProducto.largo,
+                    profundidad: this.nuevoProducto.profundidad,
+                    peso: this.nuevoProducto.peso           // Peso del producto
+                };
 
-                axios.post('/api/create-product/', formData)
-                    .then(response => {
-                        Swal.fire('Éxito', 'Producto creado correctamente.', 'success');
-                        this.nuevoProducto = {
-                            sku: '',
-                            nombre: '',
-                            marca: '',
-                            precio: 0,
-                            descripcion: '',
-                            categoria: '',
-                            codigoBarra: '',
-                            proveedor: this.form.proveedor, // Reiniciar el proveedor con el seleccionado
-                        };
-                        this.searchProductos();
-                    })
-                    .catch(error => {
-                        Swal.fire('Error', 'No se pudo crear el producto.', 'error');
-                    });
+                // Enviamos la solicitud POST al backend para crear el producto
+                fetch("/api/create-product/", { // Asegúrate de usar la ruta completa si necesario
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(nuevoProducto)  // Convertimos el objeto a JSON
+                })
+                .then(response => response.json())  // Parseamos la respuesta a JSON
+                .then(data => {
+                    if (data.message) {
+                        alert(data.message);  // Notificación de éxito
+                        // Aquí puedes agregar lógica adicional si es necesario, como actualizar la lista de productos o limpiar el formulario
+                    } else {
+                        alert("Error: " + data.error);  // Muestra cualquier error retornado
+                    }
+                })
+                .catch(error => {
+                    console.error("Error al crear el producto:", error);
+                    alert("Hubo un problema al intentar crear el producto.");
+                });
             },
             enviarDatos() {
                 // Preparar los datos para el archivo JSON

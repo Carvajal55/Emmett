@@ -37,8 +37,78 @@
                 <label for="sidProduct">ID Producto</label>
                 <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid" class="form-control">
             </div>       
-            
+            {% if request.user.usuario.rol == 'ADMIN' %}
+            <div>
+                <button @click="generateDynamicKey" class="btn btn-warning mt-3">Generar Clave de Acceso</button>
+                <p v-if="generatedKey">Clave Generada: <span>[[ generatedKey ]]</span> (Expira en 5 minutos)</p>
+            </div>
+            {% endif %}
             <button @click="dispatchConsumption" class="mt-3 btn btn-success">Despachar</button>
+            <button @click="requestDynamicKeyAccess" class="mt-3 btn btn-primary">Despacho Interno</button>
+
+            <!-- Modal para ingresar la clave dinámica -->
+            <div class="modal fade" id="dynamicKeyModal" tabindex="-1" aria-labelledby="dynamicKeyModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="dynamicKeyModalLabel">Acceso al Despacho Interno</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="text" v-model="dynamicKey" placeholder="Ingrese la clave de acceso" class="form-control" />
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" @click="validateDynamicKey" class="btn btn-primary">Ingresar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Modal para "Despacho Interno" -->
+            <div class="modal fade" id="internalDispatchModal" tabindex="-1" aria-labelledby="internalDispatchModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="internalDispatchModalLabel">Despacho Interno</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <!-- Formulario para agregar un SuperID -->
+                            <div class="input-group mb-3">
+                                <input type="text" v-model="sid" class="form-control" @keyup.enter="validateAndLinkSuperid" placeholder="Ingrese SuperID">
+                            </div>
+
+                            <!-- Tabla de productos para despacho interno -->
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>SuperID</th>
+                                        <th>Code (SKU)</th>
+                                        <th>Cantidad</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(product, index) in products" :key="index">
+                                        <td>[[ product.superid ]]</td>
+                                        <td>[[ product.code ]]</td>
+                                        <td>
+                                            <input type="number" v-model="product.quantity" class="form-control" min="1">
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-danger btn-sm" @click="removeInternalProduct(index)">Eliminar</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                            <button type="button" class="btn btn-primary" @click="dispatchConsumption">Realizar Descuento</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <table class="table mt-3">
                 <thead>
@@ -53,7 +123,7 @@
                 <tbody>
                     <tr v-for="product in products" :key="product.code">
                         <td>[[ product.code ]]</td>
-                        <td>[[ product.name ]]</td>
+                        <td>[[ product.description ]]</td>
                         <td>[[ product.totalAmount ]]</td>
                         <td>[[ product.quantity ]]</td>
                         <td>[[ product.count || 0 ]]</td>
@@ -70,11 +140,16 @@
         el: '#app',
         delimiters: ['[[', ']]'],
         data: {
+            dynamicKey: '',           // Clave ingresada por el usuario
+            generatedKey: '',         // Clave generada
+            validKey: false, 
             company: 1,
             typeDocument: 39,
             nDocument: null,
             sid: null,
-            products: []
+            products: [],
+            newProduct: { superid: '', code: '', quantity: 1 },
+            internalProducts: [] // Lista de productos para despacho interno
         },
         watch: {
             typeDocument() {
@@ -85,23 +160,52 @@
             }
         },
         methods: {
+            requestDynamicKeyAccess() {
+                new bootstrap.Modal(document.getElementById('dynamicKeyModal')).show();
+            },
+            validateDynamicKey() {
+                axios.post('/api/validate-dynamic-key/', { key: this.dynamicKey })
+                    .then(response => {
+                        if (response.data.valid) {
+                            this.validKey = true;
+                            new bootstrap.Modal(document.getElementById('dynamicKeyModal')).hide();
+                            new bootstrap.Modal(document.getElementById('internalDispatchModal')).show();
+                        } else {
+                            Swal.fire('Error', 'Clave no válida o expirada.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'No se pudo validar la clave.', 'error');
+                        console.error(error);
+                    });
+            },
+            generateDynamicKey() {
+                axios.post('/api/generate-dynamic-key/')
+                    .then(response => {
+                        this.generatedKey = response.data.key;
+                        // Forzar actualización
+                        this.$nextTick(() => {
+                            console.log("Generated Key:", this.generatedKey);
+                        });
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'No se pudo generar la clave de acceso.', 'error');
+                        console.error(error);
+                    });
+            },
             fetchDetails() {
-                // Limpia los datos previos
                 this.products = [];
-
-                // Realiza la solicitud GET para obtener detalles del documento
                 axios.get('/api/consult-bsale-document/', {
                     params: { number: this.nDocument, type: this.typeDocument }
                 }).then(response => {
-                    // Asume que el endpoint devuelve un array con los productos relevantes
                     this.products = response.data.map(product => ({
                         code: product.code,
                         description: product.description,
                         totalAmount: product.totalAmount,
                         quantity: product.quantity,
-                        count: 0, // Inicia el conteo en cero
+                        count: 0,
                         name : product.name,
-                        superid: null  // Inicializa el superid como null
+                        superid: null
                     }));
                 }).catch(error => {
                     Swal.fire('Error', 'No se pudieron obtener los detalles del documento.', 'error');
@@ -109,20 +213,36 @@
                 });
             },
             validateAndLinkSuperid() {
-                // Verifica el superid y vincula con el SKU
+                const superidToValidate = this.sid;
+                const documentProducts = this.nDocument ? this.products.map(product => product.code) : []; 
+
                 axios.post('/api/validate-superid/', {
-                    sid: this.sid,
-                    document_products: this.products.map(product => product.code)
+                    sid: superidToValidate,
+                    document_products: documentProducts
                 }).then(response => {
                     if (response.data.icon === 'success') {
-                        // Encuentra el producto en la lista si existe
-                        const productInList = this.products.find(product => product.code === response.data.sku);
-                        if (productInList && productInList.count < productInList.quantity) {
-                            productInList.count += 1;
-                            productInList.superid = this.sid;  // Vincula el superid directamente al producto
-                            this.sid = ''; // Limpia el campo de entrada después de la validación
+                        const productSku = response.data.sku;
+
+                        if (this.nDocument) {
+                            const productInList = this.products.find(product => product.code === productSku);
+                            if (productInList && productInList.count < productInList.quantity) {
+                                productInList.count += 1;
+                                productInList.superid = this.sid;
+                                this.sid = '';
+                            } else {
+                                Swal.fire('Advertencia', 'No se puede escanear más de la cantidad total.', 'warning');
+                            }
                         } else {
-                            Swal.fire('Advertencia', 'No se puede escanear más de la cantidad total.', 'warning');
+                            if (!this.products.some(product => product.code === productSku)) {
+                                this.products.push({
+                                    superid: superidToValidate,
+                                    code: productSku,
+                                    quantity: 1
+                                });
+                                this.newProduct.superid = '';
+                            } else {
+                                Swal.fire('Advertencia', 'Este producto ya fue agregado.', 'warning');
+                            }
                         }
                     } else {
                         Swal.fire('Error', response.data.title, response.data.icon);
@@ -133,14 +253,12 @@
                 });
             },
             dispatchConsumption() {
-                // Crea un payload con la información de los productos, incluyendo el superid y cantidades
                 const payload = this.products.map(product => ({
                     code: product.code,
                     quantity: product.count,
-                    superid: product.superid  // Usa el superid almacenado en cada producto
+                    superid: product.superid
                 }));
-
-                // Realiza la solicitud POST para despachar los productos
+                
                 axios.post('/api/dispatch-consumption/', {
                     nDocument: this.nDocument,
                     typeDocument: this.typeDocument,
@@ -156,6 +274,9 @@
                     Swal.fire('Error', 'Error al despachar los productos.', 'error');
                     console.error(error);
                 });
+            },
+            openInternalDispatchModal() {
+                new bootstrap.Modal(document.getElementById('internalDispatchModal')).show();
             }
         }
     });

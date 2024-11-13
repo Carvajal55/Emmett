@@ -34,6 +34,15 @@ from django.utils import timezone  # Para obtener la fecha y hora actual
 from django.views.decorators.http import require_GET
 from django.db import transaction
 from django.views.decorators.http import require_POST
+from reportlab.pdfgen import canvas
+from django.views.decorators.csrf import csrf_exempt
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import mm
+from reportlab.graphics.barcode import code128
+import random
+import string
+import datetime
+
 
 
 
@@ -46,6 +55,10 @@ def delete_user(request, user_id):
 @login_required(login_url='login_view')
 def recepciones_aceptadas(request):
     return render(request, 'recepciones_aceptadas.html')
+
+@login_required(login_url='login_view')
+def crear_sector(request):
+    return render(request, 'crear_sector.html')
 
 @login_required(login_url='login_view')
 def recepciones_aceptadas(request):
@@ -73,7 +86,12 @@ def ingresar_documentos(request):
 
 @login_required(login_url='login_view')
 def anadir_psector(request):
-    return render(request, 'anadir_psector.html')
+    # Asegurarse de que el usuario tiene un objeto `usuario` con un rol
+    user_role = request.user.usuario.rol if hasattr(request.user, 'usuario') else None
+    context = {
+        'user_role': user_role
+    }
+    return render(request, 'anadir_psector.html', context)
 
 @login_required(login_url='login_view')
 def cuadrar_sector_view(request):
@@ -94,13 +112,30 @@ def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
+
+        # Autenticación para superusuarios (Django `User`)
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
             login_f(request, user)
             return redirect("index")
         else:
-            context['error_message'] = 'El usuario o la contraseña son incorrectos.'
+            # Si no es superusuario, verifica en el modelo `Usuario`
+            try:
+                usuario_model = Usuario.objects.get(correo=username)
+                if usuario_model.clave == password:
+                    # Verifica rol y otras validaciones si es necesario
+                    if usuario_model.rol == 'SADMIN':
+                        # Almacena al usuario en sesión para validar permisos
+                        request.session['usuario_id'] = usuario_model.id
+                        request.session['usuario_rol'] = usuario_model.rol
+                        return redirect("index")
+                    else:
+                        context['error_message'] = 'No tienes permisos de SuperAdmin.'
+                else:
+                    context['error_message'] = 'La contraseña es incorrecta.'
+            except Usuario.DoesNotExist:
+                context['error_message'] = 'El usuario no existe.'
 
     return render(request, template_name, context)
 
@@ -110,49 +145,52 @@ def login_view(request):
 def index(request):
     template_name = "index.html"
     context = {}
-    meses_anteriores = []
-    # Obtenemos la fecha actual
-    fecha_actual = datetime.now()
-
-    # Agregamos el mes actual a la lista
-    meses_anteriores.append(fecha_actual.strftime('%B %Y'))
-
-    # Iteramos para obtener los 4 meses anteriores
-    for _ in range(4):
-        # Restamos un mes a la fecha actual
-        fecha_actual -= timedelta(days=fecha_actual.day)
-        fecha_actual -= timedelta(days=1)
-        # Agregamos el mes actual a la lista
-        meses_anteriores.append(fecha_actual.strftime('%B %Y'))
-    context["meses"] = meses_anteriores
+   
     return render(request, template_name, context)
 
 # Crear usuario
 @csrf_exempt
 @login_required(login_url='login_view')
 def create_user(request):
-    data = json.loads(request.body)
+    if request.method == "POST":
+        data = json.loads(request.body)
 
-    correo = data.get('correo')
-    clave = data.get('clave', '40emmett90')  # Clave por defecto
-    nombres_apellidos = data.get('nombres_apellidos', '')
-    rut = data.get('rut', '')
-    telefono = data.get('telefono', '')
+        # Obtener los datos del nuevo usuario
+        correo = data.get('correo')
+        clave = data.get('clave', '40emmett90')  # Clave por defecto
+        nombres_apellidos = data.get('nombres_apellidos', '')
+        rut = data.get('rut', '')
+        telefono = data.get('telefono', '')
+        rol = data.get('rol', 'VENTAS')  # Rol por defecto en caso de no proporcionarse
 
-    if not correo:
-        return JsonResponse({'error': 'El campo correo es obligatorio.'}, status=400)
+        # Validar campo de correo
+        if not correo:
+            return JsonResponse({'error': 'El campo correo es obligatorio.'}, status=400)
 
-    # Crear el usuario
-    usuario = Usuario.objects.create(
-        correo=correo,
-        clave=clave,
-        nombres_apellidos=nombres_apellidos,
-        rut=rut,
-        telefono=telefono,
-    )
+        # Crear el usuario en el modelo User de Django
+        try:
+            django_user = User.objects.create_user(
+                username=correo,  # Usa el correo como nombre de usuario
+                email=correo,
+                password=clave  # La contraseña será encriptada automáticamente
+            )
+            django_user.save()
+        except Exception as e:
+            return JsonResponse({'error': f'Error al crear el usuario de Django: {str(e)}'}, status=400)
 
-    return JsonResponse({'message': 'Usuario creado exitosamente.'}, status=201)
+        # Crear el usuario en el modelo Usuario y asociarlo al usuario de Django
+        usuario = Usuario.objects.create(
+            user=django_user,  # Relación con el usuario de Django
+            correo=correo,
+            clave=clave,
+            nombres_apellidos=nombres_apellidos,
+            rut=rut,
+            telefono=telefono,
+            rol=rol
+        )
 
+        return JsonResponse({'message': 'Usuario creado exitosamente.'}, status=201)
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
 
 
 # Listar usuarios
@@ -217,8 +255,11 @@ def update_user(request, user_id):
 """ BUSCAR PRODUCTOS """
 
 def listar_bodegas(request):
-    bodegas = Bodega.objects.all()
+    # Filtrar solo las bodegas con los IDs especificados
+    bodega_ids_included = [1, 2, 4, 6, 9, 10]
+    bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included)
     
+    # Preparar la respuesta solo con las bodegas seleccionadas
     bodegas_data = [
         {
             'id': bodega.idoffice,
@@ -297,55 +338,47 @@ def producto_detalles(request, product_id):
         # Obtener el producto con sus productos únicos relacionados
         producto = Products.objects.prefetch_related('unique_products').get(id=product_id)
         
-        # Obtener todas las bodegas para usarlas en el mapeo
-        bodegas = Bodega.objects.all()
+        # Filtrar solo las bodegas con los IDs específicos
+        bodega_ids_included = [1, 2, 4, 6, 9, 10]
+        bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included)
         bodega_mapping = {bodega.idoffice: bodega.name for bodega in bodegas}
 
         # Obtener todas las ubicaciones (sectores) para usarlas en el mapeo
         sectores = Sectoroffice.objects.all()
         sector_mapping = {sector.idsectoroffice: sector for sector in sectores}
 
-        # Imprimir los primeros 10 sectores en la consola (excluyendo NRN)
-        print("Primeros 10 sectores (excluyendo NRN):")
-        counter = 0
-        for sector in sectores:
-            if sector.zone == 'NRN':
-                continue  # Excluir sectores con la zona 'NRN'
-            print(f"ID Sector: {sector.idsectoroffice}, Name: {sector.namesector}, Office ID: {sector.idoffice}, Zone: {sector.zone}, Floor: {sector.floor}, Section: {sector.section}")
-            counter += 1
-            if counter >= 10:
-                break  # Detener después de los primeros 10 sectores
-
-        # Filtrar los productos únicos relacionados con el producto, excluyendo Narnia (XT99-99) y sectores con zone='NRN'
-        unique_products = producto.unique_products.exclude(location__in=Sectoroffice.objects.filter(namesector="XT99-99")).exclude(location__in=Sectoroffice.objects.filter(zone="NRN"))
+        # Excluir productos en la bodega "Narnia" o en sectores con `zone="NARN"`
+        excluded_sectors = Sectoroffice.objects.filter(namesector="XT99-99") | Sectoroffice.objects.filter(zone="NARN")
+        unique_products = producto.unique_products.exclude(location__in=excluded_sectors.values_list('idsectoroffice', flat=True))
         
-        # Inicializar el stock por bodega
+        # Inicializar el stock solo para las bodegas seleccionadas
         bodegas_stock = {bodega.idoffice: 0 for bodega in bodegas}
         
-        # Calcular el stock de cada bodega contando la cantidad de `superid` asociados a cada sector (ubicación)
+        # Calcular el stock de cada bodega seleccionada contando la cantidad de `superid` asociados a cada sector (ubicación)
         for unique_product in unique_products:
             # Obtener el sector asociado a la ubicación (location) del producto
             sector = sector_mapping.get(unique_product.location)
 
-            if sector and sector.namesector != "XT99-99" and sector.zone != "NRN":  # Excluir Narnia y sectores con zone 'NRN'
+            # Solo procesar si el sector no es "Narnia" y si el sector es válido
+            if sector and sector.namesector != "XT99-99" and sector.zone != "NARN":
                 bodega_name = bodega_mapping.get(sector.idoffice, 'Bodega desconocida')  # Usar el idOffice del sector para obtener el nombre de la bodega
 
-                # Incrementar el stock en la bodega correspondiente (contando el `superid`)
+                # Incrementar el stock en la bodega correspondiente (contando el `superid`) solo si está en las bodegas seleccionadas
                 if sector.idoffice in bodegas_stock:
                     bodegas_stock[sector.idoffice] += 1  # Incrementar 1 por cada `superid` encontrado
+                unique_product.bodega = bodega_name  # Asociar la bodega al producto único
             else:
-                bodega_name = 'Ubicación no encontrada' if not sector else 'Narnia'
+                # Si el sector es "Narnia" o no está en el mapeo, lo excluimos de la respuesta
+                continue
 
-            unique_product.bodega = bodega_name  # Asociar la bodega al producto único
-
-        # Crear la respuesta con los detalles del producto
+        # Crear la respuesta con los detalles del producto considerando solo las bodegas especificadas
         response_data = {
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice,
-            'stock_total': sum(bodegas_stock.values()),  # Stock total sumando todas las bodegas, excepto Narnia y NRN
-            'bodegas': {bodega_mapping[bodega_id]: stock for bodega_id, stock in bodegas_stock.items()},  # Información de stock por bodega
+            'stock_total': sum(bodegas_stock.values()),  # Stock total sumando solo las bodegas especificadas
+            'bodegas': {bodega_mapping[bodega_id]: stock for bodega_id, stock in bodegas_stock.items()},  # Información de stock por bodega seleccionada
             'unique_products': [
                 {
                     'superid': unique_product.superid,
@@ -359,7 +392,6 @@ def producto_detalles(request, product_id):
 
     except Products.DoesNotExist:
         return JsonResponse({'error': 'Producto no encontrado'}, status=404)
-
 
 
 #FACTURAS
@@ -707,34 +739,142 @@ def create_supplier(request):
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
+from django.utils.crypto import get_random_string
 
+# Función principal para crear un producto en Bsale y en la base de datos local
 @csrf_exempt
-def create_product(request):
-    if request.method == 'POST':
-        # Obtener los datos del producto desde la solicitud
-        sku = request.POST.get('sku', '')
-        name_product = request.POST.get('nombre', '')
-        brand = request.POST.get('marca', '')
-        price = request.POST.get('precio', 0)
-        descripcion = request.POST.get('precio', 0)
+def crear_producto(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
 
-        if not sku or not name_product:
-            return JsonResponse({'error': 'Datos incompletos para crear el producto.'}, status=400)
+        # Obtener datos del formulario enviados desde el frontend
+        nombre_producto = data.get("nombre")
+        precio = data.get("precio")
+        marca = data.get("marca")
+        proveedor_id = data.get("proveedor")
+        categoria = data.get("categoria")  # Obtiene la categoría desde los datos del frontend
+        alto = data.get("alto")
+        largo = data.get("largo")
+        profundidad = data.get("profundidad")
+        peso = data.get("peso")
 
-        # Crear un nuevo producto
-        try:
-            product = Products.objects.create(
+        # Verificamos que la categoría esté definida
+        if not categoria:
+            return JsonResponse({"error": "La categoría es obligatoria para generar el SKU."}, status=400)
+
+        # Generar el SKU con el prefijo correspondiente y el correlativo
+        sku = obtener_correlativo(categoria)
+
+        # Generar el código de barras comenzando con "9999"
+        bar_code = f"9999{get_random_string(8, '0123456789')}"
+
+        # Crear el JSON para la solicitud a Bsale (Producto Principal)
+        bsale_product_data = {
+            "name": nombre_producto,
+            "description": f"{nombre_producto} - {marca}",
+            "code": sku,
+            "barCode": bar_code,
+            "price": precio
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "access_token": BSALE_API_TOKEN
+        }
+
+        # Crear el Producto en Bsale
+        print("Enviando datos para crear producto en Bsale:", bsale_product_data)
+        response_product = requests.post(f"{BSALE_API_URL}/products.json", json=bsale_product_data, headers=headers)
+        print("Respuesta de creación de producto:", response_product.status_code, response_product.json())
+        
+        if response_product.status_code == 201:
+            bsale_product = response_product.json()
+
+            # Guardar el producto en la base de datos local
+            nuevo_producto = Products.objects.create(
                 sku=sku,
-                nameproduct=name_product,
-                brands=brand,
-                lastprice=int(price),
-                description = descripcion,
+                nameproduct=nombre_producto,
+                brands=marca,
+                codebar=bar_code,
+                iderp=bsale_product["id"],  # Guardamos el id de Bsale en la base de datos
+                lastprice=precio,
+                codsupplier=proveedor_id,
+                createdate=datetime.now().date(),
             )
-            return JsonResponse({'message': 'Producto creado correctamente.', 'id': product.id}, status=201)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            print("Producto guardado en base de datos local:", nuevo_producto)
 
-    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+            # Crear la Variante en Bsale asociada al producto
+            bsale_variant_data = {
+                "productId": bsale_product["id"],
+                "description": "",
+                "barCode": f"{bar_code}01",
+                "code": f"{sku}",
+                "unlimitedStock": 0,
+                "allowNegativeStock": 0
+            }
+
+            print("Enviando datos para crear variante en Bsale:", bsale_variant_data)
+            response_variant = requests.post(f"{BSALE_API_URL}/variants.json", json=bsale_variant_data, headers=headers)
+            print("Respuesta de creación de variante:", response_variant.status_code, response_variant.json())
+
+            # Verificar si la variante fue creada correctamente
+            if response_variant.status_code == 201:
+                bsale_variant = response_variant.json()
+                print("Variante creada en Bsale con éxito:", bsale_variant)
+
+                return JsonResponse({"message": "Producto y variante creados exitosamente", "product": nuevo_producto.sku, "variant_id": bsale_variant["id"]}, status=201)
+            else:
+                return JsonResponse({"error": "Error al crear la variante en Bsale", "details": response_variant.json()}, status=400)
+        else:
+            return JsonResponse({"error": "Error al crear el producto en Bsale", "details": response_product.json()}, status=400)
+
+  
+
+def get_sku_prefix(categoria):
+    prefix_map = {
+        "audio": "AUD",
+        "electronica": "AUD",
+        "instrumentos": "MUS",
+        "estudio": "EST",
+        "iluminacion": "ILU",
+        "otros": "OTR"
+    }
+    return prefix_map.get(categoria)
+
+import re
+
+# Función para obtener el siguiente número correlativo de SKU en una categoría
+def obtener_correlativo(categoria):
+    # Obtener el prefijo correspondiente a la categoría
+    prefix = get_sku_prefix(categoria)
+
+    # Obtener todos los productos de la base de datos
+    productos = Products.objects.all()
+
+    # Lista para almacenar los números correlativos de todos los SKUs que coincidan con el prefijo
+    numeros_sku = []
+
+    # Recorremos cada producto y extraemos el número correlativo del SKU solo si coincide con el prefijo
+    for producto in productos:
+        match = re.match(rf'({prefix})(\d+)', producto.sku)  # Separa el prefijo (3 letras) y el número
+        if match:
+            numero = int(match.group(2))  # Convertimos la parte numérica en un entero
+            numeros_sku.append(numero)
+
+    # Ordenamos la lista de números de mayor a menor
+    numeros_sku.sort(reverse=True)
+
+    # Imprimimos los 5 SKUs más altos para verificar
+    print("Los 5 SKUs más altos:", numeros_sku[:5])
+
+    # Si existen números, tomamos el más alto y le sumamos uno
+    if numeros_sku:
+        nuevo_numero = numeros_sku[0] + 1
+    else:
+        nuevo_numero = 1  # Si no hay productos en esta categoría, comenzamos desde 1
+
+    # Formatear el nuevo número correlativo con ceros a la izquierda y añadir el prefijo
+    return f"{prefix}{str(nuevo_numero).zfill(5)}"
 
 @csrf_exempt
 def generar_json(request):
@@ -1809,86 +1949,91 @@ def dispatch_consumption(request):
             type_document = data.get('typeDocument')
             company = data.get('company')
             products = data.get('products', [])
+            if not n_document:
+                n_document = 0
 
-            # Procesar cada producto para el consumo en Bsale
-            for product in products:
-                superid = product.get('superid')
-                cantidad = int(product.get('quantity', 1))  # Cantidad a descontar (1 por defecto)
+            # Verificar o crear el sector "Narnia"
+            sector_narnia, created = Sectoroffice.objects.get_or_create(
+                zone="NARN",
+                defaults={
+                    'idoffice': 0,
+                    'iduserresponsible': 0,
+                    'floor': 0,
+                    'section': 0,
+                    'namesector': "Narnia",
+                    'state': 1  # Estado activo o predeterminado
+                }
+            )
+            print(f"Sector 'Narnia' idsectoroffice: {sector_narnia.idsectoroffice}")
 
-                # Verificar si el superid existe en Uniqueproducts
-                unique_product = Uniqueproducts.objects.select_related('product').filter(superid=superid).first()
+            # Iniciar una transacción atómica
+            with transaction.atomic():
+                # Procesar cada producto para el consumo en Bsale
+                for product in products:
+                    superid = product.get('superid')
+                    cantidad = int(product.get('quantity', 1))  # Cantidad a descontar (1 por defecto)
 
-                if not unique_product:
-                    print(f"SuperID {superid} no encontrado en la base de datos.")
-                    return JsonResponse({'title': 'SuperID no encontrado', 'icon': 'error', 'row': 0})
+                    # Verificar si el superid existe en Uniqueproducts
+                    unique_product = Uniqueproducts.objects.select_related('product').filter(superid=superid).first()
 
-                # Obtener el `Sectoroffice` relacionado usando el `location` de `unique_product`
-                sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
-                if not sector:
-                    print(f"Sector no encontrado para el Location ID {unique_product.location}")
-                    return JsonResponse({'title': 'Sector no encontrado para el producto', 'icon': 'error'})
+                    if not unique_product:
+                        print(f"SuperID {superid} no encontrado en la base de datos.")
+                        return JsonResponse({'title': 'SuperID no encontrado', 'icon': 'error', 'row': 0})
 
-                idoffice = sector.idoffice
-                print(f"ID de Oficina obtenido: {idoffice}")
+                    # Obtener el Sectoroffice relacionado usando el location de unique_product
+                    sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
+                    if not sector:
+                        print(f"Sector no encontrado para el Location ID {unique_product.location}")
+                        return JsonResponse({'title': 'Sector no encontrado para el producto', 'icon': 'error'})
 
-                # Obtener el `iderp` del producto asociado
-                product_instance = unique_product.product
-                iderp = product_instance.iderp  # Aquí se obtiene el `iderp`
-                print(f"Producto asociado: {product_instance}, SKU: {product_instance.sku}, ID ERP: {iderp}")
+                    idoffice = sector.idoffice
+                    print(f"ID de Oficina obtenido: {idoffice}")
 
-                if not iderp:
-                    return JsonResponse({'title': 'El producto asociado no tiene un ID ERP válido', 'icon': 'error', 'row': 0})
+                    # Obtener el iderp del producto asociado
+                    product_instance = unique_product.product
+                    iderp = product_instance.iderp  # Aquí se obtiene el iderp
+                    print(f"Producto asociado: {product_instance}, SKU: {product_instance.sku}, ID ERP: {iderp}")
 
-                # Mover el producto a la bodega "Despachados"
-                despachados_bodega, created = Bodega.objects.get_or_create(
-                    name="Despachados",
-                    defaults={
-                        "description": "Bodega para productos despachados",
-                        "address": "Dirección ficticia para despachos",
-                        "latitude": -33.4489,
-                        "longitude": -70.6693,
-                        "country": "Chile",
-                        "city": "Santiago",
-                        "state": 1,
-                        "emailStore": "despachos@example.com",
-                        "idoffice": idoffice  # Usa el `idoffice` obtenido de Sectoroffice
+                    if not iderp:
+                        return JsonResponse({'title': 'El producto asociado no tiene un ID ERP válido', 'icon': 'error', 'row': 0})
+
+                    # Preparar los datos para enviar a Bsale
+                    data_bsale = {
+                        "note": f"Despacho desde empresa {company}",
+                        "officeId": 1,  # ID de la oficina actual
+                        "details": [
+                            {
+                                "quantity": cantidad,
+                                "variantId": iderp  # Usar iderp para el consumo en Bsale
+                            }
+                        ]
                     }
-                )
 
-                # Actualizar la información del producto en la base de datos local
-                unique_product.location = despachados_bodega.idoffice
-                unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
-                unique_product.typedocout = type_document
-                unique_product.ndocout = n_document
-                unique_product.datelastinventory = timezone.now()
-                unique_product.state = 1  # Estado de "descontado"
-                unique_product.ncompany = company
-                unique_product.save()
+                    # Hacer la solicitud POST a Bsale usando la URL de consumo correcta
+                    headers = { 
+                        "access_token": BSALE_TOKEN,
+                        "Content-Type": "application/json"
+                    }
 
-                # Preparar los datos para enviar a Bsale
-                data_bsale = {
-                    "note": f"Despacho desde empresa {company}",
-                    "officeId": idoffice,  # ID de la oficina actual
-                    "details": [
-                        {
-                            "quantity": cantidad,
-                            "variantId": iderp  # Usar `iderp` para el consumo en Bsale
-                        }
-                    ]
-                }
+                    response = requests.post("https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale)
+                    
+                    # Verificar si la respuesta de Bsale es exitosa
+                    if response.status_code not in [200, 201]:
+                        print(f"Error al consumir en Bsale: {response.status_code} - {response.text}")
+                        raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
 
-                # Hacer la solicitud POST a Bsale usando la URL de consumo correcta
-                headers = {
-                    "access_token": BSALE_TOKEN,
-                    "Content-Type": "application/json"
-                }
+                    # Mover el producto al sector "Narnia" actualizando su campo `location` con `sector_narnia.idsectoroffice`
+                    unique_product.location = sector_narnia.idsectoroffice
+                    unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
+                    unique_product.typedocout = type_document
+                    unique_product.ndocout = n_document
+                    unique_product.datelastinventory = timezone.now()
+                    unique_product.state = 1  # Estado de "descontado"
+                    unique_product.ncompany = company
+                    unique_product.save()
 
-                response = requests.post("https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale)
-                
-                # Verificar si la respuesta de Bsale es exitosa
-                if response.status_code not in [200, 201]:
-                    print(f"Error al consumir en Bsale: {response.status_code} - {response.text}")
-                    return JsonResponse({'title': 'Error al consumir en Bsale', 'icon': 'error', 'message': response.text}, status=response.status_code)
+                    # Confirmación de que el producto fue actualizado
+                    print(f"Producto {unique_product.superid} movido al sector 'Narnia' con location ID {unique_product.location}")
 
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
@@ -2042,12 +2187,22 @@ def validate_superid_simplified(request):
                 print("Producto asociado no tiene un SKU válido.")
                 return JsonResponse({'error': 'Producto asociado no tiene un SKU válido'}, status=400)
 
-            # Verificar si el SKU asociado está en la lista de productos del documento
+            # Si `document_products` está vacío, tratarlo como "Consumo Interno"
+            if not document_products:
+                print("No se proporcionaron productos del documento. Considerando como Consumo Interno.")
+                return JsonResponse({
+                    'row': 1,
+                    'title': 'SuperID validado para Consumo Interno',
+                    'icon': 'success',
+                    'sku': associated_sku
+                })
+
+            # Validación para despacho normal: verificar si el SKU está en `document_products`
             if associated_sku not in document_products:
                 print("El SKU asociado no coincide con los productos del documento.")
                 return JsonResponse({'error': 'El SKU asociado no coincide con los productos del documento'}, status=400)
 
-            # Respuesta exitosa
+            # Respuesta exitosa para despacho normal
             return JsonResponse({
                 'row': 1,
                 'title': 'SuperID y SKU validados correctamente',
@@ -2063,11 +2218,7 @@ def validate_superid_simplified(request):
 
 
 """Imprimir Etiquetas"""
-from reportlab.pdfgen import canvas
-from django.views.decorators.csrf import csrf_exempt
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.pagesizes import mm
-from reportlab.graphics.barcode import code128
+
 
 
 @csrf_exempt
@@ -2353,4 +2504,37 @@ def actualizar_iderp(request):
         })
 
     return JsonResponse({'msg': 'Método no permitido'}, status=405)
+
+
+
+#Clave Dinamica
+
+# Genera una clave dinámica para el usuario ADMIN
+@csrf_exempt
+@login_required(login_url='login_view')
+def generate_dynamic_key(request):
+    if request.user.usuario.rol == 'ADMIN':
+        # Generar una clave aleatoria de 6 dígitos
+        key = ''.join(random.choices(string.digits, k=6))
+
+        # Guardar la clave en la base de datos con una validez de 5 minutos
+        expiration_time = timezone.now() + datetime.timedelta(minutes=5)
+        DynamicKey.objects.create(key=key, expiration_time=expiration_time)
+
+        return JsonResponse({'key': key, 'expiration_time': expiration_time}, status=201)
+    return JsonResponse({'error': 'No autorizado'}, status=403)
+
+# Validar la clave dinámica
+@csrf_exempt
+@login_required(login_url='login_view')
+def validate_dynamic_key(request):
+    data = json.loads(request.body)
+    key = data.get('key')
+    
+    # Verificar si la clave existe y no ha expirado
+    try:
+        dynamic_key = DynamicKey.objects.get(key=key, expiration_time__gte=timezone.now())
+        return JsonResponse({'valid': True}, status=200)
+    except DynamicKey.DoesNotExist:
+        return JsonResponse({'valid': False, 'error': 'Clave no válida o expirada'}, status=400)
 

@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<div id="app" class="m-2">
+<div id="app" class="m-2" v-if="accesoPermitido">
     <audio id="successSound" src="{% static 'sounds/success.mp3' %}" preload="auto"></audio>
     <h3>Gestión de Productos por Sector</h3>
 
@@ -68,10 +68,23 @@
             </ul>
         </nav>
     </div>
+</div>
 
-    <!-- Elementos de audio para sonidos de éxito y error -->
-    <audio id="successSound" src="{% static 'sounds/success.mp3' %}"></audio>
-    <audio id="errorSound" src="{% static 'sounds/error.mp3' %}"></audio>
+<!-- Modal para Clave Dinámica -->
+<div class="modal fade" id="dynamicKeyModal" tabindex="-1" aria-labelledby="dynamicKeyModalLabel" aria-hidden="true" v-if="userRole === 'VENTAS' && !accesoPermitido">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dynamicKeyModalLabel">Acceso al Sector</h5>
+            </div>
+            <div class="modal-body">
+                <input type="text" v-model="dynamicKey" placeholder="Ingrese la clave de acceso" class="form-control" />
+            </div>
+            <div class="modal-footer">
+                <button type="button" @click="validateDynamicKey" class="btn btn-primary">Ingresar</button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock content %}
 
@@ -84,12 +97,15 @@
         el: '#app',
         delimiters: ['[[', ']]'],
         data: {
-            inputValue: '',  // Valor del input para sector o Super ID
-            sectorSeleccionado: '',  // Sector actualmente seleccionado
-            productos: [],  // Lista de productos en el sector
-            currentPage: 1,  // Página actual
-            itemsPerPage: 10,  // Productos por página
-            productosParaAgregar: []  // Lista de productos a agregar
+            dynamicKey: '',           // Clave ingresada por el usuario
+            accesoPermitido: false,   // Estado de acceso
+            userRole: '{{ user_role }}',     // Estado de acceso
+            inputValue: '',              // Valor del input para sector o Super ID
+            sectorSeleccionado: '',      // Sector actualmente seleccionado
+            productos: [],               // Lista de productos en el sector
+            currentPage: 1,              // Página actual
+            itemsPerPage: 10,            // Productos por página
+            productosParaAgregar: []     // Lista de productos a agregar
         },
         computed: {
             paginatedProducts() {
@@ -101,73 +117,78 @@
                 return Math.ceil(this.productos.length / this.itemsPerPage);
             }
         },
+        mounted() {
+            // Mostrar el modal de clave al cargar la página solo si el usuario es de Ventas
+            if (this.userRole === 'VENTAS' && !this.accesoPermitido) {
+                new bootstrap.Modal(document.getElementById('dynamicKeyModal')).show();
+            }
+        },
         methods: {
+            validateDynamicKey() {
+                axios.post('/api/validate-dynamic-key/', { key: this.dynamicKey })
+                    .then(response => {
+                        if (response.data.valid) {
+                            this.accesoPermitido = true;
+                            new bootstrap.Modal(document.getElementById('dynamicKeyModal')).hide();
+                        } else {
+                            Swal.fire('Error', 'Clave no válida o expirada.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'No se pudo validar la clave.', 'error');
+                        console.error(error);
+                    });
+            },
             procesarInput() {
                 const valor = this.inputValue.trim();
-
                 if (valor.startsWith('B-')) {
-                    // Si se ingresa el mismo sector, limpiar y permitir seleccionar uno nuevo
                     if (this.sectorSeleccionado === valor) {
-                        this.limpiarSeleccion();  // Cierra el sector y limpia la data
+                        this.limpiarSeleccion();
                         alert("Sector cerrado. Ahora puedes seleccionar uno nuevo.");
                     } else {
-                        // Si es un sector diferente y hay uno abierto, mostrar advertencia
                         if (this.sectorSeleccionado) {
                             alert("Ya hay un sector abierto. Cierra el sector actual antes de abrir uno nuevo.");
                             return;
                         }
-
-                        // Selecciona el nuevo sector y carga los productos
                         this.sectorSeleccionado = valor;
                         this.buscarProductos();
                     }
                 } else {
                     this.agregarProductoPorSuperID(valor);
                 }
-
                 this.inputValue = '';
             },
-
             buscarProductos() {
                 axios.post('/api/buscar-productos-sector/', {
                     searchTerm: this.sectorSeleccionado
                 })
                 .then(response => {
                     if (response.data.resp === 1) {
-                        this.productos = response.data.productos; // Actualiza la lista de productos
-                        this.currentPage = 1; // Reinicia la paginación
-                        this.playSound('success');
+                        this.productos = response.data.productos;
+                        this.currentPage = 1;
                     } else {
                         console.error(response.data.msg);
                         this.productos = [];
-                        this.playSound('error');
                     }
                 })
                 .catch(error => {
                     console.error('Error al buscar productos:', error);
-                    this.playSound('error');
                 });
             },
-
             agregarProductoPorSuperID(superid) {
                 if (this.productosParaAgregar.some(producto => producto.superid === superid)) {
                     console.warn('Este producto ya está en la lista.');
-                    this.playSound('error');
                     return;
                 }
                 this.productosParaAgregar.push({ superid });
-                this.playSound('success');
             },
-
             addProductsToSector() {
                 if (!this.sectorSeleccionado) {
                     console.error('Selecciona un sector antes de agregar productos.');
-                    this.playSound('error');
                     return;
                 }
                 if (this.productosParaAgregar.length === 0) {
                     console.error('No hay productos para agregar.');
-                    this.playSound('error');
                     return;
                 }
 
@@ -178,41 +199,28 @@
                 .then(response => {
                     if (response.data.resp === 1) {
                         this.productosParaAgregar = [];
-                        this.buscarProductos(); // Refresca la lista de productos en el sector
-                        this.playSound('success');
+                        this.buscarProductos();
                     } else {
                         console.error(response.data.msg);
-                        this.playSound('error');
                     }
                 })
                 .catch(error => {
                     console.error('Error al agregar productos:', error);
-                    this.playSound('error');
                 });
             },
-
             changePage(page) {
                 if (page > 0 && page <= this.totalPages) {
                     this.currentPage = page;
                 }
             },
-
             limpiarSeleccion() {
                 this.sectorSeleccionado = '';
                 this.productosParaAgregar = [];
                 this.productos = [];
                 this.currentPage = 1;
                 console.log("Selección limpiada, puedes ingresar un nuevo sector.");
-            },
-
-            playSound(type) {
-                const audioElement = type === 'success' ? document.getElementById('successSound') : document.getElementById('errorSound');
-                audioElement.currentTime = 0;
-                audioElement.play();
             }
         }
     });
 </script>
 {% endblock js %}
-
-<!-- B-1-G1-1 -->

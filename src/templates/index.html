@@ -16,26 +16,67 @@
 </style>
 <link rel="stylesheet" href="{% static 'libs/owl.carousel/dist/assets/owl.carousel.min.css' %}">
 {% endblock css %}
+ <!-- Your existing content here -->
 
 {% block content %}
-<div id="app">
-  
-  <!-- Your existing content here -->
-  
-  <!-- New Form for Uploading Excel File -->
-  <div class="card mt-5">
-    <div class="card-body">
-      <h5 class="card-title fw-semibold">Cargar Archivo Excel</h5>
-      <form @submit.prevent="uploadFile" enctype="multipart/form-data">
-        <div class="mb-3">
-          <label for="excelFile" class="form-label">Selecciona el archivo Excel:</label>
-          <input type="file" class="form-control" id="excelFile" ref="excelFile" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Cargar Uniqueproducts</button>
-      </form>
-    </div>
+<div id="app" class="container mt-5">
+  <div class="row">
+      <!-- Card para mostrar el Rol del Usuario -->
+      <div class="col-md-6 mb-4">
+          <div class="card h-100">
+              <div class="card-header" style="background-color: #003399; color: white;">
+                  <h6 class="mb-0" style="color: white;">Rol de Usuario</h6>
+              </div>
+              <div class="card-body">
+                {% if request.user.usuario.rol == 'ADMIN' %}
+                <div>
+                    <button @click="generateDynamicKey" class="btn btn-warning mt-3">Generar Clave de Acceso</button>
+                    <p class="mt-2" v-if="generatedKey">Clave Generada: <span>[[ generatedKey ]]</span> (Expira en 5 minutos)</p>
+                </div>
+                {% endif %}
+                  <p class="mt-2">ROL: {{ request.user.usuario.rol }}</p>
+              </div>
+          </div>
+      </div>
+
+      <!-- Card de Bienvenida o Pantalla de Inicio -->
+      <div class="col-md-6 mb-4">
+          <div class="card h-100">
+              <div class="card-header" style="background-color: #003399; color: white;">
+                  <h6 class="mb-0" style="color: white;">Pantalla Inicio</h6>
+              </div>
+              <div class="card-body">
+                  <p class="mb-0">Bienvenido a la plataforma. Explora las distintas secciones y funciones disponibles según tu rol.</p>
+              </div>
+          </div>
+      </div>
+
+      <!-- Card para Anuncio de Gráficos Próximos -->
+      <div class="col-md-6 mb-4">
+          <div class="card h-100">
+              <div class="card-header" style="background-color: #003399; color: white;">
+                  <h6 class="mb-0" style="color: white;">Próximamente</h6>
+              </div>
+              <div class="card-body">
+                  <p class="mb-0">Estaremos añadiendo gráficos y estadísticas para visualizar mejor la información relevante.</p>
+              </div>
+          </div>
+      </div>
+
+      <!-- Card para Información de Contacto -->
+      <div class="col-md-6 mb-4">
+          <div class="card h-100">
+              <div class="card-header" style="background-color: #003399; color: white;">
+                  <h6 class="mb-0" style="color: white;">Contacto</h6>
+              </div>
+              <div class="card-body">
+                  <p class="mb-0">Para cualquier duda o comentario, contáctanos en <a href="mailto:carvajal.emmett@gmail.com" style="color: blue;">carvajal.emmett@gmail.com</a>.</p>
+              </div>
+          </div>
+      </div>
   </div>
 </div>
+
 {% endblock content %}
 
 {% block js %}
@@ -48,6 +89,8 @@
       el: '#app',
       delimiters: ['[[', ']]'],
       data: {
+        dynamicKey: '',
+        generatedKey: '', 
         cantidad_de_mensajes: 0,
         cantidad_de_mensajes_whatsapp: 0,
         cantidad_de_mensajes_text: 0,
@@ -57,52 +100,20 @@
         fecha_select: "{{meses.0}}",
       },
       mounted() {
-        this.GetDashboardData();
       },
       methods: {
-          GetDashboardData() {
-            let body = {
-              "fecha_select": this.fecha_select
-            }
-            axios.post("/api/internal/get/dashboard/", body, {
-                xsrfCookieName: 'csrftoken',
-                xsrfHeaderName: 'X-CSRFTOKEN',
-            }).then((response) => {
-              this.cantidad_de_mensajes = response.data["cantidad_de_mensajes"]
-              this.cantidad_de_mensajes_whatsapp = response.data["cantidad_de_mensajes_whatsapp"]
-              this.cantidad_de_mensajes_text = response.data["cantidad_de_mensajes_text"]
-              this.llaves = response.data["grafico_dias_llaves"]
-              this.valores = response.data["grafico_dias_valores"]
-              this.ejecutivos = response.data["ejecutivos"]
-              
-              var chart = new ApexCharts(document.querySelector("#chart"), this.createChartOptions(this.llaves, this.valores));
-              chart.render();
-
-              var breakup = this.createBreakupChart();
-              var chartBreakup = new ApexCharts(document.querySelector("#breakup"), breakup);
-              chartBreakup.render();
-
-              var earning = this.createEarningChart();
-              new ApexCharts(document.querySelector("#earning"), earning).render();
-            });
-          },
-
-          uploadFile() {
-            let formData = new FormData();
-            formData.append("excel_file", this.$refs.excelFile.files[0]);
-
-            axios.post("/upload_uniqueproducts/", formData, {
-                headers: {
-                  'Content-Type': 'multipart/form-data',
-                  'X-CSRFTOKEN': this.getCookie('csrftoken')
-                }
-            }).then(response => {
-                alert("Archivo cargado exitosamente.");
-            }).catch(error => {
-                console.error("Error al cargar el archivo:", error);
-                alert("Hubo un error al cargar el archivo.");
-            });
-          },
+        generateDynamicKey() {
+            axios.post('/api/generate-dynamic-key/')
+                .then(response => {
+                    this.generatedKey = response.data.key;  // Almacena la clave generada en generatedKey
+                    console.log("Generated Key:", this.generatedKey);  // Confirma en la consola
+                })
+                .catch(error => {
+                    Swal.fire('Error', 'No se pudo generar la clave de acceso.', 'error');
+                    console.error(error);
+                });
+        },
+          
 
           getCookie(name) {
             let cookieValue = null;

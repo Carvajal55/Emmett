@@ -120,7 +120,15 @@
                 return Math.ceil(this.productosEnSector.length / this.itemsPerPage);
             }
         },
+        mounted() {
+            this.setFocus();
+        },
         methods: {
+            setFocus() {
+                this.$nextTick(() => {
+                    document.getElementById('inputScanner').focus();
+                });
+            },
             // Procesa la entrada de escaneo (sector o SuperID)
             procesarEntrada() {
                 const input = this.scannerInput.trim();
@@ -129,6 +137,7 @@
                     // Verificar si hay un sector abierto y si el nuevo input es diferente
                     if (this.previousSector && input !== this.previousSector) {
                         alert("Debes cerrar el sector actual antes de abrir uno nuevo.");
+                        this.setFocus();
                         return;
                     }
 
@@ -147,6 +156,7 @@
                     this.agregarProductoEscaneado(input);
                 }
                 this.scannerInput = ''; // Limpiar el input
+                this.setFocus();
             },
 
             // Buscar productos en el sector actual
@@ -160,11 +170,13 @@
                         this.loading = false;
                         this.productosEnSector = response.data.resp === 1 ? response.data.productos : [];
                         this.currentPage = 1; // Reinicia la paginación al cargar nuevos productos
+                        this.setFocus();
                     })
                     .catch(error => {
                         this.loading = false;
                         console.error('Error al buscar productos:', error);
                         this.productosEnSector = [];
+                        this.setFocus();
                     });
             },
 
@@ -185,12 +197,14 @@
                 if (page > 0 && page <= this.totalPages) {
                     this.currentPage = page;
                 }
+                this.setFocus();
             },
 
             // Cuadrar productos entre sector y escaneados
             cuadrarProductos() {
                 if (this.productosEscaneados.length === 0) {
                     alert("Escanea al menos un producto antes de cuadrar.");
+                    this.setFocus();
                     return;
                 }
                 this.loading = true;
@@ -221,11 +235,13 @@
                     } else {
                         console.error('Error en cuadratura:', response.data.msg);
                     }
+                    this.setFocus();
                 })
                 .catch(error => {
                     this.loading = false;
                     console.error('Error al cuadrar productos:', error);
                     this.productosMovidosNarnia = [];
+                    this.setFocus();
                 });
             }
         },

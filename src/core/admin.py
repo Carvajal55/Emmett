@@ -3,17 +3,13 @@ from core.models import Usuario, Products, Supplier, Uniqueproducts, Purchase, B
 from openpyxl import Workbook
 from django.http import HttpResponse
 
-# Configuración del admin para el modelo Usuario
-@admin.register(Usuario)
-class UsuarioAdmin(admin.ModelAdmin):
-    list_display = ('correo', 'nombres_apellidos', 'rut', 'telefono')  # Campos que se muestran en la lista
-    search_fields = ('correo', 'nombres_apellidos', 'rut')  # Campos que se pueden buscar
+
 
 # Configuración del admin para el modelo Products con exportación a Excel
 @admin.register(Products)
 class ProductsAdmin(admin.ModelAdmin):
-    list_display = ('sku', 'nameproduct', 'brands', 'currentstock')  # Mostrar campos clave en Products
-    search_fields = ('=sku', 'nameproduct', 'brands', '=iderp')  # Agregar búsqueda para SKU, nombre del producto y marcas
+    list_display = ('sku', 'nameproduct', 'brands', 'currentstock','uniquecodebar')  # Mostrar campos clave en Products
+    search_fields = ('sku', 'nameproduct', 'brands', '=iderp')  # Agregar búsqueda para SKU, nombre del producto y marcas
     actions = ['export_products_to_excel']  # Añadir la acción de exportar a Excel
 
     def export_products_to_excel(self, request, queryset):
@@ -69,3 +65,12 @@ class Bodega(admin.ModelAdmin):
 class Sectoroffice(admin.ModelAdmin):
     list_display = ('idsectoroffice','idoffice','zone','floor','section','namesector')
     search_fields = ('idsectoroffice','idoffice','zone','floor','section','namesector')
+
+class UsuarioAdmin(admin.ModelAdmin):
+    # Muestra el correo del usuario asociado usando un método
+    list_display = ('nombres_apellidos', 'rol')
+    ordering = ('user__email',)  # Ordena por correo del usuario
+
+   
+
+admin.site.register(Usuario, UsuarioAdmin)
