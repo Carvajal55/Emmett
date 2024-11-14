@@ -75,15 +75,7 @@ DATABASES = {
         'PASSWORD': os.environ.get('MYSQL_PASSWORD'),
         'HOST': os.environ.get('MYSQL_HOST'),
         'PORT': os.environ.get('MYSQL_PORT', '3306'),
-    },
-    'new_db': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.environ.get('MYSQL_NEW_DB_NAME'),  # Segunda base de datos
-        'USER': os.environ.get('MYSQL_NEW_DB_USER'),
-        'PASSWORD': os.environ.get('MYSQL_NEW_DB_PASSWORD'),
-        'HOST': os.environ.get('MYSQL_NEW_DB_HOST'),  # Misma IP o host para ambas bases de datos
-        'PORT': os.environ.get('MYSQL_NEW_DB_PORT', '3306'),
-    },
+    }
 }
 
 # MongoDB Configuration

@@ -21,6 +21,33 @@
 {% block content %}
 <div id="app" class="container mt-5">
   <div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header" style="background-color: #003399; color: white;">
+                <h6 class="mb-0" style="color: white;">Comparar Stock con Bsale</h6>
+            </div>
+            <div class="card-body">
+                <button @click="iniciarComparacion" class="btn btn-primary mt-3">Comparar Stock en Bsale</button>
+                
+                <!-- Barra de progreso -->
+                <div class="progress mt-3" v-if="loading">
+                    <div class="progress-bar" role="progressbar" :style="{ width: progress + '%' }" aria-valuemin="0" aria-valuemax="100">[[ progress ]]%</div>
+                </div>
+
+                <!-- Resultados de la Comparación con scroll -->
+                <div class="mt-3" v-if="comparacionResultado.length > 0">
+                    <h6>Resultados de la Comparación:</h6>
+                    <div class="scroll-container">
+                        <ul>
+                            <li v-for="resultado in comparacionResultado" :key="resultado">
+                                [[ resultado ]]
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
       <!-- Card para mostrar el Rol del Usuario -->
       <div class="col-md-6 mb-4">
           <div class="card h-100">
@@ -98,10 +125,52 @@
         valores: null,
         ejecutivos: [],
         fecha_select: "{{meses.0}}",
+        comparacionResultado: [], // Almacena los resultados de la comparación
+        progress: 0,             // Progreso de la comparación en porcentaje
+        loading: false 
       },
       mounted() {
       },
       methods: {
+       iniciarComparacion() {
+            this.loading = true;
+            this.progress = 0;
+            this.comparacionResultado = [];
+
+            const eventSource = new EventSource('/api/comparar-stock-bsale/');
+
+            eventSource.onmessage = (event) => {
+                const message = event.data;
+
+                // Verificar si el mensaje contiene progreso y actualizarlo
+                const match = message.match(/Progreso: (\d+(\.\d+)?)%/);
+                if (match) {
+                    this.progress = parseFloat(match[1]);
+                }
+
+                // Agregar cada mensaje de progreso y comparación a los resultados
+                this.comparacionResultado.push(message);
+
+                // Desplazar automáticamente hacia el final de la lista
+                this.$nextTick(() => {
+                    const scrollContainer = document.querySelector('.scroll-container');
+                    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                });
+
+                // Detener la conexión si el proceso está completo
+                if (message.includes("Comparación completada")) {
+                    this.loading = false;
+                    eventSource.close();
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                console.error("Error en el evento SSE:", error);
+                Swal.fire('Error', 'No se pudo completar la comparación.', 'error');
+                this.loading = false;
+                eventSource.close();
+            };
+        },
         generateDynamicKey() {
             axios.post('/api/generate-dynamic-key/')
                 .then(response => {

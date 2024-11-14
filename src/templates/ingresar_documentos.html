@@ -167,17 +167,18 @@
             </div>
         </div>
 
-        <!-- Tipo de documento -->
-        <div class="mb-3">
+  
+
+        <!-- Información del documento -->
+        <div class="mb-3 row">
+                  <!-- Tipo de documento -->
+        <div class="mb-3 col-3">
             <label for="cbTypeDocument" class="form-label">Tipo de Documento</label>
             <select class="form-select" v-model="form.tipoDocumento">
                 <option value="33">Factura de Compra</option>
                 <option value="52">Guía de Despacho</option>
             </select>
         </div>
-
-        <!-- Información del documento -->
-        <div class="mb-3 row">
             <div class="col-3">
                 <label for="nDocument" class="form-label">Número Documento</label>
                 <div class="input-group">

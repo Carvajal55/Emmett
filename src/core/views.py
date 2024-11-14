@@ -41,7 +41,6 @@ from reportlab.lib.pagesizes import mm
 from reportlab.graphics.barcode import code128
 import random
 import string
-import datetime
 from django.utils.crypto import get_random_string
 
 
@@ -347,7 +346,7 @@ def producto_detalles(request, product_id):
         sector_mapping = {sector.idsectoroffice: sector for sector in sectores}
 
         # Excluir productos en la bodega "Narnia" o en sectores con `zone="NARN"`
-        excluded_sectors = Sectoroffice.objects.filter(namesector="XT99-99") | Sectoroffice.objects.filter(zone="NARN")
+        excluded_sectors = Sectoroffice.objects.filter(namesector="XT99-99") | Sectoroffice.objects.filter(zone="NARN") | Sectoroffice.objects.filter(zone="NRN")
         unique_products = producto.unique_products.exclude(location__in=excluded_sectors.values_list('idsectoroffice', flat=True))
         
         # Inicializar el stock solo para las bodegas seleccionadas
@@ -359,7 +358,7 @@ def producto_detalles(request, product_id):
             sector = sector_mapping.get(unique_product.location)
 
             # Solo procesar si el sector no es "Narnia" y si el sector es válido
-            if sector and sector.namesector != "XT99-99" and sector.zone != "NARN":
+            if sector and sector.namesector != "XT99-99" and sector.zone != "NARN" and sector.zone != "NRN":
                 bodega_name = bodega_mapping.get(sector.idoffice, 'Bodega desconocida')  # Usar el idOffice del sector para obtener el nombre de la bodega
 
                 # Incrementar el stock en la bodega correspondiente (contando el `superid`) solo si está en las bodegas seleccionadas
@@ -739,7 +738,6 @@ def create_supplier(request):
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 
-# Función principal para crear un producto en Bsale y en la base de datos local
 @csrf_exempt
 def crear_producto(request):
     if request.method == "POST":
@@ -825,7 +823,6 @@ def crear_producto(request):
                 return JsonResponse({"error": "Error al crear la variante en Bsale", "details": response_variant.json()}, status=400)
         else:
             return JsonResponse({"error": "Error al crear el producto en Bsale", "details": response_product.json()}, status=400)
-
   
 
 def get_sku_prefix(categoria):
@@ -2030,9 +2027,13 @@ def dispatch_consumption(request):
                     unique_product.ncompany = company
                     unique_product.save()
 
-                    # Confirmación de que el producto fue actualizado
-                    print(f"Producto {unique_product.superid} movido al sector 'Narnia' con location ID {unique_product.location}")
+                    # Reducir el stock del producto relacionado en el modelo Products
+                    if product_instance.currentstock > 0:
+                        product_instance.currentstock -= cantidad  # Reduce en la cantidad consumida
+                        product_instance.save()  # Guarda el cambio en el stock
 
+                    print(f"Producto {unique_product.superid} movido al sector 'Narnia' con location ID {unique_product.location}")
+                    print(f"Stock actualizado para producto {product_instance.sku}: {product_instance.stock} unidades restantes")
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
         except Exception as e:
@@ -2339,91 +2340,107 @@ from tqdm import tqdm
 from django.db.models import Count
 import sys
 CHUNK_SIZE = 50  # Número de elementos por solicitud
+from django.http import StreamingHttpResponse
+import time
 
 
 @csrf_exempt
 def comparar_stock_bsale(request):
-    # URL base de Bsale y headers para la solicitud
-    bsale_url = f'{BSALE_API_URL}/stocks.json'
-    headers = {
-        'access_token': BSALE_TOKEN
-    }
+    def event_stream():
+        # URL base de Bsale y headers para la solicitud
+        bsale_url = f'{BSALE_API_URL}/stocks.json'
+        headers = {
+            'access_token': BSALE_TOKEN
+        }
 
-    print("| Inicio del proceso de comparación de stock entre Bsale y el inventario local.")
+        print("| Inicio del proceso de comparación de stock entre Bsale y el inventario local.")
+        yield "data: | Inicio del proceso de comparación de stock entre Bsale y el inventario local.\n\n"
 
-    # Obtener todos los productos locales con sus idERP y currentstock
-    print("| Obteniendo datos de productos locales con stock actual...")
-    productos_locales = Products.objects.values('sku', 'iderp', 'currentstock')
-
-    # Crear un diccionario de productos locales por idERP para acceso rápido
-    productos_local_dict = {producto['iderp']: producto for producto in productos_locales}
-    print(f"| Total de productos locales obtenidos: {len(productos_local_dict)}")
-
-    # Inicialización para el progreso
-    total_items = 0
-    processed_items = 0
-
-    next_url = bsale_url
-    diferencias = []
-
-    print("| Iniciando obtención de datos de Bsale...")
-
-    while next_url:
-        response = requests.get(next_url, headers=headers)
-        if response.status_code != 200:
-            print(f"Error al obtener datos de Bsale: {response.status_code} - {response.text}")
-            return JsonResponse({'error': 'Error al obtener datos de Bsale'}, status=response.status_code)
+        # Obtener todos los productos locales con sus idERP y currentstock
+        print("| Obteniendo datos de productos locales con stock actual...")
+        yield "data: | Obteniendo datos de productos locales con stock actual...\n\n"
         
-        data = response.json()
-        items = data.get('items', [])
-        total_items += len(items)  # Actualizar el total de productos
+        productos_locales = Products.objects.values('sku', 'iderp', 'currentstock')
+        productos_local_dict = {producto['iderp']: producto for producto in productos_locales}
 
-        for item in items:
-            bsale_id = item['id']
-            bsale_stock = item['quantity']
-            iderp = item['variant']['id']  # Este es el ID que corresponde al idERP local
+        print(f"| Total de productos locales obtenidos: {len(productos_local_dict)}")
+        yield f"data: | Total de productos locales obtenidos: {len(productos_local_dict)}\n\n"
+
+        total_items = 0
+        processed_items = 0
+
+        next_url = bsale_url
+        diferencias = []
+
+        print("| Iniciando obtención de datos de Bsale...")
+        yield "data: | Iniciando obtención de datos de Bsale...\n\n"
+
+        while next_url:
+            response = requests.get(next_url, headers=headers)
+            if response.status_code != 200:
+                print(f"Error al obtener datos de Bsale: {response.status_code} - {response.text}")
+                yield f"data: Error al obtener datos de Bsale: {response.status_code} - {response.text}\n\n"
+                return
             
-            # Buscar el producto local por idERP
-            producto_local = productos_local_dict.get(iderp)
+            data = response.json()
+            items = data.get('items', [])
+            total_items += len(items)
 
-            if producto_local:
-                # Comparar stock de Bsale con el stock local
-                resultado = {
-                    "sku": producto_local['sku'],
-                    "iderp": iderp,
-                    "stock_local": producto_local['currentstock'],
-                    "stock_bsale": bsale_stock,
-                    "diferencia": bsale_stock - producto_local['currentstock']
-                }
+            for item in items:
+                bsale_id = item['id']
+                bsale_stock = item['quantity']
+                iderp = item['variant']['id']
+                
+                producto_local = productos_local_dict.get(iderp)
+
+                if producto_local:
+                    resultado = {
+                        "sku": producto_local['sku'],
+                        "iderp": iderp,
+                        "stock_local": producto_local['currentstock'],
+                        "stock_bsale": bsale_stock,
+                        "diferencia": bsale_stock - producto_local['currentstock']
+                    }
+                else:
+                    resultado = {
+                        "sku": "0",
+                        "iderp": iderp,
+                        "stock_local": 0,
+                        "stock_bsale": bsale_stock,
+                        "diferencia": None
+                    }
+
+                diferencias.append(resultado)
+                
+                # Imprime y envía al frontend
+                print(f"| Comparación - SKU: {resultado['sku']}, IDERP: {resultado['iderp']}, "
+                      f"Stock Local: {resultado['stock_local']}, Stock Bsale: {resultado['stock_bsale']}, "
+                      f"Diferencia: {resultado['diferencia']}")
+                yield (f"data: Comparación - SKU: {resultado['sku']}, IDERP: {resultado['iderp']}, "
+                       f"Stock Local: {resultado['stock_local']}, Stock Bsale: {resultado['stock_bsale']}, "
+                       f"Diferencia: {resultado['diferencia']}\n\n")
+
+                processed_items += 1
+                progress = (processed_items / total_items) * 100
+                print(f"\r| Progreso: [{processed_items}/{total_items}] {progress:.2f}% completado")
+                yield f"data: Progreso: [{processed_items}/{total_items}] {progress:.2f}% completado\n\n"
+
+                time.sleep(0.1)  # Simulación de tiempo de procesamiento
+
+            next_url = data.get('next')
+            if next_url:
+                print("\n| Página siguiente de Bsale cargada.")
+                yield "data: | Página siguiente de Bsale cargada.\n\n"
             else:
-                # Producto no encontrado en local
-                resultado = {
-                    "sku": "0",
-                    "iderp": iderp,
-                    "stock_local": 0,
-                    "stock_bsale": bsale_stock,
-                    "diferencia": None
-                }
+                print("\n| No hay más páginas en Bsale.")
+                yield "data: | No hay más páginas en Bsale.\n\n"
 
-            # Añadir resultado a la lista de diferencias y print detallado
-            diferencias.append(resultado)
-            print(f"| Comparación - SKU: {resultado['sku']}, IDERP: {resultado['iderp']}, "
-                  f"Stock Local: {resultado['stock_local']}, Stock Bsale: {resultado['stock_bsale']}, "
-                  f"Diferencia: {resultado['diferencia']}")
+        print(f"\n| Comparación completada. Total de productos comparados: {len(diferencias)}")
+        yield f"data: | Comparación completada. Total de productos comparados: {len(diferencias)}\n\n"
 
-            # Actualizar y mostrar barra de progreso
-            processed_items += 1
-            progress = (processed_items / total_items) * 100
-            sys.stdout.write(f"\r| Progreso: [{processed_items}/{total_items}] {progress:.2f}% completado")
-            sys.stdout.flush()
-
-        # Continuar con la siguiente página de Bsale
-        next_url = data.get('next')
-        print("\n| Página siguiente de Bsale cargada." if next_url else "\n| No hay más páginas en Bsale.")
-
-    print(f"\n| Comparación completada. Total de productos comparados: {len(diferencias)}")
-
-    return JsonResponse({'diferencias': diferencias})
+    response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    return response
 
 @csrf_exempt
 def actualizar_stock_local(request):

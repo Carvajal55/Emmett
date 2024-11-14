@@ -37,14 +37,18 @@
                 <label for="sidProduct">ID Producto</label>
                 <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid" class="form-control">
             </div>       
-            {% if request.user.usuario.rol == 'ADMIN' %}
-            <div>
-                <button @click="generateDynamicKey" class="btn btn-warning mt-3">Generar Clave de Acceso</button>
-                <p v-if="generatedKey">Clave Generada: <span>[[ generatedKey ]]</span> (Expira en 5 minutos)</p>
-            </div>
-            {% endif %}
+            
             <button @click="dispatchConsumption" class="mt-3 btn btn-success">Despachar</button>
-            <button @click="requestDynamicKeyAccess" class="mt-3 btn btn-primary">Despacho Interno</button>
+            {% if request.user.usuario.rol == 'VENTAS' %}
+    <!-- Botón que requiere clave, visible solo para el rol de VENTAS -->
+                <button @click="requestDynamicKeyAccess" class="mt-3 btn btn-primary">Despacho Interno</button>
+            {% endif %}
+
+            {% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
+                <!-- Botón sin clave, visible solo para ADMIN y BODEGA -->
+                <button @click="openInternalDispatchModal" class="mt-3 btn btn-primary">Despacho Interno</button>
+            {% endif %}
+
 
             <!-- Modal para ingresar la clave dinámica -->
             <div class="modal fade" id="dynamicKeyModal" tabindex="-1" aria-labelledby="dynamicKeyModalLabel" aria-hidden="true">

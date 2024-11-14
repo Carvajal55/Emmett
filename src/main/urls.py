@@ -101,6 +101,7 @@ urlpatterns = [
    path('api/dispatch-product/', core_views.validate_superid_simplified, name='dispatch_product'),
 
    path('api/comparar-stock-bsale/', core_views.comparar_stock_bsale, name='comparar_stock_bsale'),
+
    path('api/actualizar-stock-local/', core_views.actualizar_stock_local, name='actualizar_stock_local'),
 
 
