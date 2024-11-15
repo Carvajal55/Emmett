@@ -106,6 +106,8 @@ urlpatterns = [
 
 
    path('api/actualizar_iderp/', core_views.actualizar_iderp, name='actualizar_iderp'),
+   path("api/obtener_datos_producto/", core_views.obtener_datos_producto, name="obtener_datos_producto"),
+
 
 
 

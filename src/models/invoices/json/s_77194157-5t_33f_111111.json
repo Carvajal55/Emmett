@@ -1,0 +1,63 @@
+{
+    "headers": {
+        "supplier": "77194157-5",
+        "supplierName": "Importadora K Y K SPA",
+        "typeDocument": "33",
+        "nDocument": "111111",
+        "dcto": 0,
+        "datePurchase": "2024-11-15",
+        "dateExpired": "2024-11-15",
+        "observation": "prueba",
+        "typePay": 1,
+        "nCheque": 0,
+        "qtyCheque": 0,
+        "subtotal": 32201,
+        "urlPDF": "",
+        "urlJson": "",
+        "dateReception": "2024-11-15",
+        "userProcess": "Nombre Usuario",
+        "urlImg": ""
+    },
+    "details": [
+        {
+            "qty": 1,
+            "cost": 8301,
+            "codeBar": "",
+            "dctoItem": 0,
+            "subtotalItem": 8301,
+            "deliveryItem": false,
+            "checkItem": "false",
+            "sku": "AUD20635",
+            "idERP": "160051",
+            "model": "A10L4 USB",
+            "idPro": ""
+        },
+        {
+            "qty": 1,
+            "cost": 15000,
+            "codeBar": "",
+            "dctoItem": 0,
+            "subtotalItem": 15000,
+            "deliveryItem": false,
+            "checkItem": "false",
+            "sku": "ILU20984",
+            "idERP": "161208",
+            "model": "64514 120v 300w",
+            "idPro": ""
+        },
+        {
+            "qty": 1,
+            "cost": 8900,
+            "codeBar": "",
+            "dctoItem": 0,
+            "subtotalItem": 8900,
+            "deliveryItem": false,
+            "checkItem": "false",
+            "sku": "MUS15932",
+            "idERP": "161409",
+            "model": "EXL110 ",
+            "idPro": ""
+        }
+    ],
+    "type": "1"
+}

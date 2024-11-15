@@ -3,3 +3,35 @@ Revisar Sidemenu con sus permisos
 https://codervent.com/syndash/demo/vertical/table-editable.html
 
 937665742A
+
+
+
+data: Sin diferencia - SKU: ILU15820, Stock Local: 0, Stock Bsale: 0.0
+
+data: Sin diferencia - SKU: ILU15820, Stock Local: 0, Stock Bsale: 0.0
+
+data: Sin diferencia - SKU: ILU15820, Stock Local: 0, Stock Bsale: 0.0
+
+data: Sin diferencia - SKU: MUS16490, Stock Local: 0, Stock Bsale: 0.0
+
+data: Sin diferencia - SKU: MUS16490, Stock Local: 0, Stock Bsale: 0.0
+
+data: Sin diferencia - SKU: MUS16490, Stock Local: 0, Stock Bsale: 0.0
+
+data: Sin diferencia - SKU: ILU23401, Stock Local: 5, Stock Bsale: 5.0
+
+data: ComparaciÃ³n - SKU: ILU23401, Stock Local: 5, Stock Bsale: 0.0, Diferencia: -5.0
+
+data: ComparaciÃ³n - SKU: ILU23401, Stock Local: 5, Stock Bsale: 0.0, Diferencia: -5.0
+
+
+data: {"sku": "MUS23750", "stock_local": 9, "stock_bsale": 0.0, "diferencia": -9.0}
+
+data: {"sku": "MUS23750", "stock_local": 9, "stock_bsale": 0.0, "diferencia": -9.0}
+
+data: {"sku": "MUS25686", "stock_local": 6, "stock_bsale": 0.0, "diferencia": -6.0}
+
+data: {"sku": "MUS25686", "stock_local": 6, "stock_bsale": 0.0, "diferencia": -6.0}
+
+
+

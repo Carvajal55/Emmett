@@ -42,6 +42,39 @@
             </div>
         </div>
     </div>
+   <!-- Modal -->
+    <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog" aria-labelledby="modalPreciosLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalPreciosLabel">Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div v-for="(precio, index) in listasPrecios" :key="index" class="form-group">
+                        <label :for="'precio-' + precio.id">[[ precio.label ]]</label>
+                        <input
+                            type="number"
+                            class="form-control"
+                            v-model="precio.valor"
+                            @input="recalcularMargen(precio)"
+                            :id="'precio-' + precio.id"
+                            placeholder="Ingrese precio"
+                        />
+                        <p><strong>Margen:</strong> [[ precio.margen || 0 ]]%</p>
+                        <button class="btn btn-primary mt-2" @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)">
+                            Guardar para [[ precio.label ]]
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Detalles de la factura -->
     <table v-if="detalles.length > 0" class="table table-striped">
@@ -52,6 +85,9 @@
                 <th>PRODUCTO</th>
                 <th>CANTIDAD</th>
                 <th>COSTO</th>
+                <!-- <th>ÚLTIMO COSTO</th> -->
+                <th>ÚLTIMO PRECIO</th>
+                <th>PRECIO BSALE</th> <!-- Nueva columna -->
                 <th>COSTO C/DCTO</th>
                 <th>TOTAL</th>
                 <th>PRECIO BASE</th>
@@ -66,22 +102,38 @@
                 <td>[[ detalle.model ]]</td>
                 <td>[[ detalle.qty ]]</td>
                 <td>[[ formatCurrency(detalle.cost) ]]</td>
-                <td>
-                    [[ formatCurrency(calcularCostoConDescuento(detalle.cost, detalle.dctoItem)) ]] 
-                    <span v-if="detalle.dctoItem">([[ detalle.dctoItem ]]%)</span>
-                </td>
+                <!-- <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td> --> <!-- lastCost -->
+                <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td> <!-- lastPrice -->
+                <td>[[ detalle.bsalePrice ]]</td> <!-- bsalePrice -->
+                <td>[[ formatCurrency(calcularCostoConDescuento(detalle.cost, detalle.dctoItem)) ]]</td>
                 <td>[[ formatCurrency(calcularTotal(detalle.cost, detalle.qty)) ]]</td>
                 <td>
-                    <input type="number" class="form-control" v-model="detalle.precioBase" @input="calcularMargen(detalle)" placeholder="Precio Base">
+                    <input
+                        type="number"
+                        class="form-control"
+                        v-model="detalle.precioBase"
+                        placeholder="Precio Base"
+                    />
+                   
                 </td>
                 <td>[[ detalle.margen ]]%</td>
                 <td>
-                    
-                    <button class="btn btn-primary mt-1" @click="actualizarPrecioBase(detalle)">Actualizar Precio</button>
+                    <button
+                        class="btn btn-info"
+                        @click="abrirModal(detalle)"
+                    >
+                        Actualizar Precios MarketPlace
+                    </button>
+                </td>
+                <td>
+                    <button class="btn btn-primary" @click="actualizarPrecioBase(detalle)">
+                        Actualizar Precio Base
+                    </button>
                 </td>
             </tr>
         </tbody>
     </table>
+    
 
     <!-- Mostrar un mensaje si no hay detalles -->
     <p v-if="detalles.length === 0 && factura">No hay detalles para esta factura.</p>
@@ -101,11 +153,167 @@
             factura: null,  // Datos de la factura
             detalles: [],   // Detalles de la factura
             errorMsg: '',    // Mensaje de error
-            idFactura: null  // ID de la factura guardado
+            idFactura: null,
+            listasPrecios: [
+                { label: 'Falabella', id: 11, valor: null, margen: null }, // Lista para Falabella
+                { label: 'Líder', id: 14, valor: null, margen: null }      // Lista para Líder
+            ], // ID de la factura guardado
+            detalleSeleccionado: null,
+            skuSeleccionado: null, // SKU del producto seleccionado
+        },
+        mounted() {
+            console.log("Componente montado"); // Verificar que el mounted se ejecuta
+
+            this.idFactura = this.getFacturaIdFromURL(); // Guardar el ID de la URL en la variable de Vue
+            if (this.idFactura) {
+                this.obtenerFactura(); // Llamar a la API con el ID de la factura
+            } else {
+                console.error("No se pudo obtener el ID de la factura desde la URL");
+            }
         },
         methods: {
+            actualizarListaPrecio(detalle, type, bPrice) {
+                if (!bPrice) {
+                    alert('Por favor ingresa un precio.');
+                    return;
+                }
+
+                const data = {
+                    idERP: detalle.idERP,
+                    sku: detalle.sku,
+                    type: type, // ID de la lista
+                    bPrice: bPrice
+                };
+
+                console.log("Actualizando lista de precios:", data);
+
+                axios.post('/api/actualizar_precio/', data)
+                    .then(response => {
+                        console.log(`Precio para lista ${type} actualizado correctamente:`, response.data);
+                        Swal.fire({
+                            title: 'Éxito',
+                            text: `El precio para la lista ${type} se actualizó correctamente.`,
+                            icon: 'success',
+                            confirmButtonText: 'OK'
+                        });
+                    })
+                    .catch(error => {
+                        console.error(`Error al actualizar el precio para la lista ${type}:`, error);
+                        Swal.fire({
+                            title: 'Error',
+                            text: 'Hubo un problema al actualizar el precio.',
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        });
+                    });
+            },
+            actualizarPrecioBase(detalle) {
+                if (!detalle.precioBase) {
+                    alert('Por favor ingresa un precio base.');
+                    return;
+                }
+
+                const data = {
+                    idERP: detalle.idERP,
+                    sku: detalle.sku,
+                    type: 3, // Lista base
+                    bPrice: detalle.precioBase
+                };
+
+                console.log("Actualizando precio base:", data);
+
+                axios.post('/api/actualizar_precio/', data)
+                    .then(response => {
+                        console.log('Precio base actualizado correctamente:', response.data);
+                        Swal.fire({
+                            title: 'Éxito',
+                            text: 'El precio base se actualizó correctamente.',
+                            icon: 'success',
+                            confirmButtonText: 'OK'
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error al actualizar el precio base:', error);
+                        Swal.fire({
+                            title: 'Error',
+                            text: 'Hubo un problema al actualizar el precio base.',
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        });
+                    });
+            },
+            abrirModal(detalle) {
+                this.skuSeleccionado = detalle.sku;
+                this.detalleSeleccionado = detalle;
+                $('#modalPrecios').modal('show');
+            },
+            actualizarListasPrecios() {
+                console.log("Actualizando listas de precios para SKU:", this.skuSeleccionado);
+                console.log("Nuevos precios:", this.listasPrecios);
+
+                // Enviar la solicitud al backend con el SKU y las listas de precios
+                axios.post('/api/actualizar_listas_precios/', {
+                    sku: this.skuSeleccionado,
+                    precios: this.listasPrecios
+                })
+                .then(response => {
+                    console.log("Listas de precios actualizadas:", response.data);
+                    Swal.fire({
+                        title: 'Éxito',
+                        text: 'Las listas de precios se actualizaron correctamente.',
+                        icon: 'success',
+                        confirmButtonText: 'OK'
+                    });
+                    $('#modalPrecios').modal('hide'); // Cerrar el modal
+                })
+                .catch(error => {
+                    console.error("Error al actualizar las listas de precios:", error);
+                    Swal.fire({
+                        title: 'Error',
+                        text: 'Hubo un problema al actualizar las listas de precios.',
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+                });
+            },
+            obtenerDatosProducto(detalle) {
+                console.log("Obteniendo datos para SKU:", detalle.sku); // Log para verificar el SKU
+                let formData = new FormData();
+                formData.append("sku", detalle.sku);
+
+                axios.post("/api/obtener_datos_producto/", formData)
+                    .then(response => {
+                        console.log("Datos del producto obtenidos:", response.data); // Verifica la respuesta completa
+
+                        // Usa this.$set para garantizar reactividad
+                        this.$set(detalle, "lastCost", parseFloat(response.data.lastCost) || 0);
+                        this.$set(detalle, "lastPrice", parseFloat(response.data.lastPrice) || 0);
+                        this.$set(detalle, "bsalePrice", response.data.bsalePrice || "No disponible");
+
+                        console.log("Detalle actualizado:", detalle); // Verifica los valores asignados
+                    })
+                    .catch(error => {
+                        console.error("Error al obtener datos del producto:", error);
+
+                        // Valores predeterminados en caso de error
+                        this.$set(detalle, "lastCost", 0);
+                        this.$set(detalle, "lastPrice", 0);
+                        this.$set(detalle, "bsalePrice", "No disponible");
+                    });
+            },
             formatCurrency(value) {
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+            },
+            recalcularMargen(precio) {
+                const costoNeto = this.detalleSeleccionado.cost; // Usar el costo del detalle seleccionado
+                const precioBaseNeto = precio.valor / 1.19; // El Precio Base sin IVA
+
+                if (precioBaseNeto > 0) {
+                    const margen = (1 - (costoNeto / precioBaseNeto)) * 100; // Fórmula del margen
+                    precio.margen = margen.toFixed(2); // Redondear a 2 decimales
+                } else {
+                    precio.margen = 0; // Si el Precio Base Neto es 0, el margen también lo es
+                }
             },
             // Función para calcular el costo con descuento
             calcularCostoConDescuento(cost, dctoItem) {
@@ -118,32 +326,37 @@
             },
             // Función para calcular el margen basado en el precio base
             calcularMargen(detalle) {
-                let costoConDescuento = this.calcularCostoConDescuento(detalle.cost, detalle.dctoItem);
-                let precioBase = detalle.precioBase;
+                const costoNeto = detalle.cost; // El costo ya está en valor neto
+                const precioBaseNeto = detalle.precioBase / 1.19; // El Precio Base sin IVA
 
-                if (precioBase > 0) {
-                    let margen = ((precioBase - costoConDescuento) / precioBase) * 100;
-                    detalle.margen = margen.toFixed(2);  // Formatear el margen a 2 decimales
+                if (precioBaseNeto > 0) {
+                    const margen = (1 - (costoNeto / precioBaseNeto)) * 100; // Fórmula del margen
+                    detalle.margen = margen.toFixed(2); // Redondear a 2 decimales
                 } else {
-                    detalle.margen = 0;  // Si no hay precio base, margen es 0
+                    detalle.margen = 0; // Si el Precio Base Neto es 0, el margen también lo es
                 }
             },
             // Función para obtener los detalles de la factura
             obtenerFactura() {
-                console.log("Obteniendo factura con ID:", this.idFactura);  // Log para verificar el ID
+                console.log("Obteniendo factura con ID:", this.idFactura); // Log para verificar el ID
 
                 let formData = new FormData();
-                formData.append('id', this.idFactura);  // Pasar el ID de la factura
+                formData.append("id", this.idFactura); // Pasar el ID de la factura
 
-                axios.post('/api/obtener_factura/', formData)
+                axios.post("/api/obtener_factura/", formData)
                     .then(response => {
-                        this.factura = response.data;  // Asignar los datos de la factura
-                        this.detalles = response.data.details;  // Asignar los detalles
-                        console.log('Datos de la factura:', response.data);
+                        this.factura = response.data; // Asignar los datos de la factura
+                        this.detalles = response.data.details; // Asignar los detalles
+                        console.log("Datos de la factura:", response.data);
+
+                        // Llamar a obtenerDatosProducto para cada detalle una vez que se hayan cargado
+                        this.detalles.forEach(detalle => {
+                            this.obtenerDatosProducto(detalle); // Aquí llamamos a obtenerDatosProducto
+                        });
                     })
                     .catch(error => {
-                        console.error('Error al obtener la factura:', error);
-                        this.errorMsg = 'Hubo un problema al obtener los detalles de la factura.';
+                        console.error("Error al obtener la factura:", error);
+                        this.errorMsg = "Hubo un problema al obtener los detalles de la factura.";
                     });
             },
             // Función para rechazar la factura con confirmación
@@ -209,44 +422,6 @@
                 const idFactura = urlParts[urlParts.length - 2];  // El ID de la factura está en la penúltima parte de la URL
                 return idFactura;
             },
-            actualizarPrecioBase(detalle) {
-                // Verificar si el precio base se ha ingresado
-                console.log(detalle)
-                console.log(detalle.idERP)
-                if (!detalle.precioBase) {
-                    alert('Por favor ingresa un precio base.');
-                    return;
-                }
-
-                // Crear un objeto con la información necesaria
-                let data = {
-                    idERP: detalle.idERP, // Suponiendo que detalle tiene el ID del producto
-                    sku: detalle.sku,
-                    type: 3, // Tipo fijo para esta prueba
-                    bPrice: detalle.precioBase
-                };
-                console.log(data)
-                // Hacer la solicitud al backend con axios
-                axios.post('/api/actualizar_precio/', data)
-                    .then(response => {
-                        console.log('Precio actualizado correctamente:', response.data);
-                        Swal.fire({
-                            title: 'Éxito',
-                            text: 'El precio se ha actualizado correctamente.',
-                            icon: 'success',
-                            confirmButtonText: 'OK'
-                        });
-                    })
-                    .catch(error => {
-                        console.error('Error al actualizar el precio:', error);
-                        Swal.fire({
-                            title: 'Error',
-                            text: 'Hubo un problema al actualizar el precio.',
-                            icon: 'error',
-                            confirmButtonText: 'OK'
-                        });
-                    });
-            }
         },
         mounted() {
             console.log("Componente montado");  // Verificar que el mounted se ejecuta
