@@ -5,7 +5,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout, authenticate
 from django.conf import settings
 from pymongo import MongoClient
-from datetime import datetime, timedelta
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -21,7 +20,6 @@ from io import BytesIO
 import zipfile
 from django.http import HttpResponse
 from openpyxl import Workbook
-from io import BytesIO
 import json
 from django.contrib import messages
 import requests
@@ -43,6 +41,9 @@ import random
 import string
 from django.utils.crypto import get_random_string
 from datetime import datetime, timedelta
+import qrcode
+import io
+
 
 
 
@@ -2650,6 +2651,107 @@ def obtener_datos_producto(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Método no permitido"}, status=405)
+
+
+#CREAR SECTORES
+    
+
+@csrf_exempt
+def crear_sector_API(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+
+            # Validación de los campos
+            idoffice = data.get('idoffice')
+            zone = data.get('zone')
+            floor = data.get('floor')
+            section = data.get('section')
+            namesector = data.get('namesector')
+            description = data.get('description', '')
+
+            if not (idoffice and zone and floor and section and namesector):
+                return JsonResponse({'error': 'Todos los campos son obligatorios excepto descripción'}, status=400)
+
+            # Crear el sector
+            sector = Sectoroffice.objects.create(
+                idoffice=idoffice,
+                zone=zone,
+                floor=floor,
+                section=section,
+                namesector=namesector,
+                description=description,
+            )
+
+            # Generar el código QR
+            qr_code_content = f"B-{idoffice}-{zone}{floor}-{section}"
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(qr_code_content)
+            qr.make(fit=True)
+
+            # Convertir QR a imagen en formato base64 para enviar o guardar
+            img = qr.make_image(fill_color="black", back_color="white")
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG")
+            buffer.seek(0)
+
+            # Retornar respuesta con los datos del sector creado
+            return JsonResponse({
+                'message': 'Sector creado con éxito.',
+                'sector': {
+                    'idsectoroffice': sector.idsectoroffice,
+                    'idoffice': sector.idoffice,
+                    'zone': sector.zone,
+                    'floor': sector.floor,
+                    'section': sector.section,
+                    'namesector': sector.namesector,
+                    'description': sector.description,
+                    'qr_code_content': qr_code_content,
+                },
+                'qr_code': buffer.getvalue().decode('latin1')  # Imagen del QR
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+
+def listar_bodegas(request):
+    try:
+        # Obtener las bodegas activas
+        bodegas = Bodega.objects.all().values('idoffice', 'name')  # Ajusta los nombres de los campos según tu modelo
+        return JsonResponse(list(bodegas), safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
     
 
 
+def listar_sectores(request):
+    try:
+        # Obtener todos los sectores y unir con los nombres de las bodegas
+        sectores = Sectoroffice.objects.all().values(
+            'idsectoroffice',
+            'idoffice',
+            'zone',
+            'floor',
+            'section',
+            'namesector',
+            'description'
+        )
+        
+        # Agregar el nombre de la bodega basado en `idoffice`
+        sectores_list = []
+        for sector in sectores:
+            bodega_name = Bodega.objects.filter(idoffice=sector['idoffice']).values_list('name', flat=True).first()
+            sector['bodega_name'] = bodega_name if bodega_name else 'Sin nombre'
+            sectores_list.append(sector)
+        
+        return JsonResponse(sectores_list, safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

@@ -107,6 +107,11 @@ urlpatterns = [
 
    path('api/actualizar_iderp/', core_views.actualizar_iderp, name='actualizar_iderp'),
    path("api/obtener_datos_producto/", core_views.obtener_datos_producto, name="obtener_datos_producto"),
+    #Crear Sector
+   path('api/crear-sector/', core_views.crear_sector_API, name='crear_sector'),
+   path('api/listar-bodegas/', core_views.listar_bodegas, name='listar_bodegas'),
+   path('api/listar-sectores/', core_views.listar_sectores, name='listar_sectores'),
+   
 
 
 

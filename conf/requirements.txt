@@ -51,3 +51,4 @@ django-humanize
 WeasyPrint
 reportlab
 pandas
+qrcode[pil]
