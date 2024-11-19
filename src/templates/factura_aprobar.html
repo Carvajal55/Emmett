@@ -38,6 +38,7 @@
                 <p><strong>Fecha Recepción:</strong> [[ factura.headers.dateReception ]]</p>
                 <p><strong>Descuento Documento:</strong> [[ factura.headers.dcto || '0' ]]</p>
                 <p><strong>Valor Neto:</strong> [[ formatCurrency(factura.headers.subtotalNeto) ]]</p>
+                <p><strong>Valor con Descuento Neto:</strong> [[ formatCurrency(factura.headers.dcto_subtotal) ]]</p>
                 <p><strong>Total IVA Incluido:</strong> [[ formatCurrency(factura.headers.subtotalBruto) ]]</p>
             </div>
         </div>
@@ -104,7 +105,7 @@
                 <td>[[ formatCurrency(detalle.cost) ]]</td>
                 <!-- <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td> --> <!-- lastCost -->
                 <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td> <!-- lastPrice -->
-                <td>[[ detalle.bsalePrice ]]</td> <!-- bsalePrice -->
+                <td>[[ formatCurrency(detalle.bsalePrice || 0) ]]</td> <!-- bsalePrice -->
                 <td>[[ formatCurrency(calcularCostoConDescuento(detalle.cost, detalle.dctoItem)) ]]</td>
                 <td>[[ formatCurrency(calcularTotal(detalle.cost, detalle.qty)) ]]</td>
                 <td>
@@ -113,7 +114,10 @@
                         class="form-control"
                         v-model="detalle.precioBase"
                         placeholder="Precio Base"
+                        @input="calcularMargen(detalle)" 
                     />
+                </td>
+                
                    
                 </td>
                 <td>[[ detalle.margen ]]%</td>
@@ -278,8 +282,10 @@
             },
             obtenerDatosProducto(detalle) {
                 console.log("Obteniendo datos para SKU:", detalle.sku); // Log para verificar el SKU
+
                 let formData = new FormData();
                 formData.append("sku", detalle.sku);
+                formData.append("price_list_id", 3); // Enviar la lista de precios fija (3)
 
                 axios.post("/api/obtener_datos_producto/", formData)
                     .then(response => {
@@ -326,15 +332,17 @@
             },
             // Función para calcular el margen basado en el precio base
             calcularMargen(detalle) {
-                const costoNeto = detalle.cost; // El costo ya está en valor neto
-                const precioBaseNeto = detalle.precioBase / 1.19; // El Precio Base sin IVA
+                // Verifica que los valores sean números válidos
+                const costoNeto = parseFloat(detalle.cost) || 0; 
+                const precioBaseNeto = (parseFloat(detalle.precioBase) || 0) / 1.19; // Precio base sin IVA
 
                 if (precioBaseNeto > 0) {
-                    const margen = (1 - (costoNeto / precioBaseNeto)) * 100; // Fórmula del margen
-                    detalle.margen = margen.toFixed(2); // Redondear a 2 decimales
+                    const margen = ((precioBaseNeto - costoNeto) / precioBaseNeto) * 100; // Fórmula del margen
+                    detalle.margen = margen.toFixed(2); // Redondea a 2 decimales
                 } else {
-                    detalle.margen = 0; // Si el Precio Base Neto es 0, el margen también lo es
+                    detalle.margen = 0; // Si el precio base neto es 0, el margen también lo es
                 }
+                console.log(`Margen calculado para SKU ${detalle.sku}:`, detalle.margen);
             },
             // Función para obtener los detalles de la factura
             obtenerFactura() {

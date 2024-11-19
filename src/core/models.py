@@ -78,6 +78,13 @@ class Products(models.Model):
     idproduct = models.IntegerField(db_column='idProduct', blank=True, null=True)  # Field name made lowercase.
     meliprice_s1 = models.IntegerField(db_column='meliPrice_s1', blank=True, null=True)  # Field name made lowercase.
     uniquecodebar = models.BooleanField(default=False, blank=True, null=True)  # Nuevo campo
+    alto = models.IntegerField(blank=True, null=True) 
+    largo = models.IntegerField(blank=True, null=True)  # Field name made lowercase.
+    profundidad = models.IntegerField(blank=True, null=True)  # Field name made lowercase.
+    peso = models.IntegerField(blank=True, null=True)  # Field name made lowercase.
+
+     
+     
     class Meta:
         db_table = 'products'
 
@@ -126,10 +133,12 @@ class Purchase(models.Model):
     printstatus = models.IntegerField(db_column='printStatus', blank=True, null=True)  # Field name made lowercase.
     dateprint = models.DateField(db_column='datePrint', blank=True, null=True)  # Field name made lowercase.
     iddocument = models.CharField(db_column='idDocument', max_length=45, blank=True, null=True)  # Field name made lowercase.
-
+    subtotal = models.FloatField(default=0)  # Subtotal sin descuento
+    subtotal_with_discount = models.FloatField(default=0)
     class Meta:
-        managed = False
         db_table = 'purchase'
+
+
 
 
 class Sectoroffice(models.Model):

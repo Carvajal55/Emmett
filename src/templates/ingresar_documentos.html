@@ -147,11 +147,11 @@
         </div>
 
         <!-- Botón para ver todos los proveedores -->
-        <div class="mt-4">
+        <!-- <div class="mt-4">
             <button class="btn btn-primary" @click="mostrarTodosLosProveedores">
                 Ver todos los proveedores
             </button>
-        </div>
+        </div> -->
 
         
 
@@ -242,7 +242,15 @@
         </div>
 
         <!-- Botones de acción omitidos por brevedad... -->
-            <button type="button" class="btn btn-success btn-lg" @click="enviarDatos">Guardar</button>
+        <button 
+            type="button" 
+            style="background-color: #28a745; color: white; border: none;" 
+            class="btn btn-lg" 
+            @click="enviarDatos"
+            :disabled="!formularioValido">
+            Guardar
+        </button>
+
         </div>
         <!-- Contenido de las tablas -->
         <div class="row">
@@ -256,7 +264,9 @@
                                 <th>#</th>
                                 <th>MODELO</th>
                                 <th>SKU</th>
-                                <th>CANT</th>
+                                <th>CANT ESP</th>
+                                <th>CANT REC</th>
+                                <th>COMP</th> <!-- Nueva columna para el checkmark -->
                                 <th>COSTO</th>
                                 <th>DCTO</th>
                                 <th>SUBTOTAL</th>
@@ -269,14 +279,24 @@
                                 <td>[[ producto.model ]]</td>
                                 <td>[[ producto.sku ]]</td>
                                 <td>
-                                    <input class="form-control form-control-sm" v-model.number="producto.cantidad" @input="calcularSubtotalProducto(index)" type="number">
+                                    <input class="form-control form-control-sm" v-model.number="producto.cantidad" @input="verificarCompleto(index)" type="number">
+                                </td>
+                                <td>
+                                    <input class="form-control form-control-sm" v-model.number="producto.received_quantity" @input="verificarCompleto(index)" type="number">
+                                </td>
+                                <td>
+                                    <input type="checkbox" v-model="producto.completo">
                                 </td>
                                 <td>
                                     <input class="form-control form-control-sm" v-model.number="producto.costo" @input="calcularSubtotalProducto(index)" type="number">
                                 </td>
-                                <td><input class="form-control form-control-sm" v-model.number="producto.descuento" type="number"></td>
+                                <td>
+                                    <input class="form-control form-control-sm" v-model.number="producto.descuento" type="number">
+                                </td>
                                 <td>[[ formatCurrency(producto.subtotal) ]]</td>
-                                <td><button class="btn btn-danger btn-sm" @click="eliminarProducto(producto.sku)">Eliminar</button></td>
+                                <td>
+                                    <button class="btn btn-danger btn-sm" @click="eliminarProducto(producto.sku)">Eliminar</button>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -408,22 +428,56 @@
                 pruebaElectronica: false,
                 checkboxFinalElectronica: false,
             },
+            nuevosCampos: {
+                expected_quantity: 0, // Cantidad esperada del producto
+                received_quantity: 0, // Cantidad recibida del producto
+                difference: 0         // Diferencia calculada (expected_quantity - received_quantity)
+            }
 
         },
         watch: {
             searchQuery(newQuery) {
                 this.searchProveedores(newQuery);
+            },
+            "form.descuentoGeneral"(newValue) {
+                this.productosDocumento.forEach(producto => {
+                    producto.descuento = newValue; // Actualiza el descuento
+                    if (producto.subtotal) {
+                        producto.subtotal = producto.lastprice - (producto.lastprice * (newValue / 100));
+                    }
+                });
             }
         },
         computed: {
             // Propiedad computada que suma todos los subtotales
             totalSubtotales() {
                 return this.productosDocumento.reduce((total, producto) => total + (producto.subtotal || 0), 0);
+            },
+            formularioValido() {
+                // Verifica que las fechas, número de documento y al menos un producto estén presentes
+                const { fechaEmision, fechaVencimiento, numeroDocumento } = this.form;
+                return (
+                    fechaEmision &&
+                    fechaVencimiento &&
+                    numeroDocumento &&
+                    this.productosDocumento.length > 0
+                );
+            },
+            totalSubtotales() {
+                return this.productosDocumento.reduce((total, producto) => total + (producto.subtotal || 0), 0);
             }
         },
-
-        
         methods: {
+            actualizarDescuentoProductos(descuentoGeneral) {
+                this.detalles.forEach(detalle => {
+                    detalle.dcto = descuentoGeneral; // Actualizar el descuento de cada producto
+                    detalle.cost_with_discount = detalle.cost - (detalle.cost * (descuentoGeneral / 100)); // Recalcular el costo con descuento
+                });
+            },
+            verificarCompleto(index) {
+                const producto = this.productosDocumento[index];
+                producto.completo = producto.cantidad === producto.received_quantity; // Marca como completo si coinciden
+            },
             calcularSubtotalProducto(index) {
                 const producto = this.productosDocumento[index];
                 const cantidad = producto.cantidad || 0;
@@ -500,15 +554,24 @@
                         text: 'Este producto ya ha sido agregado.',
                     });
                 } else {
+                    const descuentoGeneral = this.form.descuentoGeneral || 0; // Obtén el descuento general actual
                     const nuevoProducto = {
                         model: producto.nameproduct,
                         sku: producto.sku,
-                        cantidad: 1,  // Valor inicial para evitar NaN
-                        //costo: producto.lastprice || 0, // Asegura que costo tenga un valor numérico
-                        descuento: 0,
+                        cantidad: 1,  // Cantidad esperada, inicializada con 1
+                        costo: "", // Precio del producto
+                        descuento: descuentoGeneral, // Asignar el descuento general al producto
                         entrega: false,
-                        subtotal: producto.lastprice || 0  // Calcula el subtotal inicial basado en el costo
+                        subtotal: producto.lastprice || 0,
+                        received_quantity: 0,   // Cantidad recibida inicialmente en 0
+                        difference: 1           // Diferencia inicial entre esperada y recibida
                     };
+
+                    // Calcular el subtotal con descuento
+                    if (producto.lastprice) {
+                        nuevoProducto.subtotal = producto.lastprice - (producto.lastprice * (descuentoGeneral / 100));
+                    }
+
                     this.productosDocumento.push(nuevoProducto);
                     this.calcularSubtotalProducto(this.productosDocumento.length - 1); // Actualiza el subtotal
                 }
@@ -562,6 +625,10 @@
             },
             cargarProductos() {
                 this.searchProductos();
+            },
+            calcularDiferencia(index) {
+                const producto = this.productosDocumento[index];
+                producto.difference = producto.cantidad - (producto.received_quantity || 0);
             },
             crearProveedor() {
                 // Crear un objeto FormData
@@ -619,29 +686,30 @@
                 });
             },
             enviarDatos() {
-                // Preparar los datos para el archivo JSON
                 const jsonData = {
                     headers: {
-                        supplier: this.form.rutProveedor, // RUT del proveedor (supplier)
-                        supplierName: this.form.razonSocial, // Nombre del proveedor (suppliername)
+                        supplier: this.form.rutProveedor,
+                        supplierName: this.form.razonSocial,
                         typeDocument: this.form.tipoDocumento,
                         nDocument: this.form.numeroDocumento,
                         dcto: this.form.descuentoGeneral,
                         datePurchase: this.form.fechaEmision,
                         dateExpired: this.form.fechaVencimiento,
-                        observation: this.form.observaciones, // Observación
+                        observation: this.form.observaciones,
                         typePay: this.form.tipoPago,
                         nCheque: this.form.numeroCheque,
                         qtyCheque: this.form.cantidadCheque,
-                        subtotal: this.totalSubtotales, // Total de subtotales calculados
-                        urlPDF: "", // Ajustar en el backend si es necesario
-                        urlJson: "", // Ajustar en el backend si es necesario
+                        subtotal: this.totalSubtotales,
+                        urlPDF: "",
+                        urlJson: "",
                         dateReception: this.currentDate,
-                        userProcess: "Nombre Usuario", // Cambiar al nombre real del usuario
-                        urlImg: "" // Ajustar en el backend si es necesario
+                        userProcess: "Nombre Usuario",
+                        urlImg: ""
                     },
                     details: this.productosDocumento.map(producto => ({
-                        qty: producto.cantidad,
+                        qty: producto.cantidad,              // Cantidad esperada
+                        received_quantity: producto.received_quantity, // Cantidad recibida
+                        completo: producto.completo,         // Si llegaron todas las unidades
                         cost: producto.costo,
                         codeBar: producto.codebar || '',
                         dctoItem: producto.descuento,
@@ -649,14 +717,13 @@
                         deliveryItem: producto.entrega,
                         checkItem: producto.entrega ? "true" : "false",
                         sku: producto.sku,
-                        idERP: "", // Agregar si está disponible
+                        idERP: "",
                         model: producto.model,
-                        idPro: "" // Agregar si está disponible
+                        idPro: ""
                     })),
-                    type: "1" // Ajusta este campo según sea necesario
+                    type: "1"
                 };
 
-                // Enviar los datos al backend
                 axios.post('/api/generar-json/', jsonData)
                     .then(response => {
                         Swal.fire({
@@ -688,6 +755,7 @@
             },
         },
         mounted() {
+            this.mostrarTodosLosProveedores();
             this.cargarProveedores();
             this.cargarProductos();
         }

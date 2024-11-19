@@ -577,9 +577,9 @@ def listar_facturas_pendientes(request):
     query = request.GET.get('q', '')
     page = request.GET.get('page', 1)
 
-    # Filtrar facturas pendientes (status = 0) y ordenar por fecha de adición descendente
-    facturas = Purchase.objects.filter(status=0).order_by('-dateadd')
-    
+    # Filtrar facturas pendientes (status = 0) y ordenar por fecha de creación descendente
+    facturas = Purchase.objects.filter(status=0).order_by('-dateadd')  # Asegúrate de que `dateadd` sea el campo correcto
+
     # Filtrar por número de folio si se introduce una búsqueda
     if query:
         facturas = facturas.filter(number__icontains=query)
@@ -716,6 +716,7 @@ def obtener_factura(request):
                 "statusCss": "alert-info",  
                 "imgInvoice": factura.urlimg,
                 "statusInvoiceD": factura.status,
+                "dcto_subtotal" : factura.subtotal_with_discount
             },
             "details": detalles,  # Detalles extraídos del archivo JSON
         }
@@ -726,6 +727,22 @@ def obtener_factura(request):
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 """ Ingresar Documentos """
+def get_suppliers(request):
+    # Obtiene el parámetro de búsqueda (si existe)
+    query = request.GET.get('q', '')
+
+    # Filtrar proveedores por RUT o nombre si hay un término de búsqueda
+    if query:
+        suppliers = Supplier.objects.filter(
+            Q(namesupplier__icontains=query) | Q(rutsupplier__icontains=query)
+        ).values('id', 'namesupplier', 'rutsupplier')
+    else:
+        # Si no hay búsqueda, devolver todos los proveedores
+        suppliers = Supplier.objects.all().values('id', 'namesupplier', 'rutsupplier')
+
+    # Convertimos a lista y retornamos en formato JSON
+    return JsonResponse(list(suppliers), safe=False)
+
 @csrf_exempt
 def create_supplier(request):
     if request.method == 'POST':
@@ -783,7 +800,11 @@ def crear_producto(request):
             "description": f"{nombre_producto} - {marca}",
             "code": sku,
             "barCode": bar_code,
-            "price": precio
+            "price": precio,
+            "height": alto,  # Alto en cm
+            "width": largo,  # Largo en cm (ancho)
+            "depth": profundidad,  # Profundidad en cm
+            "weight": peso  # Peso en kg
         }
 
         headers = {
@@ -809,6 +830,10 @@ def crear_producto(request):
                 lastprice=precio,
                 codsupplier=proveedor_id,
                 createdate=datetime.now().date(),
+                alto=alto,
+                largo=largo,
+                profundidad=profundidad,
+                peso=peso,
             )
             print("Producto guardado en base de datos local:", nuevo_producto)
 
@@ -836,6 +861,7 @@ def crear_producto(request):
                 return JsonResponse({"error": "Error al crear la variante en Bsale", "details": response_variant.json()}, status=400)
         else:
             return JsonResponse({"error": "Error al crear el producto en Bsale", "details": response_product.json()}, status=400)
+
   
 
 def get_sku_prefix(categoria):
@@ -890,7 +916,7 @@ def generar_json(request):
         try:
             data = json.loads(request.body)
 
-            # Obtener los datos necesarios del encabezado para el modelo Purchase
+            # Obtener los datos necesarios del encabezado
             headers = data.get('headers', {})
             supplier = headers.get('supplier', '')
             supplier_name = headers.get('supplierName', '')
@@ -898,8 +924,8 @@ def generar_json(request):
             number_document = headers.get('nDocument', None)
             observation = headers.get('observation', '')
             date_purchase = headers.get('datePurchase', None)
-            subtotal = headers.get('subtotal', 0)
             url_img = headers.get('urlImg', '')
+            global_discount = float(headers.get('dcto', 0) or 0)  # Descuento global
 
             # Crear el nombre del archivo basado en los datos del encabezado
             file_name = f"s_{supplier}t_{type_document}f_{number_document}.json"
@@ -911,14 +937,31 @@ def generar_json(request):
             # Crear las carpetas si no existen
             os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
-            # Iterar sobre los detalles de la factura para asignar el `idERP` a cada SKU
+            # Variables para calcular los subtotales
+            subtotal_without_discount = 0
+            subtotal_with_discount = 0
+
+            # Procesar los detalles de la factura
             for detalle in data.get('details', []):
-                sku = detalle.get('sku', '')
-                try:
-                    producto = Products.objects.get(sku=sku)
-                    detalle['idERP'] = producto.iderp  # Asignar el valor de `idERP`
-                except Products.DoesNotExist:
-                    detalle['idERP'] = None  # Si no se encuentra el SKU, asignar None
+                cost = float(detalle.get('cost', 0))  # Convertir costo a número
+                product_discount = float(detalle.get('dctoItem', global_discount) or 0)  # Convertir descuento a número
+
+                # Calcular el costo con descuento
+                cost_with_discount = cost - (cost * (product_discount / 100))
+
+                # Actualizar subtotales
+                subtotal_without_discount += cost * detalle.get('qty', 1)  # Considerar la cantidad
+                subtotal_with_discount += cost_with_discount * detalle.get('qty', 1)  # Considerar la cantidad
+
+                # Agregar estos campos al detalle
+                detalle['cost_with_discount'] = cost_with_discount  # Costo con descuento
+
+            # Añadir los subtotales al encabezado del JSON
+            headers['subtotalWithoutDiscount'] = subtotal_without_discount
+            headers['subtotalWithDiscount'] = subtotal_with_discount
+
+            # Actualizar el JSON con los nuevos encabezados
+            data['headers'] = headers
 
             # Guardar el JSON en el archivo especificado
             with open(absolute_file_path, 'w', encoding='utf-8') as json_file:
@@ -933,7 +976,8 @@ def generar_json(request):
                 observation=observation,
                 dateadd=timezone.now(),
                 dateproccess=date_purchase,
-                subtotal=subtotal,
+                subtotal=subtotal_without_discount,  # Subtotal sin descuento
+                subtotal_with_discount=subtotal_with_discount,  # Subtotal con descuento
                 urljson=relative_file_path,  # Guardar solo la ruta relativa en la base de datos
                 urlimg=url_img,
                 status=0,  # Estado predeterminado
@@ -941,8 +985,10 @@ def generar_json(request):
 
             # Devolver la ruta del archivo creada y un mensaje de éxito
             return JsonResponse({
-                'message': 'Archivo JSON y registro creados correctamente',
+                'message': 'Archivo JSON creado correctamente',
                 'urlJson': relative_file_path,
+                'subtotalWithoutDiscount': subtotal_without_discount,
+                'subtotalWithDiscount': subtotal_with_discount,
                 'purchaseId': purchase.id
             }, status=201)
 
@@ -951,21 +997,6 @@ def generar_json(request):
             return JsonResponse({'error': str(e)}, status=400)
 
     return JsonResponse({'error': 'Método no permitido'}, status=405)
-def get_suppliers(request):
-    # Obtiene el parámetro de búsqueda (si existe)
-    query = request.GET.get('q', '')
-
-    # Filtrar proveedores por RUT o nombre si hay un término de búsqueda
-    if query:
-        suppliers = Supplier.objects.filter(
-            Q(namesupplier__icontains=query) | Q(rutsupplier__icontains=query)
-        ).values('id', 'namesupplier', 'rutsupplier')
-    else:
-        # Si no hay búsqueda, devolver todos los proveedores
-        suppliers = Supplier.objects.all().values('id', 'namesupplier', 'rutsupplier')
-
-    # Convertimos a lista y retornamos en formato JSON
-    return JsonResponse(list(suppliers), safe=False)
 
 
 def get_products(request):
@@ -2564,6 +2595,8 @@ BSALE_TOKEN = '1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc' """
 def obtener_datos_producto(request):
     if request.method == "POST":
         sku = request.POST.get("sku")
+        price_list_id = 3  # ID fijo de la lista de precios
+
         if not sku:
             return JsonResponse({"error": "El SKU es obligatorio"}, status=400)
 
@@ -2574,17 +2607,23 @@ def obtener_datos_producto(request):
             last_price = producto.lastprice
 
             # Consultar precio en Bsale
-            bsale_url = "https://api.bsale.io/v1/products"  # Ajustar la URL real
+            bsale_url = f"https://api.bsale.cl/v1/price_lists/{price_list_id}/details.json"
             headers = {
                 "Content-Type": "application/json",
-                "access_token": BSALE_TOKEN  # Reemplazar con el token real
+                "access_token": BSALE_TOKEN
             }
-            params = {"sku": sku}
+            params = {"code": sku}
 
             bsale_response = requests.get(bsale_url, headers=headers, params=params)
             if bsale_response.status_code == 200:
                 bsale_data = bsale_response.json()
-                bsale_price = bsale_data.get("price", None)  # Ajustar según la estructura de la respuesta
+                items = bsale_data.get("items", [])
+
+                if items:
+                    # Obtener el primer item y su precio con impuestos
+                    bsale_price = items[0].get("variantValueWithTaxes", "No disponible")
+                else:
+                    bsale_price = "No disponible"
             else:
                 bsale_price = "No disponible"
 

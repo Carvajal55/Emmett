@@ -1,0 +1,41 @@
+{
+    "headers": {
+        "supplier": "20098233",
+        "supplierName": "Cristian Prueba",
+        "typeDocument": "33",
+        "nDocument": "3333",
+        "dcto": 0,
+        "datePurchase": "2024-11-12",
+        "dateExpired": "2024-11-07",
+        "observation": "",
+        "typePay": 1,
+        "nCheque": 0,
+        "qtyCheque": 0,
+        "subtotal": 5000,
+        "urlPDF": "",
+        "urlJson": "",
+        "dateReception": "2024-11-18",
+        "userProcess": "Nombre Usuario",
+        "urlImg": ""
+    },
+    "details": [
+        {
+            "qty": 1,
+            "received_quantity": 5,
+            "completo": true,
+            "cost": 5000,
+            "codeBar": "",
+            "dctoItem": 0,
+            "subtotalItem": 5000,
+            "deliveryItem": false,
+            "checkItem": "false",
+            "sku": "AUD20635",
+            "idERP": "",
+            "model": "A10L4 USB",
+            "idPro": "",
+            "expected_quantity": 0,
+            "difference": -5
+        }
+    ],
+    "type": "1"
+}

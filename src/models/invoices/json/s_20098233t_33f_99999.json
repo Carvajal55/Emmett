@@ -1,0 +1,41 @@
+{
+    "headers": {
+        "supplier": "20098233",
+        "supplierName": "Cristian Prueba",
+        "typeDocument": "33",
+        "nDocument": "99999",
+        "dcto": 0,
+        "datePurchase": "2024-11-18",
+        "dateExpired": "2024-12-18",
+        "observation": "",
+        "typePay": 1,
+        "nCheque": 0,
+        "qtyCheque": 0,
+        "subtotal": 100000,
+        "urlPDF": "",
+        "urlJson": "",
+        "dateReception": "2024-11-18",
+        "userProcess": "Nombre Usuario",
+        "urlImg": ""
+    },
+    "details": [
+        {
+            "qty": 10,
+            "received_quantity": 0,
+            "completo": true,
+            "cost": 10000,
+            "codeBar": "",
+            "dctoItem": 5,
+            "subtotalItem": 100000,
+            "deliveryItem": false,
+            "checkItem": "false",
+            "sku": "AUD25608",
+            "idERP": "",
+            "model": "NVK-I08BT RED",
+            "idPro": "",
+            "expected_quantity": 0,
+            "difference": 0
+        }
+    ],
+    "type": "1"
+}
