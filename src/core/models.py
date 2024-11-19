@@ -41,7 +41,6 @@ class Categoryserp(models.Model):
     iderp = models.IntegerField(db_column='idERP', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
         db_table = 'categorysERP'
 
 
@@ -52,7 +51,6 @@ class Productconfig(models.Model):
     categoryid = models.IntegerField(db_column='categoryID', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
         db_table = 'productConfig'
 
 
@@ -96,8 +94,7 @@ class Productscost(models.Model):
     idsupplier = models.IntegerField(db_column='idSupplier', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
-        db_table = 'productsCost'
+         db_table = 'productsCost'
 
 
 class Productsprices(models.Model):
@@ -113,7 +110,6 @@ class Productsprices(models.Model):
     idvariantplist = models.IntegerField(db_column='idVariantPlist', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
         db_table = 'productsPrices'
 
 
@@ -157,7 +153,6 @@ class Sectoroffice(models.Model):
     namedescriptive = models.CharField(db_column='nameDescriptive', max_length=100, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
         db_table = 'sectorOffice'
 
 
@@ -167,8 +162,7 @@ class Supplier(models.Model):
     alias = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
-        managed = False
-        db_table = 'supplier'
+         db_table = 'supplier'
 
 
 class Uniqueproducts(models.Model):
@@ -192,8 +186,7 @@ class Uniqueproducts(models.Model):
     ncompany = models.IntegerField(blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
-        db_table = 'uniqueProducts'
+         db_table = 'uniqueProducts'
 
         
 class Bodega(models.Model):

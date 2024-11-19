@@ -2403,9 +2403,11 @@ def comparar_stock_bsale(request):
 
         iderp_locales = set(productos_local_dict.keys())
         if not iderp_locales:
-            message = "No hay productos locales para comparar."
-            print(message)  # Print en consola
-            yield f"data: {message}\n\n"
+            message = {
+                "message": "No hay productos locales para comparar.",
+                "progress": 0
+            }
+            yield f"data: {json.dumps(message)}\n\n"
             return
 
         # Bucle para procesar datos de Bsale
@@ -2413,9 +2415,11 @@ def comparar_stock_bsale(request):
         while next_url:
             response = requests.get(next_url, headers={'access_token': BSALE_TOKEN})
             if response.status_code != 200:
-                message = f"Error al obtener datos de Bsale: {response.status_code}"
-                print(message)  # Print en consola
-                yield f"data: {message}\n\n"
+                message = {
+                    "message": f"Error al obtener datos de Bsale: {response.status_code}",
+                    "progress": 0
+                }
+                yield f"data: {json.dumps(message)}\n\n"
                 return
             
             data = response.json()
@@ -2425,6 +2429,7 @@ def comparar_stock_bsale(request):
                 iderp = item['variant']['id']
                 bsale_stock = item['quantity']
 
+                # Solo procesar productos que existen en la base de datos local
                 if iderp in iderp_locales:
                     productos_comparados += 1
                     producto_local = productos_local_dict[iderp]
@@ -2438,16 +2443,17 @@ def comparar_stock_bsale(request):
                             "diferencia": diferencia_stock
                         }
                         productos_con_diferencia_stock.append(detalle)
-                        message = f"Comparación - SKU: {detalle['sku']}, Diferencia: {detalle['diferencia']}"
-                        print(message)  # Print en consola
-                        yield f"data: {json.dumps(detalle)}\n\n"
+                        # Enviar el detalle del producto con diferencia
+                        yield f"data: {json.dumps({'message': f'Diferencia encontrada: {detalle}', 'progress': None})}\n\n"
 
-                # Enviar progreso cada 10 productos procesados
-                if productos_comparados % 10 == 0 or productos_comparados == total_productos_locales:
-                    progress = (productos_comparados / total_productos_locales) * 100
-                    progress_message = f"Progreso: {productos_comparados}/{total_productos_locales} ({progress:.2f}%)"
-                    print(progress_message)  # Print en consola
-                    yield f"data: {progress_message}\n\n"
+                    # Enviar progreso cada 10 productos procesados o al finalizar
+                    if productos_comparados % 10 == 0 or productos_comparados == total_productos_locales:
+                        progress = (productos_comparados / total_productos_locales) * 100
+                        progress_message = {
+                            "message": f"Progreso: {productos_comparados}/{total_productos_locales} ({progress:.2f}%)",
+                            "progress": progress
+                        }
+                        yield f"data: {json.dumps(progress_message)}\n\n"
 
             next_url = data.get('next')
 
@@ -2455,11 +2461,15 @@ def comparar_stock_bsale(request):
         resumen = {
             "total_productos_locales": total_productos_locales,
             "productos_comparados": productos_comparados,
-            "productos_con_diferencias": productos_con_diferencia_stock  # Detalle de SKUs con diferencias
+            "productos_con_diferencias": len(productos_con_diferencia_stock),  # Solo la cantidad
+            "detalles": productos_con_diferencia_stock  # Incluye el detalle de las diferencias
         }
-        resumen_message = f"Resumen: {json.dumps(resumen, indent=2)}"
-        print(resumen_message)  # Print del resumen en consola
-        yield f"data: Resumen: {json.dumps(resumen)}\n\n"
+        resumen_message = {
+            "message": "Proceso completado. Revisión finalizada.",
+            "progress": 100,
+            "resumen": resumen
+        }
+        yield f"data: {json.dumps(resumen_message)}\n\n"
 
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
