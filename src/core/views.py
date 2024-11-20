@@ -101,6 +101,10 @@ def cuadrar_sector_view(request):
 def despacho(request):
     return render(request, 'despacho.html')
 
+@login_required(login_url='login_view')
+def editar_productos(request):
+    return render(request, 'editar_productos.html')
+
 
 """ 
 APIS  """
@@ -313,13 +317,21 @@ def buscar_productosAPI(request):
                 'locationname': location_name
             })
         
+        # Añadir los valores necesarios para edición
         productos_data.append({
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice,
             'stock_total': len(unique_products_data),  # Stock total basado en el número de productos únicos
-            'unique_products': unique_products_data
+            'unique_products': unique_products_data,
+            'prefixed': producto.prefixed,  # Nuevo campo
+            'brands': producto.brands,      # Nuevo campo
+            'iderp': producto.iderp,        # Nuevo campo
+            'alto': producto.alto,          # Nuevo campo
+            'largo': producto.largo,        # Nuevo campo
+            'profundidad': producto.profundidad,  # Nuevo campo
+            'peso': producto.peso           # Nuevo campo
         })
 
     response = {
@@ -1269,7 +1281,7 @@ def buscar_productos_por_sector(request):
         return JsonResponse({'error': 'Sector no encontrado.'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-    
+   
 
 @csrf_exempt
 def search_products_by_sector(request):
@@ -1299,8 +1311,8 @@ def search_products_by_sector(request):
                 if sector:
                     print(f"Sector found: {sector.namesector} with id {sector.idsectoroffice}")
 
-                    # Buscar productos en Uniqueproducts asociados al sector encontrado
-                    productos = Uniqueproducts.objects.filter(location=sector.idsectoroffice)
+                    # Buscar productos en Uniqueproducts asociados al sector encontrado, ordenados por ID
+                    productos = Uniqueproducts.objects.filter(location=sector.idsectoroffice).reverse()
                     productos_data = []
 
                     for producto in productos:
@@ -2391,90 +2403,76 @@ import time
 
 @csrf_exempt
 def comparar_stock_bsale(request):
-    def event_stream():
-        # Variables de conteo
-        total_productos_locales = 0
-        productos_comparados = 0
-        productos_con_diferencia_stock = []
+    # Inicialización
+    total_productos_locales = 0
+    productos_comparados = 0
+    productos_con_diferencia_stock = []
+    processed_iderps = set()  # Para rastrear productos ya procesados
 
-        # Obtener productos locales
-        productos_locales = Products.objects.values('sku', 'iderp', 'currentstock')
-        productos_local_dict = {producto['iderp']: producto for producto in productos_locales}
-        total_productos_locales = len(productos_local_dict)
+    # Obtener productos locales
+    productos_locales = Products.objects.values('sku', 'iderp', 'currentstock')
+    productos_local_dict = {producto['iderp']: producto for producto in productos_locales}
+    total_productos_locales = len(productos_local_dict)
 
-        iderp_locales = set(productos_local_dict.keys())
-        if not iderp_locales:
-            message = {
-                "message": "No hay productos locales para comparar.",
-                "progress": 0
+    iderp_locales = set(productos_local_dict.keys())
+    if not iderp_locales:
+        return JsonResponse({
+            "message": "No hay productos locales para comparar.",
+            "resumen": {
+                "total_productos_locales": total_productos_locales,
+                "productos_comparados": 0,
+                "productos_con_diferencias": 0,
+                "detalles": []
             }
-            yield f"data: {json.dumps(message)}\n\n"
-            return
+        }, status=200)
 
-        # Bucle para procesar datos de Bsale
-        next_url = f'{BSALE_API_URL}/stocks.json'
-        while next_url:
-            response = requests.get(next_url, headers={'access_token': BSALE_TOKEN})
-            if response.status_code != 200:
-                message = {
-                    "message": f"Error al obtener datos de Bsale: {response.status_code}",
-                    "progress": 0
-                }
-                yield f"data: {json.dumps(message)}\n\n"
-                return
-            
-            data = response.json()
-            items = data.get('items', [])
+    # Procesar datos de Bsale
+    next_url = f'{BSALE_API_URL}/stocks.json'
+    while next_url:
+        response = requests.get(next_url, headers={'access_token': BSALE_TOKEN})
+        if response.status_code != 200:
+            return JsonResponse({
+                "message": f"Error al obtener datos de Bsale: {response.status_code}",
+                "resumen": {}
+            }, status=response.status_code)
 
-            for item in items:
-                iderp = item['variant']['id']
-                bsale_stock = item['quantity']
+        data = response.json()
+        items = data.get('items', [])
+        for item in items:
+            variant = item.get('variant')
+            if not variant:
+                continue
+            iderp = variant.get('id')
+            bsale_stock = item.get('quantity', 0)
 
-                # Solo procesar productos que existen en la base de datos local
-                if iderp in iderp_locales:
-                    productos_comparados += 1
-                    producto_local = productos_local_dict[iderp]
-                    diferencia_stock = bsale_stock - producto_local['currentstock']
+            # Solo procesar productos locales y no procesados previamente
+            if iderp in iderp_locales and iderp not in processed_iderps:
+                processed_iderps.add(iderp)  # Marcar como procesado
+                productos_comparados += 1
+                producto_local = productos_local_dict[iderp]
+                diferencia_stock = bsale_stock - producto_local['currentstock']
 
-                    if diferencia_stock != 0:
-                        detalle = {
-                            "sku": producto_local['sku'],
-                            "stock_local": producto_local['currentstock'],
-                            "stock_bsale": bsale_stock,
-                            "diferencia": diferencia_stock
-                        }
-                        productos_con_diferencia_stock.append(detalle)
-                        # Enviar el detalle del producto con diferencia
-                        yield f"data: {json.dumps({'message': f'Diferencia encontrada: {detalle}', 'progress': None})}\n\n"
+                if diferencia_stock != 0:
+                    productos_con_diferencia_stock.append({
+                        "sku": producto_local['sku'],
+                        "stock_local": producto_local['currentstock'],
+                        "stock_bsale": bsale_stock,
+                        "diferencia": diferencia_stock
+                    })
 
-                    # Enviar progreso cada 10 productos procesados o al finalizar
-                    if productos_comparados % 10 == 0 or productos_comparados == total_productos_locales:
-                        progress = (productos_comparados / total_productos_locales) * 100
-                        progress_message = {
-                            "message": f"Progreso: {productos_comparados}/{total_productos_locales} ({progress:.2f}%)",
-                            "progress": progress
-                        }
-                        yield f"data: {json.dumps(progress_message)}\n\n"
+        next_url = data.get('next')
 
-            next_url = data.get('next')
-
-        # Resumen final
-        resumen = {
-            "total_productos_locales": total_productos_locales,
-            "productos_comparados": productos_comparados,
-            "productos_con_diferencias": len(productos_con_diferencia_stock),  # Solo la cantidad
-            "detalles": productos_con_diferencia_stock  # Incluye el detalle de las diferencias
-        }
-        resumen_message = {
-            "message": "Proceso completado. Revisión finalizada.",
-            "progress": 100,
-            "resumen": resumen
-        }
-        yield f"data: {json.dumps(resumen_message)}\n\n"
-
-    response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
-    response['Cache-Control'] = 'no-cache'
-    return response
+    # Resumen final
+    resumen = {
+        "total_productos_locales": total_productos_locales,
+        "productos_comparados": productos_comparados,
+        "productos_con_diferencias": len(productos_con_diferencia_stock),
+        "detalles": productos_con_diferencia_stock
+    }
+    return JsonResponse({
+        "message": "Proceso completado.",
+        "resumen": resumen
+    }, status=200)
 
 @csrf_exempt
 def actualizar_stock_local(request):

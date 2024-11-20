@@ -155,34 +155,25 @@
       methods: {
         iniciarComparacion() {
             this.loading = true;
-            this.progress = 0;
 
-            const eventSource = new EventSource('/api/comparar-stock-bsale/');
+            axios.get('/api/comparar-stock-bsale/')
+                .then(response => {
+                    const data = response.data;
 
-            eventSource.onmessage = (event) => {
-                const message = event.data;
+                    if (data.resumen) {
+                        this.comparacionResultado = data.resumen.detalles;
+                        Swal.fire('Éxito', 'La comparación se completó correctamente.', 'success');
+                    } else {
+                        Swal.fire('Atención', 'No se encontraron diferencias en el stock.', 'info');
+                    }
 
-                // Verificar si el mensaje contiene progreso
-                const match = message.match(/Progreso: (\d+(\.\d+)?)%/);
-                if (match) {
-                    this.progress = parseFloat(match[1]); // Actualizar el progreso en porcentaje
-                }
-
-                // Detectar finalización
-                if (message.includes("Comparación completada")) {
-                    Swal.fire('Éxito', 'La comparación se completó correctamente.', 'success');
                     this.loading = false;
-                    eventSource.close();
-                }
-            };
-
-            eventSource.onerror = (error) => {
-                console.error("Error en el evento SSE:", error);
-                Swal.fire('Error', 'Ocurrió un error durante la comparación.', 'error');
-                this.loading = false;
-                this.progress = 0; // Reiniciar progreso en caso de error
-                eventSource.close();
-            };
+                })
+                .catch(error => {
+                    Swal.fire('Error', 'Ocurrió un error durante la comparación.', 'error');
+                    console.error(error);
+                    this.loading = false;
+                });
         },
         generateDynamicKey() {
             axios.post('/api/generate-dynamic-key/')

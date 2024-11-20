@@ -55,6 +55,14 @@
             <span class="hide-menu">Agregar Productos a Sector</span>
           </a>
         </li>
+
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'editar_productos' %}">
+            <span><i class="ti ti-plus"></i></span>
+            <span class="hide-menu">Editar Productos</span>
+          </a>
+        </li>
+
         {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'BODEGA' or request.user.usuario.rol == 'VENTAS' %}
         <!-- Cuadrar Sector -->
         <li class="sidebar-item">

@@ -35,6 +35,8 @@ urlpatterns = [
     path('anadir_psector/', core_views.anadir_psector, name='anadir_psector'), # URL que apunta al HTML
     path('cuadrar_sector/', core_views.cuadrar_sector_view, name='cuadrar_sector'), 
     path('crear_sector/', core_views.crear_sector, name='crear_sector'), # URL que apunta al HTML
+    path('editar_productos/', core_views.editar_productos, name='editar_productos'), # URL que apunta al HTML
+
     # URL que apunta al HTML
     path('despacho/', core_views.despacho, name='despacho'),
 

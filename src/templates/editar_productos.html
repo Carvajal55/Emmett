@@ -1,0 +1,120 @@
+{% extends 'partials/base.html' %}
+{% load static %}
+
+{% block content %}
+<div id="app">
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>Gestión de Productos</h5>
+                <!-- Buscador -->
+                <input 
+                    type="text" 
+                    class="form-control" 
+                    placeholder="Buscar por SKU" 
+                    v-model="searchQuery" 
+                    @input="fetchProducts(1)" 
+                    list="productSuggestions">
+                <datalist id="productSuggestions">
+                    <option v-for="product in suggestions" :key="product.id" :value="product.sku">
+                        [[ product.name ]]
+                    </option>
+                </datalist>
+            </div>
+            <hr>
+            
+            <!-- Formulario para editar el producto -->
+            <div v-if="product">
+                <h5>Editar Producto</h5>
+                <form @submit.prevent="updateProduct">
+                    <div class="form-group">
+                        <label>SKU</label>
+                        <input type="text" v-model="product.sku" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre</label>
+                        <input type="text" v-model="product.name" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Prefijo</label>
+                        <input type="text" v-model="product.prefixed" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Marca</label>
+                        <input type="text" v-model="product.brands" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>ID ERP</label>
+                        <input type="text" v-model="product.iderp" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Alto</label>
+                        <input type="number" v-model="product.alto" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Largo</label>
+                        <input type="number" v-model="product.largo" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Profundidad</label>
+                        <input type="number" v-model="product.profundidad" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Peso</label>
+                        <input type="number" v-model="product.peso" class="form-control">
+                    </div>
+                    <button type="submit" class="btn btn-success mt-3">Guardar Cambios</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block js %}
+<script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    delimiters: ['[[', ']]'],
+    data: {
+        searchQuery: '', // Almacena el término de búsqueda
+        suggestions: [], // Lista de productos para el autocompletar
+        product: null,   // Producto seleccionado para editar
+    },
+    methods: {
+        async fetchProducts(page = 1) {
+            if (!this.searchQuery) {
+                this.suggestions = [];
+                this.product = null;
+                return;
+            }
+            try {
+                const response = await axios.get(`/api/buscar-productos/?q=${this.searchQuery}&page=${page}`);
+                this.suggestions = response.data.products; // Sugerencias para el autocompletar
+                if (response.data.products.length === 1) {
+                    this.product = response.data.products[0]; // Seleccionar producto si solo hay uno
+                } else {
+                    this.product = null; // No seleccionar automáticamente si hay múltiples resultados
+                }
+            } catch (error) {
+                console.error('Error al buscar productos:', error);
+                this.suggestions = [];
+                this.product = null;
+            }
+        },
+        async updateProduct() {
+            if (!this.product) return;
+            try {
+                await axios.put(`/api/editar-producto/${this.product.id}/`, this.product);
+                alert('Producto actualizado con éxito');
+            } catch (error) {
+                console.error('Error al actualizar el producto:', error);
+                alert('Error al actualizar el producto');
+            }
+        }
+    }
+});
+</script>
+{% endblock js %}
