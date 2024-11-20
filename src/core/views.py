@@ -511,6 +511,9 @@ def listar_compras(request):
     if search_query:
         compras = compras.filter(number__icontains=search_query)
 
+    # Ordenar en orden descendente por fecha de creación
+    compras = compras.order_by('-dateadd')  # Cambia '-dateadd' a otro campo si prefieres otro criterio
+
     # Crear paginador
     paginator = Paginator(compras, 10)  # 10 facturas por página
     page_obj = paginator.get_page(page_number)
@@ -539,7 +542,6 @@ def listar_compras(request):
         'total_items': paginator.count
     }
     return JsonResponse(response_data)
-
 @csrf_exempt
 def resumen_factura(request):
     if request.method == 'POST':
@@ -740,6 +742,27 @@ def obtener_factura(request):
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 """ Ingresar Documentos """
+
+def get_factura(request):
+    tipo_documento = request.GET.get('type')
+    numero_documento = request.GET.get('number')
+
+    # Buscar la factura por tipo, número de documento y estado
+    factura = get_object_or_404(
+        Purchase, 
+        typedoc=tipo_documento, 
+        number=numero_documento,
+        status__in=[0, 2]  # Solo estados Pendientes (0) o Rechazados (2)
+    )
+
+    # Leer el archivo JSON desde el campo `urlJson`
+    try:
+        with open(factura.urljson, 'r') as json_file:
+            data = json.load(json_file)
+        return JsonResponse(data, safe=False)
+    except FileNotFoundError:
+        return JsonResponse({'error': 'El archivo JSON no existe.'}, status=404)
+
 def get_suppliers(request):
     # Obtiene el parámetro de búsqueda (si existe)
     query = request.GET.get('q', '')

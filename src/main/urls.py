@@ -62,6 +62,8 @@ urlpatterns = [
     #Imprimir etiquetas
     path('api/imprimir-etiqueta/', core_views.imprimir_etiqueta, name='imprimir_etiqueta'),
     #Ingresar Documentos
+    
+    path('api/get-factura/', core_views.get_factura, name='get_factura'),
     path('api/create-supplier/', core_views.create_supplier, name='create_supplier'),
     path('api/create-product/', core_views.crear_producto, name='crear_producto'),
     path('api/generar-json/', core_views.generar_json, name='generar_json'),

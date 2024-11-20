@@ -7,14 +7,27 @@
 
     <div class="">
         <!-- Botones para crear proveedor y producto -->
-        <div class="mb-4">
-            <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modalCrearProveedor">
-                Crear Proveedor
-            </button>
-            <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modalCrearProducto">
-                Crear Producto
-            </button>
+        <div class="mb-4 row">
+            <div class="col-2 mt-4">
+                <button class="btn btn-primary " data-bs-toggle="modal" data-bs-target="#modalCrearProveedor">
+                    Crear Proveedor
+                </button>
+            </div>
+            <div class="col-2 mt-4">
+                <button class="btn btn-primary " data-bs-toggle="modal" data-bs-target="#modalCrearProducto">
+                    Crear Producto
+                </button>
+            </div>
+            <div class="col-4">
+                <label for="nDocument" class="form-label">Número Documento</label>
+                <div class="input-group">
+                    <input class="form-control" type="number" @keyup.enter="buscarFactura" v-model="form.numeroDocumento">
+                    <button class="input-group-text" @click="buscarFactura"><i class="bi bi-search"></i></button>
+                </div>
+            </div>
         </div>
+<!-- Línea gruesa -->
+<hr style="border-top: 4px solid #000; margin-top: 20px; margin-bottom: 20px;">
 
         <!-- Modal para Crear Proveedor -->
         <div class="modal fade" id="modalCrearProveedor" tabindex="-1" aria-labelledby="modalProveedorLabel" aria-hidden="true">
@@ -121,25 +134,44 @@
 
         <!-- Campo de búsqueda de proveedor -->
         <div>
-            <input type="text" class="form-control" placeholder="Buscar proveedor por RUT o Nombre"
-                v-model="searchQuery" @input="searchProveedores" />
-
+            <!-- Campo de búsqueda -->
+            <input 
+                type="text" 
+                class="form-control" 
+                placeholder="Buscar proveedor por RUT o Nombre"
+                v-model="searchQuery" 
+                @input="searchProveedores" 
+            />
+        
             <!-- Lista de resultados de búsqueda con scroll -->
-            <div v-if="proveedores.length && !showAllProveedores && !proveedorSeleccionado" class="list-group mt-2" style="max-height: 150px; overflow-y: auto;">
-                <button v-for="proveedor in proveedores" :key="proveedor.id" 
-                        @click="seleccionarProveedor(proveedor)" 
-                        class="list-group-item list-group-item-action">
+            <div 
+                v-if="searchQuery && proveedores.length && !showAllProveedores && !proveedorSeleccionado" 
+                class="list-group mt-2" 
+                style="max-height: 150px; overflow-y: auto;"
+            >
+                <button 
+                    v-for="proveedor in proveedores" 
+                    :key="proveedor.id" 
+                    @click="seleccionarProveedor(proveedor)" 
+                    class="list-group-item list-group-item-action"
+                >
                     [[ proveedor.rutsupplier ]] - [[ proveedor.namesupplier ]]
                 </button>
             </div>
             
             <!-- Mostrar mensaje cuando no hay resultados -->
-            <div v-else-if="!showAllProveedores && !proveedorSeleccionado" class="mt-2 text-muted">
+            <div 
+                v-else-if="searchQuery && !showAllProveedores && !proveedorSeleccionado" 
+                class="mt-2 text-muted"
+            >
                 No se encontraron proveedores.
             </div>
-
+        
             <!-- Datos del proveedor seleccionado -->
-            <div v-if="form.proveedor && !showAllProveedores && proveedorSeleccionado" class="mt-3">
+            <div 
+                v-if="form.proveedor && !showAllProveedores && proveedorSeleccionado" 
+                class="mt-3"
+            >
                 <h5>Proveedor Seleccionado</h5>
                 <p>RUT: [[ form.rutProveedor ]]</p>
                 <p>Razón Social: [[ form.razonSocial ]]</p>
@@ -236,7 +268,7 @@
         </div>
 
         <!-- Observaciones -->
-        <div class="mb-3">
+        <div class="my-3">
             <label for="observation" class="form-label">Observación</label>
             <input class="form-control form-control-lg" v-model="form.observaciones">
         </div>
@@ -253,7 +285,7 @@
 
         </div>
         <!-- Contenido de las tablas -->
-        <div class="row">
+        <div class="row mt-3">
             <!-- Tabla de Productos en el Documento -->
             <div class="col-7">
                 <h4>Productos en el Documento</h4>
@@ -392,6 +424,7 @@
             showAllProveedores: false,
             proveedorSeleccionado: false,
             currentDate: new Date().toISOString().slice(0, 10),
+            facturaCargada: false,
             nuevoProveedor: {
                 rut: '',
                 nombre: '',
@@ -468,6 +501,52 @@
             }
         },
         methods: {
+            async buscarFactura() {
+                if (!this.form.numeroDocumento || !this.form.tipoDocumento) {
+                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento.', 'error');
+                    return;
+                }
+
+                try {
+                    const response = await axios.get('/api/get-factura/', {
+                        params: {
+                            type: this.form.tipoDocumento,
+                            number: this.form.numeroDocumento,
+                        },
+                    });
+
+                    // Cargar datos de la factura en el formulario
+                    const data = response.data;
+                    this.form.rutProveedor = data.headers.supplier;
+                    this.form.razonSocial = data.headers.supplierName;
+                    this.form.fechaEmision = data.headers.datePurchase;
+                    this.form.fechaVencimiento = data.headers.dateExpired;
+                    this.form.descuentoGeneral = data.headers.dcto;
+                    this.form.tipoPago = data.headers.typePay;
+                    this.form.numeroCheque = data.headers.nCheque;
+                    this.form.cantidadCheque = data.headers.qtyCheque;
+                    this.form.subtotal = data.headers.subtotal;
+                    this.form.observaciones = data.headers.observation;
+
+                    // Cargar los productos en la tabla
+                    this.productosDocumento = data.details.map((detalle) => ({
+                        model: detalle.model,
+                        sku: detalle.sku,
+                        cantidad: parseInt(detalle.qty, 10),
+                        received_quantity: parseInt(detalle.received_quantity || 0, 10),
+                        costo: parseFloat(detalle.cost),
+                        descuento: parseFloat(detalle.dctoItem),
+                        subtotal: parseFloat(detalle.subtotalItem),
+                        completo: detalle.checkItem === "true",
+                    }));
+
+                    this.facturaCargada = true;
+                    Swal.fire('Éxito', 'Factura cargada correctamente.', 'success');
+                } catch (error) {
+                    console.error('Error al buscar la factura:', error);
+                    Swal.fire('Error', 'No se encontró la factura.', 'error');
+                }
+            },
             actualizarDescuentoProductos(descuentoGeneral) {
                 this.detalles.forEach(detalle => {
                     detalle.dcto = descuentoGeneral; // Actualizar el descuento de cada producto
