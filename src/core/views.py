@@ -2305,7 +2305,7 @@ def imprimir_etiqueta(request):
         # Obtener el último correlativo y superID para el producto
         last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
-        base_superid = last_unique_product.superid[:-len(str(last_unique_product.correlative))] if last_unique_product else sku
+        base_superid = f"{producto.id}e"  # Generar superid como ID del producto + 'e'
 
         # Crear el PDF con tamaño 10.2 cm x 5 cm
         page_width, page_height = 102 * mm, 50 * mm
@@ -2322,19 +2322,18 @@ def imprimir_etiqueta(request):
             barcode_sku_left = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
             barcode_sku_left.drawOn(pdf, x_sku_left, y_sku_left)
             pdf.setFont("Helvetica", 6)
-            #pdf.drawString(x_sku_left, y_sku_left - 10, f"SKU: {sku}")
+            pdf.drawString(x_sku_left + 20, y_sku_left - 10, f"SKU: {sku}")
 
             # SuperID en vertical (rotado)
             pdf.saveState()
             pdf.rotate(90)
-            x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -2 * mm
-            barcode_superid_left = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
+            x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -5 * mm
+            barcode_superid_left = code128.Code128(super_id, barWidth=0.45 * mm, barHeight=9 * mm)
             barcode_superid_left.drawOn(pdf, y_superid_rotated_left, -x_superid_rotated_left)
-            pdf.restoreState()
-
-            # Texto debajo del SuperID
+            # Texto del SuperID rotado
             pdf.setFont("Helvetica", 6)
-            #pdf.drawString(10 * mm, 5 * mm, f"SuperID: {super_id}")
+            pdf.drawString(y_superid_rotated_left + 15, -x_superid_rotated_left - 15, f"SuperID: {super_id}")
+            pdf.restoreState()
 
             # Parte derecha de la etiqueta (si se requiere más de un elemento por página)
             if i % 2 == 1:
@@ -2342,15 +2341,18 @@ def imprimir_etiqueta(request):
                 barcode_sku_right = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
                 barcode_sku_right.drawOn(pdf, x_sku_right, y_sku_right)
                 pdf.setFont("Helvetica", 6)
-                #pdf.drawString(x_sku_right, y_sku_right - 10, f"SKU: {sku}")
+                pdf.drawString(x_sku_right + 20, y_sku_right - 10, f"SKU: {sku}")
+
 
                 pdf.saveState()
                 pdf.rotate(90)
-                x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -2 * mm
-                barcode_superid_right = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
+                x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -5 * mm
+                barcode_superid_right = code128.Code128(super_id, barWidth=0.45 * mm, barHeight=9 * mm)
                 barcode_superid_right.drawOn(pdf, y_superid_rotated_right, -x_superid_rotated_right)
+                # Texto del SuperID rotado
+                pdf.setFont("Helvetica", 6)
+                pdf.drawString(y_superid_rotated_right + 15, -x_superid_rotated_right - 15, f"SuperID: {super_id}")
                 pdf.restoreState()
-                #pdf.drawString(60 * mm, 5 * mm, f"SuperID: {super_id}")
 
             # Guardar el nuevo UniqueProduct
             Uniqueproducts.objects.create(
@@ -2372,7 +2374,7 @@ def imprimir_etiqueta(request):
 
         pdf.save()
 
-       # Llamar a `registrar_recepcion_stock` con `sku` y `qty`
+        # Llamar a `registrar_recepcion_stock` con `sku` y `qty`
         response_stock = registrar_recepcion_stock(request, sku, qty)
 
         # Verificar el estado de la respuesta para mostrar en el mensaje final
@@ -2381,7 +2383,6 @@ def imprimir_etiqueta(request):
         else:
             msg_stock = f"Error al registrar stock en Bsale: {response_stock.json().get('msg', 'Error desconocido')}"
 
-        # Devolver la ruta del archivo creada y un mensaje de éxito
         # Devolver la URL del archivo creada, superid, y el estado de la recepción de stock
         pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
         return JsonResponse({
