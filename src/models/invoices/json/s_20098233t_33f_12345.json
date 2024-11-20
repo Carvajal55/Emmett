@@ -33,7 +33,8 @@
             "idPro": "",
             "expected_quantity": 0,
             "received_quantity": 0,
-            "difference": 0
+            "difference": 0,
+            "printed": true
         },
         {
             "qty": 1,
@@ -49,8 +50,10 @@
             "idPro": "",
             "expected_quantity": 0,
             "received_quantity": 0,
-            "difference": 0
+            "difference": 0,
+            "printed": true
         }
     ],
-    "type": "1"
+    "type": "1",
+    "invoice_printed": true
 }

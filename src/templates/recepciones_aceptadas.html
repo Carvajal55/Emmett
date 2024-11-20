@@ -93,15 +93,14 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <!-- Filtrar los detalles para que solo muestre aquellos con `printed: false` -->
-                      <tr v-for="detalle in detallesFactura.filter(item => item.printed === false)" :key="detalle.sku">
-                        <td>[[ detalle.sku ]]</td>
-                        <td>[[ detalle.model ]]</td>
-                        <td>[[ detalle.qty ]]</td>
-                        <td>
-                          <button @click="imprimirDetalle(detalle)" class="btn btn-success btn-sm">Imprimir Etiqueta</button>
-                        </td>
-                      </tr>
+                        <tr v-for="detalle in detallesFactura.filter(item => !item.printed)" :key="detalle.sku">
+                            <td>[[ detalle.sku ]]</td>
+                            <td>[[ detalle.model ]]</td>
+                            <td>[[ detalle.qty ]]</td>
+                            <td>
+                                <button @click="imprimirDetalle(detalle)" class="btn btn-success btn-sm">Imprimir Etiqueta</button>
+                            </td>
+                        </tr>
                     </tbody>
                   </table>
                 </div>
@@ -180,8 +179,8 @@
             // Imprimir un detalle de la factura
             
             formatCurrency(value) {
-            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
-            },
+                return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+                },
             imprimirDetalle(detalle) {
                 console.log("Imprimiendo detalle:", detalle);
 
@@ -191,14 +190,14 @@
                 formData.append('model', detalle.model);
                 formData.append('qty', detalle.qty);
                 formData.append('codebar', detalle.codebar || '');
-                formData.append('urlJson', detalle.urlJson); // Asegurarse de incluir urlJson
+                formData.append('urlJson', detalle.urlJson);
 
                 console.log("Datos enviados a la API:", {
                     sku: detalle.sku,
                     model: detalle.model,
                     qty: detalle.qty,
                     codebar: detalle.codebar || '',
-                    urlJson: detalle.urlJson // Mostrar también urlJson en el log para verificación
+                    urlJson: detalle.urlJson
                 });
 
                 // Enviar la solicitud al backend para generar la etiqueta
@@ -213,6 +212,13 @@
                                 text: 'La etiqueta se ha generado correctamente.',
                                 icon: 'success',
                                 confirmButtonText: 'OK'
+                            }).then(() => {
+                                // Llamar a `fetchFacturas` para actualizar la lista
+                                this.fetchFacturas(this.currentPage);
+
+                                // Cerrar el modal automáticamente
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('detallesModal'));
+                                if (modal) modal.hide();
                             });
                         } else {
                             Swal.fire({
@@ -232,7 +238,9 @@
                             confirmButtonText: 'OK'
                         });
                     });
-            }
+            },
+
+
         },
         
         mounted() {

@@ -37,8 +37,10 @@
             "model": "64514 120v 300w",
             "idPro": "",
             "cost_with_discount": 7500.0,
-            "discount_applied": 7500.0
+            "discount_applied": 7500.0,
+            "printed": true
         }
     ],
-    "type": "1"
+    "type": "1",
+    "invoice_printed": true
 }

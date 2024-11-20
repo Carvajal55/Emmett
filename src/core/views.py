@@ -512,7 +512,7 @@ def listar_compras(request):
         compras = compras.filter(number__icontains=search_query)
 
     # Ordenar en orden descendente por fecha de creación
-    compras = compras.order_by('-dateadd')  # Cambia '-dateadd' a otro campo si prefieres otro criterio
+    compras = compras.order_by('-dateadd')
 
     # Crear paginador
     paginator = Paginator(compras, 10)  # 10 facturas por página
@@ -521,6 +521,15 @@ def listar_compras(request):
     # Formatear los datos en una lista
     compras_list = []
     for compra in page_obj:
+        # Leer el archivo JSON y verificar si la factura ya fue impresa
+        try:
+            with open(compra.urljson, 'r') as json_file:
+                factura_data = json.load(json_file)
+            if factura_data.get('invoice_printed', False):
+                continue  # Saltar facturas ya impresas
+        except FileNotFoundError:
+            continue  # Saltar facturas cuyo archivo JSON no existe
+
         compras_list.append({
             'id': compra.id,
             'supplier': compra.supplier,
@@ -2325,10 +2334,10 @@ def imprimir_etiqueta(request):
         absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
         os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
-        # Obtener el último correlativo y superID para el producto
+        # Obtener el último correlativo y SuperID para el producto
         last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
-        base_superid = f"{producto.id}e"  # Generar superid como ID del producto + 'e'
+        base_superid = last_unique_product.superid[:-len(str(last_unique_product.correlative))] if last_unique_product else sku
 
         # Crear el PDF con tamaño 10.2 cm x 5 cm
         page_width, page_height = 102 * mm, 50 * mm
@@ -2336,7 +2345,7 @@ def imprimir_etiqueta(request):
 
         super_ids = []
         for i in range(qty):
-            # Calcular el superID y actualizar el correlativo
+            # Calcular el SuperID y actualizar el correlativo
             super_id = f"{base_superid}{current_correlative}"
             super_ids.append(super_id)
 
@@ -2345,18 +2354,19 @@ def imprimir_etiqueta(request):
             barcode_sku_left = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
             barcode_sku_left.drawOn(pdf, x_sku_left, y_sku_left)
             pdf.setFont("Helvetica", 6)
-            pdf.drawString(x_sku_left + 20, y_sku_left - 10, f"SKU: {sku}")
+            pdf.drawString(x_sku_left, y_sku_left - 10, f"SKU: {sku}")
 
             # SuperID en vertical (rotado)
             pdf.saveState()
             pdf.rotate(90)
-            x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -5 * mm
-            barcode_superid_left = code128.Code128(super_id, barWidth=0.45 * mm, barHeight=9 * mm)
+            x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -2 * mm
+            barcode_superid_left = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
             barcode_superid_left.drawOn(pdf, y_superid_rotated_left, -x_superid_rotated_left)
-            # Texto del SuperID rotado
-            pdf.setFont("Helvetica", 6)
-            pdf.drawString(y_superid_rotated_left + 15, -x_superid_rotated_left - 15, f"SuperID: {super_id}")
             pdf.restoreState()
+
+            # Texto debajo del SuperID
+            pdf.setFont("Helvetica", 6)
+            pdf.drawString(10 * mm, 5 * mm, f"SuperID: {super_id}")
 
             # Parte derecha de la etiqueta (si se requiere más de un elemento por página)
             if i % 2 == 1:
@@ -2364,18 +2374,15 @@ def imprimir_etiqueta(request):
                 barcode_sku_right = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
                 barcode_sku_right.drawOn(pdf, x_sku_right, y_sku_right)
                 pdf.setFont("Helvetica", 6)
-                pdf.drawString(x_sku_right + 20, y_sku_right - 10, f"SKU: {sku}")
-
+                pdf.drawString(x_sku_right, y_sku_right - 10, f"SKU: {sku}")
 
                 pdf.saveState()
                 pdf.rotate(90)
-                x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -5 * mm
-                barcode_superid_right = code128.Code128(super_id, barWidth=0.45 * mm, barHeight=9 * mm)
+                x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -2 * mm
+                barcode_superid_right = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
                 barcode_superid_right.drawOn(pdf, y_superid_rotated_right, -x_superid_rotated_right)
-                # Texto del SuperID rotado
-                pdf.setFont("Helvetica", 6)
-                pdf.drawString(y_superid_rotated_right + 15, -x_superid_rotated_right - 15, f"SuperID: {super_id}")
                 pdf.restoreState()
+                pdf.drawString(60 * mm, 5 * mm, f"SuperID: {super_id}")
 
             # Guardar el nuevo UniqueProduct
             Uniqueproducts.objects.create(
@@ -2416,6 +2423,7 @@ def imprimir_etiqueta(request):
         })
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
 
 from tqdm import tqdm
 from django.db.models import Count

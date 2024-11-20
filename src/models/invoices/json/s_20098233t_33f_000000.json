@@ -35,8 +35,10 @@
             "idERP": "",
             "model": "64514 120v 300w",
             "idPro": "",
-            "cost_with_discount": 10000.0
+            "cost_with_discount": 10000.0,
+            "printed": false
         }
     ],
-    "type": "1"
+    "type": "1",
+    "invoice_printed": false
 }

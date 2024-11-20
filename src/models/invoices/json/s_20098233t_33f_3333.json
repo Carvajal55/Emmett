@@ -34,8 +34,10 @@
             "model": "A10L4 USB",
             "idPro": "",
             "expected_quantity": 0,
-            "difference": -5
+            "difference": -5,
+            "printed": true
         }
     ],
-    "type": "1"
+    "type": "1",
+    "invoice_printed": true
 }

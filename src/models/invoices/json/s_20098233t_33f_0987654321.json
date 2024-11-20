@@ -36,9 +36,9 @@
             "model": "GREY8",
             "idPro": "",
             "cost_with_discount": 150000.0,
-            "printed": false
+            "printed": true
         }
     ],
     "type": "1",
-    "invoice_printed": false
+    "invoice_printed": true
 }

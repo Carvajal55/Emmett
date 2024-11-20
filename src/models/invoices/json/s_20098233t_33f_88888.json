@@ -36,7 +36,8 @@
             "expected_quantity": 0,
             "difference": 0,
             "dcto": 0.0,
-            "cost_with_discount": 5000.0
+            "cost_with_discount": 5000.0,
+            "printed": true
         },
         {
             "qty": 1,
@@ -55,8 +56,10 @@
             "expected_quantity": 0,
             "difference": 0,
             "dcto": 0.0,
-            "cost_with_discount": 5000.0
+            "cost_with_discount": 5000.0,
+            "printed": true
         }
     ],
-    "type": "1"
+    "type": "1",
+    "invoice_printed": true
 }
