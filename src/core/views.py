@@ -2317,7 +2317,12 @@ def imprimir_etiqueta(request):
         model = request.POST.get('model')
         qty = int(request.POST.get('qty', 1))
         codebar = request.POST.get('codebar', '')
+        url_json = request.POST.get('urlJson')  # Ruta del archivo JSON
 
+         # Verificar que el SKU, cantidad y URL del JSON sean válidos
+        if not sku or qty <= 0 or not url_json:
+            return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
+        
         # Verificar que el SKU y la cantidad sean válidos
         if not sku or qty <= 0:
             return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
@@ -2354,7 +2359,7 @@ def imprimir_etiqueta(request):
             barcode_sku_left = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
             barcode_sku_left.drawOn(pdf, x_sku_left, y_sku_left)
             pdf.setFont("Helvetica", 6)
-            pdf.drawString(x_sku_left, y_sku_left - 10, f"SKU: {sku}")
+            pdf.drawString(x_sku_left + 20, y_sku_left - 10, f"SKU: {sku}")
 
             # SuperID en vertical (rotado)
             pdf.saveState()
@@ -2362,11 +2367,11 @@ def imprimir_etiqueta(request):
             x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -2 * mm
             barcode_superid_left = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
             barcode_superid_left.drawOn(pdf, y_superid_rotated_left, -x_superid_rotated_left)
-            pdf.restoreState()
 
-            # Texto debajo del SuperID
+            # Rotar el texto del SuperID
             pdf.setFont("Helvetica", 6)
-            pdf.drawString(10 * mm, 5 * mm, f"SuperID: {super_id}")
+            pdf.drawString(y_superid_rotated_left + 15, -x_superid_rotated_left - 15, f"SuperID: {super_id}")
+            pdf.restoreState()
 
             # Parte derecha de la etiqueta (si se requiere más de un elemento por página)
             if i % 2 == 1:
@@ -2374,15 +2379,18 @@ def imprimir_etiqueta(request):
                 barcode_sku_right = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
                 barcode_sku_right.drawOn(pdf, x_sku_right, y_sku_right)
                 pdf.setFont("Helvetica", 6)
-                pdf.drawString(x_sku_right, y_sku_right - 10, f"SKU: {sku}")
+                pdf.drawString(x_sku_right + 20 , y_sku_right - 10, f"SKU: {sku}")
 
                 pdf.saveState()
                 pdf.rotate(90)
                 x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -2 * mm
                 barcode_superid_right = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
                 barcode_superid_right.drawOn(pdf, y_superid_rotated_right, -x_superid_rotated_right)
+
+                # Rotar el texto del SuperID
+                pdf.setFont("Helvetica", 6)
+                pdf.drawString(y_superid_rotated_right + 15, -x_superid_rotated_right - 15, f"SuperID: {super_id}")
                 pdf.restoreState()
-                pdf.drawString(60 * mm, 5 * mm, f"SuperID: {super_id}")
 
             # Guardar el nuevo UniqueProduct
             Uniqueproducts.objects.create(
@@ -2403,6 +2411,27 @@ def imprimir_etiqueta(request):
                 pdf.showPage()
 
         pdf.save()
+
+        # Modificar el archivo JSON para marcar los productos como impresos
+        try:
+            with open(url_json, 'r+') as json_file:
+                data = json.load(json_file)
+                # Cambiar el atributo `printed` a True para todos los detalles
+                for detail in data.get('details', []):
+                    if detail.get('sku') == sku:
+                        detail['printed'] = True
+                
+                # Cambiar el estado general del invoice a "printed"
+                data['invoice_printed'] = True
+
+                # Sobrescribir el archivo JSON con los cambios
+                json_file.seek(0)
+                json.dump(data, json_file, indent=4)
+                json_file.truncate()
+        except FileNotFoundError:
+            return JsonResponse({'error': 'El archivo JSON no existe.'}, status=404)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Error al leer o modificar el archivo JSON.'}, status=400)
 
         # Llamar a `registrar_recepcion_stock` con `sku` y `qty`
         response_stock = registrar_recepcion_stock(request, sku, qty)

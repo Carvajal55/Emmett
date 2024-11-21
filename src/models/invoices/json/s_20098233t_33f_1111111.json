@@ -3,44 +3,42 @@
         "supplier": "20098233",
         "supplierName": "Cristian Prueba",
         "typeDocument": "33",
-        "nDocument": "444444",
+        "nDocument": "1111111",
         "dcto": 0,
-        "datePurchase": "2024-11-18",
-        "dateExpired": "2024-11-19",
+        "datePurchase": "2024-11-21",
+        "dateExpired": "2024-12-21",
         "observation": "",
         "typePay": 1,
         "nCheque": 0,
         "qtyCheque": 0,
-        "subtotal": 15000,
+        "subtotal": 10000,
         "urlPDF": "",
         "urlJson": "",
-        "dateReception": "2024-11-18",
+        "dateReception": "2024-11-21",
         "userProcess": "Nombre Usuario",
         "urlImg": "",
-        "subtotalWithoutDiscount": 15000.0,
-        "subtotalWithDiscount": 7500.0,
-        "totalDiscountApplied": 7500.0
+        "subtotalWithoutDiscount": 10000.0,
+        "subtotalWithDiscount": 10000.0
     },
     "details": [
         {
-            "qty": 3,
+            "qty": 2,
             "received_quantity": 0,
             "completo": false,
             "cost": 5000,
             "codeBar": "",
-            "dctoItem": 50,
-            "subtotalItem": 15000,
+            "dctoItem": 0,
+            "subtotalItem": 10000,
             "deliveryItem": false,
             "checkItem": "false",
             "sku": "ILU20984",
             "idERP": "",
             "model": "64514 120v 300w",
             "idPro": "",
-            "cost_with_discount": 7500.0,
-            "discount_applied": 7500.0,
-            "printed": false
+            "cost_with_discount": 5000.0,
+            "printed": true
         }
     ],
     "type": "1",
-    "invoice_printed": false
+    "invoice_printed": true
 }
