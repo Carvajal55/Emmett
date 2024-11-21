@@ -6,15 +6,16 @@
     <div class="card">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5>Gestión de Productos</h5>
+                <h5>Gestión de Productos Ingresar SKU</h5>
                 <!-- Buscador -->
                 <input 
                     type="text" 
                     class="form-control" 
                     placeholder="Buscar por SKU" 
                     v-model="searchQuery" 
-                    @input="fetchProducts(1)" 
-                    list="productSuggestions">
+                    @keyup.enter="fetchProducts(1)" 
+                    list="productSuggestions"
+                    ref="searchInput">
                 <datalist id="productSuggestions">
                     <option v-for="product in suggestions" :key="product.id" :value="product.sku">
                         [[ product.name ]]
@@ -83,35 +84,37 @@ new Vue({
         suggestions: [], // Lista de productos para el autocompletar
         product: null,   // Producto seleccionado para editar
     },
+    mounted() {
+        this.$refs.searchInput.focus(); // Cargar las bodegas al iniciar la aplicación
+    },
     methods: {
         async fetchProducts(page = 1) {
+            this.searchQuery = this.searchQuery.trim(); // Limpia la entrada
+
             if (!this.searchQuery) {
+                alert('Por favor, ingrese un SKU válido.');
                 this.suggestions = [];
                 this.product = null;
                 return;
             }
+
             try {
                 const response = await axios.get(`/api/buscar-productos/?q=${this.searchQuery}&page=${page}`);
-                this.suggestions = response.data.products; // Sugerencias para el autocompletar
+                this.suggestions = response.data.products;
+
                 if (response.data.products.length === 1) {
-                    this.product = response.data.products[0]; // Seleccionar producto si solo hay uno
+                    this.product = response.data.products[0]; // Selecciona el producto automáticamente
+                } else if (response.data.products.length === 0) {
+                    alert('No se encontraron productos con el SKU ingresado.');
+                    this.product = null;
                 } else {
-                    this.product = null; // No seleccionar automáticamente si hay múltiples resultados
+                    this.product = null; // Resetea si hay múltiples resultados
                 }
             } catch (error) {
                 console.error('Error al buscar productos:', error);
+                alert('Hubo un problema al buscar el producto. Inténtalo de nuevo.');
                 this.suggestions = [];
                 this.product = null;
-            }
-        },
-        async updateProduct() {
-            if (!this.product) return;
-            try {
-                await axios.put(`/api/editar-producto/${this.product.id}/`, this.product);
-                alert('Producto actualizado con éxito');
-            } catch (error) {
-                console.error('Error al actualizar el producto:', error);
-                alert('Error al actualizar el producto');
             }
         }
     }

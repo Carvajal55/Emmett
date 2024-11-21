@@ -9,7 +9,9 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5>Gestión de Productos</h5>
                     <!-- Campo de Búsqueda con Autocompletar -->
-                    <input type="text" class="form-control" placeholder="Buscar por SKU o Nombre" v-model="searchQuery" @input="fetchProducts(1)" list="productSuggestions">
+                    <input type="text" class="form-control" placeholder="Buscar por SKU o Nombre" 
+                    v-model="searchQuery" @input="fetchProducts(1)" 
+                    list="productSuggestions" ref="searchInput">
                 </div>
                 <hr>
 
@@ -178,7 +180,8 @@ new Vue({
         }
     },
     mounted() {
-        this.fetchBodegas();  // Cargar las bodegas al iniciar la aplicación
+        this.fetchBodegas(); 
+        this.$refs.searchInput.focus(); // Cargar las bodegas al iniciar la aplicación
     }
 });
 </script>
