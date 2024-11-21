@@ -38,7 +38,6 @@
                 <p><strong>Fecha Recepción:</strong> [[ factura.headers.dateReception ]]</p>
                 <p><strong>Descuento Documento:</strong> [[ factura.headers.dcto || '0' ]]</p>
                 <p><strong>Valor Neto:</strong> [[ formatCurrency(factura.headers.subtotalNeto) ]]</p>
-                <p><strong>Valor con Descuento Neto:</strong> [[ formatCurrency(factura.headers.dcto_subtotal) ]]</p>
                 <p><strong>Total IVA Incluido:</strong> [[ formatCurrency(factura.headers.subtotalBruto) ]]</p>
             </div>
         </div>
@@ -89,7 +88,6 @@
                 <!-- <th>ÚLTIMO COSTO</th> -->
                 <th>ÚLTIMO PRECIO</th>
                 <th>PRECIO BSALE</th> <!-- Nueva columna -->
-                <th>COSTO C/DCTO</th>
                 <th>TOTAL</th>
                 <th>PRECIO BASE</th>
                 <th>MARGEN</th>
@@ -106,7 +104,6 @@
                 <!-- <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td> --> <!-- lastCost -->
                 <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td> <!-- lastPrice -->
                 <td>[[ formatCurrency(detalle.bsalePrice || 0) ]]</td> <!-- bsalePrice -->
-                <td>[[ formatCurrency(calcularCostoConDescuento(detalle.cost, detalle.dctoItem)) ]]</td>
                 <td>[[ formatCurrency(calcularTotal(detalle.cost, detalle.qty)) ]]</td>
                 <td>
                     <input

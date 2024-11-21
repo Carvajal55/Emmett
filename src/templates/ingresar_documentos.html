@@ -320,10 +320,22 @@
                                     <input type="checkbox" v-model="producto.completo">
                                 </td>
                                 <td>
-                                    <input class="form-control form-control-sm" v-model.number="producto.costo" @input="calcularSubtotalProducto(index)" type="number">
+                                    <input
+                                        class="form-control form-control-sm"
+                                        v-model.number="producto.costo"
+                                        @input="calcularSubtotalProducto(index)"
+                                        type="number"
+                                        placeholder="Costo con Descuento"
+                                        readonly
+                                    />
                                 </td>
                                 <td>
-                                    <input class="form-control form-control-sm" v-model.number="producto.descuento" type="number">
+                                    <input 
+                                        class="form-control form-control-sm" 
+                                        v-model.number="producto.descuento" 
+                                        @input="calcularSubtotalProducto(index)" 
+                                        type="number" 
+                                        placeholder="Descuento (%)">
                                 </td>
                                 <td>[[ formatCurrency(producto.subtotal) ]]</td>
                                 <td>
@@ -473,10 +485,10 @@
                 this.searchProveedores(newQuery);
             },
             "form.descuentoGeneral"(newValue) {
-                this.productosDocumento.forEach(producto => {
-                    producto.descuento = newValue; // Actualiza el descuento
-                    if (producto.subtotal) {
-                        producto.subtotal = producto.lastprice - (producto.lastprice * (newValue / 100));
+                this.productosDocumento.forEach((producto, index) => {
+                    if (!producto.descuento) {
+                        // Solo aplica el descuento general si no hay descuento específico
+                        this.calcularSubtotalProducto(index);
                     }
                 });
             }
@@ -560,8 +572,19 @@
             calcularSubtotalProducto(index) {
                 const producto = this.productosDocumento[index];
                 const cantidad = producto.cantidad || 0;
-                const costo = producto.costo || 0;
-                producto.subtotal = cantidad * costo;
+                const costoOriginal = producto.costo || 0;
+
+                // Usa el descuento del producto si existe; si no, aplica el descuento general
+                const descuento = producto.descuento || this.form.descuentoGeneral || 0;
+
+                // Costo con descuento aplicado
+                const costoConDescuento = costoOriginal * (1 - descuento / 100);
+
+                // Actualiza el costo con descuento en el objeto del producto
+                producto.costo = costoConDescuento;
+
+                // Calcula el subtotal con el costo actualizado
+                producto.subtotal = cantidad * costoConDescuento;
             },
             calcularTotalSubtotales() {
                 const total = this.productosDocumento.reduce((acc, producto) => acc + (producto.subtotal || 0), 0);
@@ -637,22 +660,18 @@
                     const nuevoProducto = {
                         model: producto.nameproduct,
                         sku: producto.sku,
-                        cantidad: 1,  // Cantidad esperada, inicializada con 1
-                        costo: "", // Precio del producto
+                        cantidad: 1, // Cantidad esperada, inicializada con 1
+                        costo: 0, // Precio del producto
                         descuento: descuentoGeneral, // Asignar el descuento general al producto
                         entrega: false,
-                        subtotal: producto.lastprice || 0,
-                        received_quantity: 0,   // Cantidad recibida inicialmente en 0
-                        difference: 1           // Diferencia inicial entre esperada y recibida
+                        received_quantity: 0, // Cantidad recibida inicialmente en 0
+                        completo: false,
                     };
 
                     // Calcular el subtotal con descuento
-                    if (producto.lastprice) {
-                        nuevoProducto.subtotal = producto.lastprice - (producto.lastprice * (descuentoGeneral / 100));
-                    }
+                    nuevoProducto.subtotal = nuevoProducto.cantidad * nuevoProducto.costo * (1 - nuevoProducto.descuento / 100);
 
                     this.productosDocumento.push(nuevoProducto);
-                    this.calcularSubtotalProducto(this.productosDocumento.length - 1); // Actualiza el subtotal
                 }
             },
             eliminarProducto(sku) {
@@ -771,7 +790,7 @@
                         supplierName: this.form.razonSocial,
                         typeDocument: this.form.tipoDocumento,
                         nDocument: this.form.numeroDocumento,
-                        dcto: this.form.descuentoGeneral,
+                        dcto: this.form.descuentoGeneral, // Descuento general
                         datePurchase: this.form.fechaEmision,
                         dateExpired: this.form.fechaVencimiento,
                         observation: this.form.observaciones,
@@ -785,14 +804,14 @@
                         userProcess: "Nombre Usuario",
                         urlImg: ""
                     },
-                    details: this.productosDocumento.map(producto => ({
-                        qty: producto.cantidad,              // Cantidad esperada
-                        received_quantity: producto.received_quantity, // Cantidad recibida
-                        completo: producto.completo,         // Si llegaron todas las unidades
-                        cost: producto.costo,
+                    details: this.productosDocumento.map((producto) => ({
+                        qty: producto.cantidad,
+                        received_quantity: producto.received_quantity,
+                        completo: producto.completo,
+                        cost: producto.costo, // Ahora el costo ya tiene el descuento aplicado
                         codeBar: producto.codebar || '',
-                        dctoItem: producto.descuento,
-                        subtotalItem: producto.costo * producto.cantidad,
+                        dctoItem: producto.descuento || this.form.descuentoGeneral, // Descuento por producto
+                        subtotalItem: producto.subtotal,
                         deliveryItem: producto.entrega,
                         checkItem: producto.entrega ? "true" : "false",
                         sku: producto.sku,

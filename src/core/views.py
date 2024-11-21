@@ -982,7 +982,7 @@ def generar_json(request):
             # Crear las carpetas si no existen
             os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
-            # Variables para calcular los subtotales
+            # Variables para calcular los totales
             subtotal_without_discount = 0
             subtotal_with_discount = 0
 
@@ -1001,9 +1001,16 @@ def generar_json(request):
                 # Agregar estos campos al detalle
                 detalle['cost_with_discount'] = cost_with_discount  # Costo con descuento
 
-            # Añadir los subtotales al encabezado del JSON
+            # Calcular IVA y subtotales finales
+            iva_rate = 0.19  # Tasa de IVA (19%)
+            iva_amount = subtotal_with_discount * iva_rate
+            subtotal_bruto = subtotal_with_discount + iva_amount
+
+            # Añadir los subtotales y el IVA al encabezado
             headers['subtotalWithoutDiscount'] = subtotal_without_discount
             headers['subtotalWithDiscount'] = subtotal_with_discount
+            headers['iva'] = iva_amount
+            headers['subtotalBruto'] = subtotal_bruto
 
             # Actualizar el JSON con los nuevos encabezados
             data['headers'] = headers
@@ -1021,8 +1028,7 @@ def generar_json(request):
                 observation=observation,
                 dateadd=timezone.now(),
                 dateproccess=date_purchase,
-                subtotal=subtotal_without_discount,  # Subtotal sin descuento
-                subtotal_with_discount=subtotal_with_discount,  # Subtotal con descuento
+                subtotal=subtotal_with_discount,  # Subtotal con descuento
                 urljson=relative_file_path,  # Guardar solo la ruta relativa en la base de datos
                 urlimg=url_img,
                 status=0,  # Estado predeterminado
@@ -1034,6 +1040,8 @@ def generar_json(request):
                 'urlJson': relative_file_path,
                 'subtotalWithoutDiscount': subtotal_without_discount,
                 'subtotalWithDiscount': subtotal_with_discount,
+                'iva': iva_amount,
+                'subtotalBruto': subtotal_bruto,
                 'purchaseId': purchase.id
             }, status=201)
 
