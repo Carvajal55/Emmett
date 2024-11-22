@@ -62,8 +62,9 @@ urlpatterns = [
     #Imprimir etiquetas
     path('api/imprimir-etiqueta/', core_views.imprimir_etiqueta, name='imprimir_etiqueta'),
     #Ingresar Documentos
-    path('api/bulk-upload/<str:model_type>/', core_views.bulk_upload, name='bulk_upload'),
-    path('api/get-brands/', core_views.get_brands, name='get_brands'),
+    path('api/create-category/', core_views.create_category, name='create_category'),
+    path('api/create-brand/', core_views.create_brand, name='create_brand'),
+    path('api/get-brands/', core_views.search_brands, name='search_brands'),
     path('api/get-categories/', core_views.get_categories, name='get_categories'),
     path('api/get-factura/', core_views.get_factura, name='get_factura'),
     path('api/create-supplier/', core_views.create_supplier, name='create_supplier'),
@@ -118,6 +119,8 @@ urlpatterns = [
    path('api/listar-bodegas/', core_views.listar_bodegas, name='listar_bodegas'),
    path('api/listar-sectores/', core_views.listar_sectores, name='listar_sectores'),
    
+    path('api/bulk-upload/<str:model_type>/', core_views.bulk_upload, name='bulk_upload'),
+
 
 
 

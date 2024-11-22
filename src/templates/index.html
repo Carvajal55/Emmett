@@ -122,6 +122,25 @@
               </div>
           </div>
       </div>
+      <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header" style="background-color: #003399; color: white;">
+                <h6 class="mb-0" style="color: white;">Carga masiva</h6>
+            </div>
+            <div class="card-body">
+                <input type="file" id="fileInput" @change="uploadFile">
+                    <select v-model="modelType">
+                        <option value="brand">Marcas</option>
+                        <option value="category">Categorías</option>
+                    </select>
+                    <button @click="uploadCSV">Subir Archivo</button>
+            </div>
+        </div>
+    </div>
+
+      
+
+      </div>
   </div>
 </div>
 
@@ -137,6 +156,8 @@
       el: '#app',
       delimiters: ['[[', ']]'],
       data: {
+        file: null,
+        modelType: 'brand',
         dynamicKey: '',
         generatedKey: '', 
         cantidad_de_mensajes: 0,
@@ -153,6 +174,30 @@
       mounted() {
       },
       methods: {
+        uploadFile(event) {
+            this.file = event.target.files[0];
+        },
+        async uploadCSV() {
+            if (!this.file) {
+                alert("Debe seleccionar un archivo.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', this.file);
+
+            try {
+                const response = await axios.post(`/api/bulk-upload/${this.modelType}/`, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+                alert(`Se han creado ${response.data.created} registros. Errores: ${response.data.errors}`);
+            } catch (error) {
+                console.error('Error al subir el archivo:', error);
+                alert("Error al procesar el archivo.");
+            }
+        },
         iniciarComparacion() {
             this.loading = true;
 
