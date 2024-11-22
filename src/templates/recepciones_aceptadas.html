@@ -12,6 +12,7 @@
                     <option value="1">Aceptadas</option>
                     <option value="0">Pendientes</option>
                     <option value="2">Rechazadas</option>
+                    <option value="3">Procesadas</option>
                     <option value="all">Todas</option>
                 </select>
             </div>
@@ -47,7 +48,7 @@
                             <!-- Formatear el subtotal en pesos chilenos -->
                             <td>[[ formatCurrency(factura.subtotal) ]]</td>
                             <td>
-                                [[ factura.status == 1 ? 'Aceptado' : (factura.status == 0 ? 'Pendientes de Revisión' : 'Rechazado') ]]
+                                [[ factura.status == 1 ? 'Aceptado' : (factura.status == 0 ? 'Pendientes de Revisión' : (factura.status == 2 ? 'Rechazado' : 'Procesado')) ]]
                             </td>
                             <td>[[ factura.dateAdd ]]</td>
                             <td>
