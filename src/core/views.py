@@ -43,6 +43,14 @@ from django.utils.crypto import get_random_string
 from datetime import datetime, timedelta
 import qrcode
 import io
+from dotenv import load_dotenv
+
+
+# Carga el archivo .env
+load_dotenv()
+
+# Obtiene el token desde las variables de entorno
+BSALE_API_TOKEN = os.getenv('BSALE_API_TOKEN')
 
 
 
@@ -426,7 +434,7 @@ def actualizar_precio(request):
         # Paso 1: Construir el URL para obtener los costos en Bsale
         url_costs = f"{BSALE_API_URL}/price_lists/{type}/details.json?variantid={id_erp}"
         headers = {
-            'access_token': BSALE_TOKEN,  # Usar 'access_token' en lugar de 'Authorization'
+            'access_token': BSALE_API_TOKEN,  # Usar 'access_token' en lugar de 'Authorization'
             'Content-Type': 'application/json'
         }
 
@@ -752,11 +760,37 @@ def obtener_factura(request):
 
 """ Ingresar Documentos """
 
-def get_brands(request):
+@csrf_exempt
+def create_category(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        name = data.get('name')
+        if not name:
+            return JsonResponse({'error': 'El nombre de la categoría es obligatorio.'}, status=400)
+        category, created = Category.objects.get_or_create(name=name)
+        if created:
+            return JsonResponse({'message': 'Categoría creada correctamente.'})
+        return JsonResponse({'error': 'La categoría ya existe.'}, status=400)
+    
+@csrf_exempt
+def create_brand(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        name = data.get('name')
+        if not name:
+            return JsonResponse({'error': 'El nombre de la marca es obligatorio.'}, status=400)
+        brand, created = Brand.objects.get_or_create(name=name)
+        if created:
+            return JsonResponse({'message': 'Marca creada correctamente.'})
+        return JsonResponse({'error': 'La marca ya existe.'}, status=400)   
+    
+def search_brands(request):
     query = request.GET.get('q', '')
-    brands = Brand.objects.filter(name__icontains=query)[:20]
-    brand_list = [{'id': brand.id, 'name': brand.name} for brand in brands]
-    return JsonResponse({'brands': brand_list})
+    if query:
+        brands = Brand.objects.filter(name__icontains=query).values('id', 'name')
+    else:
+        brands = Brand.objects.all().values('id', 'name')
+    return JsonResponse(list(brands), safe=False)
 
 
 def get_categories(request):
@@ -1686,7 +1720,7 @@ def obtener_variant_id_por_sku(sku):
     """Función para obtener el variant_id desde Bsale basado en el SKU"""
     url = f"https://api.bsale.cl/v1/variants.json?code={sku}"
     headers = {
-        'access_token': '1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc',  # Reemplaza con tu token de Bsale
+        'access_token': BSALE_API_TOKEN,  # Reemplaza con tu token de Bsale
         'Accept': 'application/json'
     }
     
@@ -1759,7 +1793,7 @@ def actualizar_stock_bsale(variant_id, stock):
     """Función para actualizar el stock en Bsale usando el variant_id"""
     url = f"https://api.bsale.cl/v1/variants/{variant_id}/stock.json"
     headers = {
-        'access_token': '1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc',  # Reemplaza con tu token
+        'access_token': BSALE_API_TOKEN , # Reemplaza con tu token
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     }
@@ -1778,13 +1812,12 @@ def actualizar_stock_bsale(variant_id, stock):
     
 
 BSALE_API_URL = 'https://api.bsale.io/v1'
-BSALE_TOKEN = '1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc'
 
 # Función para obtener el variantId
 def obtener_variant_id(sku):
     url = f"{BSALE_API_URL}/stocks.json?code={sku}"
     headers = {
-        'access_token': BSALE_TOKEN,
+        'access_token': BSALE_API_TOKEN,
         'Accept': 'application/json'
     }
     response = requests.get(url, headers=headers)
@@ -1800,7 +1833,7 @@ def obtener_variant_id(sku):
 def obtener_stock_bsale(variant_id):
     url = f"{BSALE_API_URL}/stocks.json?variantid={variant_id}"
     headers = {
-        'access_token': BSALE_TOKEN,
+        'access_token': BSALE_API_TOKEN,
         'Accept': 'application/json'
     }
     response = requests.get(url, headers=headers)
@@ -1814,7 +1847,7 @@ def obtener_stock_bsale(variant_id):
 def actualizar_stock_bsale(variant_id, office_id, new_stock):
     url = f"{BSALE_API_URL}/stocks/receptions.json"
     headers = {
-        'access_token': BSALE_TOKEN,
+        'access_token': BSALE_API_TOKEN,
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     }
@@ -1849,7 +1882,7 @@ def calcular_stock_local(sku):
 def obtener_stock_id(variant_id, office_id):
     """Función para obtener el stock_id de una variante y sucursal (office) en Bsale"""
     headers = {
-        'access_token': BSALE_TOKEN,
+        'access_token': BSALE_API_TOKEN,
         'Accept': 'application/json'
     }
     # Filtrar por variant_id y office_id
@@ -1893,7 +1926,7 @@ def sincronizar_producto(request, sku):
                     'quantity': stock_local  # Usar el stock local calculado
                 }
                 headers = {
-                    'access_token': BSALE_TOKEN,
+                    'access_token': BSALE_API_TOKEN,
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 }
@@ -1944,7 +1977,7 @@ def registrar_recepcion_stock(request, sku, qty):
             }
 
             headers = {
-                'access_token': BSALE_TOKEN,
+                'access_token': BSALE_API_TOKEN,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             }
@@ -2132,7 +2165,7 @@ def dispatch_consumption(request):
 
                     # Hacer la solicitud POST a Bsale usando la URL de consumo correcta
                     headers = { 
-                        "access_token": BSALE_TOKEN,
+                        "access_token": BSALE_API_TOKEN,
                         "Content-Type": "application/json"
                     }
 
@@ -2169,7 +2202,7 @@ def dispatch_consumption(request):
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
 
 BSALE_API_URL = "https://api.bsale.cl/v1"  # URL base de Bsale
-BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
+#BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
 
 
 @csrf_exempt
@@ -2184,7 +2217,7 @@ def get_unique_document(request):
     # Construir la URL inicial para obtener el ID del documento
     url_costs = f"{BSALE_API_URL}/documents/costs.json?codesii={type_document}&number={number}"
     headers = {
-        'access_token': BSALE_TOKEN,
+        'access_token': BSALE_API_TOKEN,
         'Content-Type': 'application/json'
     }
 
@@ -2527,7 +2560,7 @@ def comparar_stock_bsale(request):
     # Procesar datos de Bsale
     next_url = f'{BSALE_API_URL}/stocks.json'
     while next_url:
-        response = requests.get(next_url, headers={'access_token': BSALE_TOKEN})
+        response = requests.get(next_url, headers={'access_token': BSALE_API_TOKEN})
         if response.status_code != 200:
             return JsonResponse({
                 "message": f"Error al obtener datos de Bsale: {response.status_code}",
@@ -2615,7 +2648,7 @@ def actualizar_iderp(request):
             sku = producto.sku
             url = f"{BSALE_API_URLID}?code={sku}"
             headers = {
-                'access_token': BSALE_TOKEN,
+                'access_token': BSALE_API_TOKEN,
                 'Accept': 'application/json'
             }
 
@@ -2695,7 +2728,7 @@ def crear_sector(request):
 def buscar_sector(request):
     """
 """  BSALE_API_URL = 'https://api.bsale.io/v1'
-BSALE_TOKEN = '1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc' """
+BSALE_API_TOKEN = 'BSALE_API_TOKEN' """
 #mover luego
 #  
 @csrf_exempt
@@ -2717,7 +2750,7 @@ def obtener_datos_producto(request):
             bsale_url = f"https://api.bsale.cl/v1/price_lists/{price_list_id}/details.json"
             headers = {
                 "Content-Type": "application/json",
-                "access_token": BSALE_TOKEN
+                "access_token": BSALE_API_TOKEN
             }
             params = {"code": sku}
 
@@ -2854,6 +2887,7 @@ def listar_sectores(request):
     
 
 #Carga masiva
+import csv
 
 @csrf_exempt
 def bulk_upload(request, model_type):

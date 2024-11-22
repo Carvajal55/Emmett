@@ -4,7 +4,7 @@
 {% block content %}
 <div id="app" class="m-2 extra-small ">
     <h3>Agregar Recepción EMMETT [[ currentDate ]]</h3>
-
+   
     <div class="">
         <!-- Botones para crear proveedor y producto -->
         <div class="mb-4 row">
@@ -18,6 +18,11 @@
                     Crear Producto
                 </button>
             </div>
+            <div class="col-2 mt-4">
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCrearCategoriaMarca">
+                    Crear Categoría/Marca
+                </button>
+            </div>
             <div class="col-4">
                 <label for="nDocument" class="form-label">Número Documento</label>
                 <div class="input-group">
@@ -28,6 +33,30 @@
         </div>
 <!-- Línea gruesa -->
 <hr style="border-top: 4px solid #000; margin-top: 20px; margin-bottom: 20px;">
+        <!-- Modal Crear marca categoria -->
+        <div class="modal fade" id="modalCrearCategoriaMarca" tabindex="-1" aria-labelledby="modalCategoriaMarcaLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalCategoriaMarcaLabel">Crear Categoría o Marca</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="nuevaCategoria" class="form-label">Nueva Categoría</label>
+                            <input type="text" class="form-control" v-model="nuevaCategoria" placeholder="Nombre de la categoría">
+                            <button class="btn btn-primary mt-2" @click="crearCategoria">Crear Categoría</button>
+                        </div>
+                        <hr>
+                        <div class="mb-3">
+                            <label for="nuevaMarca" class="form-label">Nueva Marca</label>
+                            <input type="text" class="form-control" v-model="nuevaMarca" placeholder="Nombre de la marca">
+                            <button class="btn btn-secondary mt-2" @click="crearMarca">Crear Marca</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Modal para Crear Proveedor -->
         <div class="modal fade" id="modalCrearProveedor" tabindex="-1" aria-labelledby="modalProveedorLabel" aria-hidden="true">
@@ -79,7 +108,31 @@
                             <!-- Marca -->
                             <div class="col-6 mb-3">
                                 <label for="marcaProducto" class="form-label">Marca</label>
-                                <input type="text" class="form-control" v-model="nuevoProducto.marca">
+                                <input 
+                                    type="text" 
+                                    class="form-control" 
+                                    placeholder="Buscar marca" 
+                                    v-model="nuevoProducto.marcaBusqueda" 
+                                    @input="buscarMarcas" 
+                                />
+                                <div 
+                                    v-if="marcas.length > 0" 
+                                    class="list-group mt-2" 
+                                    style="max-height: 150px; overflow-y: auto;"
+                                >
+                                    <button 
+                                        v-for="marca in marcas" 
+                                        :key="marca.id" 
+                                        @click="seleccionarMarca(marca)" 
+                                        class="list-group-item list-group-item-action"
+                                    >
+                                        [[ marca.name ]]
+                                    </button>
+                                </div>
+                                <!-- Mostrar la marca seleccionada -->
+                                <div v-if="nuevoProducto.marcaSeleccionada" class="mt-2">
+                                    <strong>Marca seleccionada:</strong> [[ nuevoProducto.marcaSeleccionada.name ]]
+                                </div>
                             </div>
                            
                             <!-- Proveedor -->
@@ -408,6 +461,9 @@
         el: '#app',
         delimiters: ['[[', ']]'],
         data: {
+            nuevaCategoria: '', // Para la nueva categoría
+            nuevaMarca: '', 
+            marcas: [],
             form: {
                 proveedor: null,
                 rutProveedor: '',
@@ -443,6 +499,8 @@
                 alias: ''
             },
             nuevoProducto: {
+                marcaBusqueda: '',
+                marcaSeleccionada: null,
                 sku: '',
                 nombre: '',
                 marca: '',
@@ -494,6 +552,7 @@
             }
         },
         computed: {
+            
             // Propiedad computada que suma todos los subtotales
             totalSubtotales() {
                 return this.productosDocumento.reduce((total, producto) => total + (producto.subtotal || 0), 0);
@@ -513,6 +572,56 @@
             }
         },
         methods: {
+            async crearCategoria() {
+                if (!this.nuevaCategoria) {
+                    Swal.fire('Error', 'El nombre de la categoría no puede estar vacío.', 'error');
+                    return;
+                }
+
+                try {
+                    const response = await axios.post('/api/create-category/', { name: this.nuevaCategoria });
+                    Swal.fire('Éxito', `Categoría "${this.nuevaCategoria}" creada correctamente.`, 'success');
+                    this.nuevaCategoria = ''; // Limpia el campo
+                } catch (error) {
+                    Swal.fire('Error', 'No se pudo crear la categoría.', 'error');
+                    console.error('Error al crear la categoría:', error);
+                }
+            },
+            async crearMarca() {
+                if (!this.nuevaMarca) {
+                    Swal.fire('Error', 'El nombre de la marca no puede estar vacío.', 'error');
+                    return;
+                }
+
+                try {
+                    const response = await axios.post('/api/create-brand/', { name: this.nuevaMarca });
+                    Swal.fire('Éxito', `Marca "${this.nuevaMarca}" creada correctamente.`, 'success');
+                    this.nuevaMarca = ''; // Limpia el campo
+                } catch (error) {
+                    Swal.fire('Error', 'No se pudo crear la marca.', 'error');
+                    console.error('Error al crear la marca:', error);
+                }
+            },
+            seleccionarMarca(marca) {
+                this.nuevoProducto.marcaSeleccionada = marca;
+                this.nuevoProducto.marcaBusqueda = marca.name; // Actualiza el input con el nombre de la marca seleccionada
+                this.marcas = []; // Limpiar la lista de sugerencias
+            },
+            async buscarMarcas() {
+                try {
+                    if (this.nuevoProducto.marcaBusqueda.length > 2) {
+                        const response = await axios.get('/api/get-brands/', {
+                            params: { q: this.nuevoProducto.marcaBusqueda }
+                        });
+                        this.marcas = response.data;
+                    } else {
+                        this.marcas = [];
+                    }
+                } catch (error) {
+                    console.error('Error al buscar marcas:', error);
+                } finally {
+                }
+            },
             async buscarFactura() {
                 if (!this.form.numeroDocumento || !this.form.tipoDocumento) {
                     Swal.fire('Error', 'Debe ingresar el tipo y número de documento.', 'error');
