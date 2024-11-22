@@ -1,5 +1,5 @@
 from django.contrib import admin
-from core.models import Usuario, Products, Supplier, Uniqueproducts, Purchase, Bodega, Sectoroffice
+from core.models import Usuario, Products, Supplier, Uniqueproducts, Purchase, Bodega, Sectoroffice,Brand,Category
 from openpyxl import Workbook
 from django.http import HttpResponse
 
@@ -51,6 +51,7 @@ class UniqueproductsAdmin(admin.ModelAdmin):
     list_display = ('id', 'superid', 'locationname', 'product') 
     search_fields = ('id', 'superid', 'product__sku', 'product__nameproduct')  # Campos específicos del modelo relacionado
 
+
 @admin.register(Purchase)
 class PurchaseAdmin(admin.ModelAdmin):
     list_display = ('iddocument','number', 'idpurchase')
@@ -72,5 +73,10 @@ class UsuarioAdmin(admin.ModelAdmin):
     ordering = ('user__email',)  # Ordena por correo del usuario
 
    
+
+admin.site.register(Brand)
+
+admin.site.register(Category)
+
 
 admin.site.register(Usuario, UsuarioAdmin)

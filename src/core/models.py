@@ -227,4 +227,18 @@ class DynamicKey(models.Model):
 
     def is_valid(self):
         return timezone.now() <= self.expiration_time
+    
+#NUEVOS MODELOS
+class Brand(models.Model):
+    name = models.CharField(max_length=255, unique=True, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Category(models.Model):
+    name = models.CharField(max_length=255, unique=True, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
 

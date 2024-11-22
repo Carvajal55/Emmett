@@ -62,7 +62,9 @@ urlpatterns = [
     #Imprimir etiquetas
     path('api/imprimir-etiqueta/', core_views.imprimir_etiqueta, name='imprimir_etiqueta'),
     #Ingresar Documentos
-    
+    path('api/bulk-upload/<str:model_type>/', core_views.bulk_upload, name='bulk_upload'),
+    path('api/get-brands/', core_views.get_brands, name='get_brands'),
+    path('api/get-categories/', core_views.get_categories, name='get_categories'),
     path('api/get-factura/', core_views.get_factura, name='get_factura'),
     path('api/create-supplier/', core_views.create_supplier, name='create_supplier'),
     path('api/create-product/', core_views.crear_producto, name='crear_producto'),
