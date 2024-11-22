@@ -501,7 +501,7 @@ def actualizar_precio(request):
 
 def listar_compras(request):
     # Obtener parámetros de filtro y paginación desde el request
-    status = request.GET.get('status')  # Aceptará '0', '1', '2' o 'all'
+    status = request.GET.get('status')  # Aceptará '0', '1', '2', '3' o 'all'
     page_number = request.GET.get('page', 1)
     search_query = request.GET.get('q', '').strip()  # Búsqueda por folio
 
@@ -512,6 +512,8 @@ def listar_compras(request):
         compras = Purchase.objects.filter(status=1)  # Aceptadas
     elif status == '2':
         compras = Purchase.objects.filter(status=2)  # Rechazadas
+    elif status == '3':
+        compras = Purchase.objects.filter(status=3)  # Procesadas
     else:
         compras = Purchase.objects.all()  # Todas las facturas
 
@@ -529,14 +531,16 @@ def listar_compras(request):
     # Formatear los datos en una lista
     compras_list = []
     for compra in page_obj:
-        # Leer el archivo JSON y verificar si la factura ya fue impresa
+        # Leer el archivo JSON para obtener datos adicionales si es necesario
         try:
             with open(compra.urljson, 'r') as json_file:
                 factura_data = json.load(json_file)
-            if factura_data.get('invoice_printed', False):
+
+            # Excluir facturas impresas solo si el estado no es "Procesadas"
+            if factura_data.get('invoice_printed', False) and status != '3':
                 continue  # Saltar facturas ya impresas
         except FileNotFoundError:
-            continue  # Saltar facturas cuyo archivo JSON no existe
+            pass  # Continuar si el archivo JSON no existe
 
         compras_list.append({
             'id': compra.id,
@@ -559,6 +563,7 @@ def listar_compras(request):
         'total_items': paginator.count
     }
     return JsonResponse(response_data)
+
 @csrf_exempt
 def resumen_factura(request):
     if request.method == 'POST':
@@ -2493,7 +2498,8 @@ def imprimir_etiqueta(request):
                 
                 # Cambiar el estado general del invoice a "printed"
                 data['invoice_printed'] = True
-
+                data['type'] = 3
+                
                 # Sobrescribir el archivo JSON con los cambios
                 json_file.seek(0)
                 json.dump(data, json_file, indent=4)
@@ -2511,7 +2517,13 @@ def imprimir_etiqueta(request):
             msg_stock = "Stock registrado en Bsale con éxito."
         else:
             msg_stock = f"Error al registrar stock en Bsale: {response_stock.json().get('msg', 'Error desconocido')}"
-
+        # Actualizar el estado de la factura en el modelo `Purchase`
+        try:
+            factura = Purchase.objects.get(urljson=url_json)  # O usa otro campo, como `number`
+            factura.status = 3  # Cambiar el estado a "procesado"
+            factura.save()
+        except Purchase.DoesNotExist:
+            return JsonResponse({'error': 'Factura no encontrada para actualizar el estado.'}, status=404)
         # Devolver la URL del archivo creada, superid, y el estado de la recepción de stock
         pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
         return JsonResponse({
