@@ -118,6 +118,8 @@ urlpatterns = [
    path('api/crear-sector/', core_views.crear_sector_API, name='crear_sectorAPI'),
    path('api/listar-bodegas/', core_views.listar_bodegas, name='listar_bodegas'),
    path('api/listar-sectores/', core_views.listar_sectores, name='listar_sectores'),
+   #Editar Productois
+   path('api/editar-producto/<str:sku>/', core_views.editar_producto, name='editar_producto'),
    
     path('api/bulk-upload/<str:model_type>/', core_views.bulk_upload, name='bulk_upload'),
 

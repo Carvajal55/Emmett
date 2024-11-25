@@ -116,6 +116,50 @@ new Vue({
                 this.suggestions = [];
                 this.product = null;
             }
+        },
+        async updateProduct() {
+            if (!this.product || !this.product.sku) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Producto inválido. Asegúrate de seleccionar un producto válido.',
+                });
+                return;
+            }
+
+            try {
+                const response = await axios.put(`/api/editar-producto/${this.product.sku}/`, {
+                    name: this.product.name,
+                    prefixed: this.product.prefixed,
+                    brands: this.product.brands,
+                    iderp: this.product.iderp,
+                    alto: this.product.alto,
+                    largo: this.product.largo,
+                    profundidad: this.product.profundidad,
+                    peso: this.product.peso,
+                });
+
+                if (response.data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Éxito',
+                        text: 'Producto actualizado correctamente.',
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Advertencia',
+                        text: `Error al actualizar el producto: ${response.data.message}`,
+                    });
+                }
+            } catch (error) {
+                console.error('Error al actualizar el producto:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Hubo un problema al actualizar el producto. Inténtalo de nuevo.',
+                });
+            }
         }
     }
 });
