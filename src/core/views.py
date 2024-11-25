@@ -284,20 +284,21 @@ def listar_bodegas(request):
 
 
 def buscar_productosAPI(request):
-    query = request.GET.get('q', '')
+    query = request.GET.get('q', '').strip()
     page = request.GET.get('page', 1)
 
-    # Filtrar productos por SKU o nombre si hay un término de búsqueda
-    if query:
-        productos = Products.objects.filter(
-            models.Q(sku__icontains=query) | models.Q(nameproduct__icontains=query)
-        ).prefetch_related('unique_products')
-    else:
+    # Validar si hay un término de búsqueda
+    if not query:
         return JsonResponse({
             'products': [],
             'total_pages': 1,
             'current_page': 1
-        })
+        }, status=200)
+
+    # Filtrar productos por SKU o nombre
+    productos = Products.objects.filter(
+        Q(sku__icontains=query) | Q(nameproduct__icontains=query)
+    ).prefetch_related('unique_products')
 
     # Excluir ubicaciones que cuentan como "Narnia"
     narnia_locations = ['XT99-99', 'NRN1-1']
@@ -314,6 +315,7 @@ def buscar_productosAPI(request):
     except EmptyPage:
         productos_page = paginator.page(paginator.num_pages)
 
+    # Serializar los productos
     productos_data = []
     for producto in productos_page:
         unique_products_data = []
@@ -325,30 +327,31 @@ def buscar_productosAPI(request):
                 'locationname': location_name
             })
         
-        # Añadir los valores necesarios para edición
+        # Serialización de producto principal
         productos_data.append({
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
-            'price': producto.lastprice,
-            'stock_total': len(unique_products_data),  # Stock total basado en el número de productos únicos
+            'price': producto.lastprice or 0,  # Default a 0 si no está definido
+            'stock_total': len(unique_products_data),  # Basado en productos únicos
             'unique_products': unique_products_data,
-            'prefixed': producto.prefixed,  # Nuevo campo
-            'brands': producto.brands,      # Nuevo campo
-            'iderp': producto.iderp,        # Nuevo campo
-            'alto': producto.alto,          # Nuevo campo
-            'largo': producto.largo,        # Nuevo campo
-            'profundidad': producto.profundidad,  # Nuevo campo
-            'peso': producto.peso           # Nuevo campo
+            'prefixed': producto.prefixed or '',  # Campo opcional
+            'brands': producto.brands or '',      # Campo opcional
+            'iderp': producto.iderp or '',        # Campo opcional
+            'alto': producto.alto or 0,          # Campo opcional
+            'largo': producto.largo or 0,        # Campo opcional
+            'profundidad': producto.profundidad or 0,  # Campo opcional
+            'peso': producto.peso or 0           # Campo opcional
         })
 
+    # Respuesta JSON
     response = {
         'products': productos_data,
         'total_pages': paginator.num_pages,
         'current_page': productos_page.number,
     }
 
-    return JsonResponse(response)
+    return JsonResponse(response, safe=False)
 
 
 
@@ -868,112 +871,97 @@ def create_supplier(request):
 @csrf_exempt
 def crear_producto(request):
     if request.method == "POST":
-        try:
-            data = json.loads(request.body)
+        data = json.loads(request.body)
 
-            # Validar campos requeridos
-            required_fields = ["nombre", "precio", "marca", "proveedor", "categoria"]
-            for field in required_fields:
-                if not data.get(field):
-                    return JsonResponse({"error": f"El campo '{field}' es obligatorio."}, status=400)
+        # Obtener datos del formulario enviados desde el frontend
+        nombre_producto = data.get("nombre")
+        precio = data.get("precio")
+        marca = data.get("marca")
+        proveedor_id = data.get("proveedor")
+        categoria = data.get("categoria")  # Obtiene la categoría desde los datos del frontend
+        alto = data.get("alto")
+        largo = data.get("largo")
+        profundidad = data.get("profundidad")
+        peso = data.get("peso")
 
-            # Obtener datos del formulario
-            nombre_producto = data["nombre"]
-            precio = float(data["precio"])
-            marca = data["marca"]
-            proveedor_id = data["proveedor"]
-            categoria = data["categoria"]
-            alto = float(data.get("alto", 0))
-            largo = float(data.get("largo", 0))
-            profundidad = float(data.get("profundidad", 0))
-            peso = float(data.get("peso", 0))
-            atributos = data.get("atributos", [])  # Lista de atributos opcionales para variantes
+        # Verificamos que la categoría esté definida
+        if not categoria:
+            return JsonResponse({"error": "La categoría es obligatoria para generar el SKU."}, status=400)
 
-            # Generar el SKU y el código de barras
-            sku = obtener_correlativo(categoria)
-            bar_code = f"9999{get_random_string(8, '0123456789')}"
+        # Generar el SKU con el prefijo correspondiente y el correlativo
+        sku = obtener_correlativo(categoria)
 
-            # Datos para crear el producto en Bsale
-            bsale_product_data = {
-                "name": nombre_producto,
-                "description": f"{nombre_producto} - {marca}",
-                "code": sku,
-                "barCode": bar_code,
-                "price": precio,
-                "height": alto,
-                "width": largo,
-                "depth": profundidad,
-                "weight": peso,
-            }
+        # Generar el código de barras comenzando con "9999"
+        bar_code = f"9999{get_random_string(8, '0123456789')}"
 
-            headers = {
-                "Content-Type": "application/json",
-                "access_token": BSALE_API_TOKEN
-            }
+        # Crear el JSON para la solicitud a Bsale (Producto Principal)
+        bsale_product_data = {
+            "name": nombre_producto,
+            "description": f"{nombre_producto} - {marca}",
+            "code": sku,
+            "barCode": bar_code,
+            "price": precio,
+            "height": alto,  # Alto en cm
+            "width": largo,  # Largo en cm (ancho)
+            "depth": profundidad,  # Profundidad en cm
+            "weight": peso  # Peso en kg
+        }
 
-            # Crear producto en Bsale
-            response_product = requests.post(f"{BSALE_API_URL}/products.json", json=bsale_product_data, headers=headers)
-            if response_product.status_code != 201:
-                return JsonResponse({"error": "Error al crear el producto en Bsale", "details": response_product.json()}, status=400)
+        headers = {
+            "Content-Type": "application/json",
+            "access_token": BSALE_API_TOKEN
+        }
 
+        # Crear el Producto en Bsale
+        print("Enviando datos para crear producto en Bsale:", bsale_product_data)
+        response_product = requests.post(f"{BSALE_API_URL}/products.json", json=bsale_product_data, headers=headers)
+        print("Respuesta de creación de producto:", response_product.status_code, response_product.json())
+        
+        if response_product.status_code == 201:
             bsale_product = response_product.json()
 
-            # Transacción atómica para guardar datos locales y manejar atributos
-            with transaction.atomic():
-                # Guardar producto en la base de datos local
-                nuevo_producto = Products.objects.create(
-                    sku=sku,
-                    nameproduct=nombre_producto,
-                    brands=marca,
-                    codebar=bar_code,
-                    iderp=bsale_product["id"],
-                    lastprice=precio,
-                    codsupplier=proveedor_id,
-                    createdate=datetime.now().date(),
-                    alto=alto,
-                    largo=largo,
-                    profundidad=profundidad,
-                    peso=peso,
-                )
+            # Guardar el producto en la base de datos local
+            nuevo_producto = Products.objects.create(
+                sku=sku,
+                nameproduct=nombre_producto,
+                brands=marca,
+                codebar=bar_code,
+                iderp=bsale_product["id"],  # Guardamos el id de Bsale en la base de datos
+                lastprice=precio,
+                codsupplier=proveedor_id,
+                createdate=datetime.now().date(),
+                alto=alto,
+                largo=largo,
+                profundidad=profundidad,
+                peso=peso,
+            )
+            print("Producto guardado en base de datos local:", nuevo_producto)
 
-                # Manejar la creación de variantes con atributos
-                variant_responses = []
-                for atributo in atributos:
-                    descripcion = atributo.get("description")
-                    valores = atributo.get("valores", [])  # Lista de valores para el atributo
+            # Crear la Variante en Bsale asociada al producto
+            bsale_variant_data = {
+                "productId": bsale_product["id"],
+                "description": "",
+                "barCode": f"{bar_code}01",
+                "code": f"{sku}",
+                "unlimitedStock": 0,
+                "allowNegativeStock": 0
+            }
 
-                    for valor in valores:
-                        bar_code_variant = f"{bar_code}{get_random_string(4, '0123456789')}"  # Código de barras para la variante
-                        bsale_variant_data = {
-                            "productId": bsale_product["id"],
-                            "description": f"{descripcion} - {valor}",
-                            "barCode": bar_code_variant,
-                            "code": f"{sku}-{valor}",
-                            "unlimitedStock": 0,
-                            "allowNegativeStock": 0,
-                            "attribute_values": [
-                                {"description": valor, "attributeId": atributo.get("attributeId")}
-                            ]
-                        }
+            print("Enviando datos para crear variante en Bsale:", bsale_variant_data)
+            response_variant = requests.post(f"{BSALE_API_URL}/variants.json", json=bsale_variant_data, headers=headers)
+            print("Respuesta de creación de variante:", response_variant.status_code, response_variant.json())
 
-                        response_variant = requests.post(f"{BSALE_API_URL}/variants.json", json=bsale_variant_data, headers=headers)
-                        if response_variant.status_code == 201:
-                            variant_responses.append(response_variant.json())
-                        else:
-                            raise Exception(f"Error al crear la variante: {response_variant.json()}")
+            # Verificar si la variante fue creada correctamente
+            if response_variant.status_code == 201:
+                bsale_variant = response_variant.json()
+                print("Variante creada en Bsale con éxito:", bsale_variant)
 
-            return JsonResponse({
-                "message": "Producto y variantes creados exitosamente",
-                "product": nuevo_producto.sku,
-                "variants": variant_responses,
-            }, status=201)
+                return JsonResponse({"message": "Producto y variante creados exitosamente", "product": nuevo_producto.sku, "variant_id": bsale_variant["id"]}, status=201)
+            else:
+                return JsonResponse({"error": "Error al crear la variante en Bsale", "details": response_variant.json()}, status=400)
+        else:
+            return JsonResponse({"error": "Error al crear el producto en Bsale", "details": response_product.json()}, status=400)
 
-        except ValueError as e:
-            return JsonResponse({"error": "Error de validación de datos", "details": str(e)}, status=400)
-        except Exception as e:
-            return JsonResponse({"error": "Error interno del servidor", "details": str(e)}, status=500)
-
-    return JsonResponse({"error": "Método no permitido"}, status=405)
 
   
 
@@ -2948,3 +2936,41 @@ def bulk_upload(request, model_type):
             return JsonResponse({'error': 'Modelo no válido'}, status=400)
 
         return JsonResponse({'created': created, 'errors': errors})
+    
+
+
+#Editar Productos
+from django.views.decorators.http import require_http_methods
+
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def editar_producto(request, sku):
+    try:
+        # Verificar si el producto existe
+        producto = Products.objects.filter(sku=sku).first()
+        if not producto:
+            return JsonResponse({'success': False, 'message': 'Producto no encontrado'}, status=404)
+        
+        # Parsear el cuerpo de la solicitud
+        body = json.loads(request.body)
+
+        # Actualizar los campos del producto
+        producto.nameproduct = body.get('name', producto.nameproduct)
+        producto.prefixed = body.get('prefixed', producto.prefixed)
+        producto.brands = body.get('brands', producto.brands)
+        producto.iderp = body.get('iderp', producto.iderp)
+        producto.alto = body.get('alto', producto.alto)
+        producto.largo = body.get('largo', producto.largo)
+        producto.profundidad = body.get('profundidad', producto.profundidad)
+        producto.peso = body.get('peso', producto.peso)
+        
+        # Guardar cambios en la base de datos
+        producto.save()
+
+        return JsonResponse({'success': True, 'message': 'Producto actualizado correctamente'}, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Error al procesar el cuerpo de la solicitud'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)

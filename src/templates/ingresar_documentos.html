@@ -8,17 +8,17 @@
     <div class="">
         <!-- Botones para crear proveedor y producto -->
         <div class="mb-4 row">
-            <div class="col-2 mt-4">
+            <div class="col-auto mt-4">
                 <button class="btn btn-primary " data-bs-toggle="modal" data-bs-target="#modalCrearProveedor">
                     Crear Proveedor
                 </button>
             </div>
-            <div class="col-2 mt-4">
+            <div class="col-auto mt-4">
                 <button class="btn btn-primary " data-bs-toggle="modal" data-bs-target="#modalCrearProducto">
                     Crear Producto
                 </button>
             </div>
-            <div class="col-2 mt-4">
+            <div class="col-auto mt-4">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCrearCategoriaMarca">
                     Crear Categoría/Marca
                 </button>
@@ -138,11 +138,45 @@
                             <!-- Proveedor -->
                             <div class="col-6 mb-3">
                                 <label for="proveedorProducto" class="form-label">Proveedor</label>
-                                <select class="form-select" v-model="nuevoProducto.proveedor">
-                                    <option v-for="proveedor in proveedores" :value="proveedor.id" :key="proveedor.id">
+                            
+                                <!-- Input editable para buscar proveedores -->
+                                <input 
+                                    v-if="!proveedorSeleccionadoProd" 
+                                    type="text" 
+                                    class="form-control" 
+                                    placeholder="Buscar proveedor por RUT o Nombre"
+                                    v-model="searchQueryProd" 
+                                    @input="searchProveedoresProd"
+                                />
+                            
+                                <!-- Texto fijo para el proveedor seleccionado -->
+                                <div v-else class="d-flex justify-content-between align-items-center">
+                                    <span>
+                                        [[ proveedorSeleccionadoProd.rutsupplier ]] - [[ proveedorSeleccionadoProd.namesupplier ]]
+                                    </span>
+                                    <button 
+                                        class="btn btn-sm btn-link text-danger" 
+                                        @click="limpiarProveedorSeleccionado"
+                                    >
+                                        Cambiar
+                                    </button>
+                                </div>
+                            
+                                <!-- Lista de resultados de búsqueda -->
+                                <div 
+                                    v-if="searchQueryProd && provedoresProd.length && !proveedorSeleccionadoProd" 
+                                    class="list-group mt-2" 
+                                    style="max-height: 150px; overflow-y: auto;"
+                                >
+                                    <button 
+                                        v-for="proveedor in provedoresProd" 
+                                        :key="proveedor.id" 
+                                        @click="seleccionarProveedorProd(proveedor)" 
+                                        class="list-group-item list-group-item-action"
+                                    >
                                         [[ proveedor.rutsupplier ]] - [[ proveedor.namesupplier ]]
-                                    </option>
-                                </select>
+                                    </button>
+                                </div>
                             </div>
                             <!-- Categoría -->
                             <div class="col-6 mb-3">
@@ -486,11 +520,16 @@
             },
             searchProduct: '',
             searchQuery: '', 
+            searchQueryProd: '', 
+            
             productosDocumento: [],
             productos: [],
             proveedores: [],
+            provedoresProd:[],
             showAllProveedores: false,
             proveedorSeleccionado: false,
+            proveedorSeleccionadoProd: null,
+
             currentDate: new Date().toISOString().slice(0, 10),
             facturaCargada: false,
             nuevoProveedor: {
@@ -541,7 +580,12 @@
         watch: {
             searchQuery(newQuery) {
                 this.searchProveedores(newQuery);
+                this.searchProveedoresProd(newQuery);
             },
+            searchQueryProd(newQuery) {
+                this.searchProveedoresProd(newQuery);
+            },
+            
             "form.descuentoGeneral"(newValue) {
                 this.productosDocumento.forEach((producto, index) => {
                     if (!producto.descuento) {
@@ -603,8 +647,9 @@
                 }
             },
             seleccionarMarca(marca) {
+                console.log(marca)
                 this.nuevoProducto.marcaSeleccionada = marca;
-                this.nuevoProducto.marcaBusqueda = marca.name; // Actualiza el input con el nombre de la marca seleccionada
+                this.nuevoProducto.marca = marca.name; // Actualiza el input con el nombre de la marca seleccionada
                 this.marcas = []; // Limpiar la lista de sugerencias
             },
             async buscarMarcas() {
@@ -805,6 +850,22 @@
                 };
                 this.productosDocumento = [];
             },
+            
+            searchProveedoresProd(query) {
+                // Asegura que la búsqueda solo se ejecute si la query es válida y tiene más de 2 caracteres
+                if (query && query.length > 2) {
+                    axios.get('/api/get-suppliers/', { params: { q: query } })
+                        .then(response => {
+                            this.provedoresProd = response.data;
+                            this.showAllProveedores = false;
+                        })
+                        .catch(error => {
+                            console.error('Error al buscar proveedores:', error);
+                        });
+                } else {
+                    this.provedoresProd = []; 
+                }
+            },
             searchProveedores(query) {
                 // Asegura que la búsqueda solo se ejecute si la query es válida y tiene más de 2 caracteres
                 if (query && query.length > 2) {
@@ -817,7 +878,7 @@
                             console.error('Error al buscar proveedores:', error);
                         });
                 } else {
-                    this.proveedores = []; // Limpiar resultados si la búsqueda es menor de 3 caracteres o está vacía
+                    this.proveedores = []; 
                 }
             },
             seleccionarProveedor(proveedor) {
@@ -827,8 +888,15 @@
                 this.proveedorSeleccionado = true; // Marca que se ha seleccionado un proveedor
                 this.proveedores = []; // Vacía la lista de proveedores después de la selección
             },
-            cargarProveedores() {
-                this.searchProveedores();
+            seleccionarProveedorProd(proveedor) {
+                this.proveedorSeleccionadoProd = proveedor; // Actualiza el proveedor seleccionado
+                this.nuevoProducto.proveedor = proveedor.id; // Vincula el ID al producto
+                this.searchQueryProd = ''; // Limpia el input de búsqueda
+                this.provedoresProd = []; // Limpia las sugerencias
+            },
+            limpiarProveedorSeleccionado() {
+                this.proveedorSeleccionadoProd = null; // Limpia el proveedor seleccionado
+                this.nuevoProducto.proveedor = null; // Limpia el ID del proveedor
             },
             cargarProductos() {
                 this.searchProductos();
@@ -963,8 +1031,9 @@
         },
         mounted() {
             this.mostrarTodosLosProveedores();
-            this.cargarProveedores();
+            this.searchProveedores();
             this.cargarProductos();
+            this.searchProveedoresProd();
         }
     });
 </script>

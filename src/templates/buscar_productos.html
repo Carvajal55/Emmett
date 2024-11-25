@@ -78,13 +78,17 @@
                         <thead>
                             <tr>
                                 <th>Bodega</th>
-                                <th v-for="bodega in bodegas" :key="bodega.id">[[ bodega.name ]]</th>
+                                <th v-for="(stock, bodega) in selectedProduct.bodegas" :key="bodega">
+                                    [[ bodega ]]
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td>Stock</td>
-                                <td v-for="bodega in bodegas" :key="bodega.id">[[ selectedProduct.bodegas[bodega.name] ]]</td>
+                                <td>Stock Total</td>
+                                <td v-for="(stock, bodega) in selectedProduct.bodegas" :key="bodega">
+                                    [[ stock ]]
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -120,69 +124,104 @@
 <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
-new Vue({
-    el: '#app',
-    delimiters: ['[[', ']]'],
-    data: {
-        products: [],  // Lista de productos
-        bodegas: [],  // Lista de sucursales (bodegas)
-        searchQuery: '',  // Término de búsqueda
-        currentPage: 1,  // Página actual
-        totalPages: 1,   // Total de páginas
-        maxVisiblePages: 10,  // Máximo de páginas visibles
-        selectedProduct: null,  // Producto seleccionado
-    },
-    computed: {
-        visiblePages() {
-            let pages = [];
-            let start = Math.max(1, this.currentPage - Math.floor(this.maxVisiblePages / 2));
-            let end = Math.min(start + this.maxVisiblePages - 1, this.totalPages);
-            start = Math.max(1, end - this.maxVisiblePages + 1);
-
-            for (let i = start; i <= end; i++) {
-                pages.push(i);
-            }
-            return pages;
-        }
-    },
-    methods: {
-        async fetchProducts(page = 1) {
-            if (!this.searchQuery) {
-                this.products = [];
-                return;
-            }
-            try {
-                const response = await axios.get(`/api/buscar-productos/?page=${page}&q=${this.searchQuery}`);
-                this.products = response.data.products;
-                this.totalPages = response.data.total_pages;
-                this.currentPage = response.data.current_page;
-            } catch (error) {
-                console.error('Error al cargar productos:', error);
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            products: [],             // Lista de productos
+            bodegas: [],              // Lista de sucursales (bodegas)
+            searchQuery: '',          // Término de búsqueda
+            currentPage: 1,           // Página actual
+            totalPages: 1,            // Total de páginas
+            maxVisiblePages: 10,      // Máximo de páginas visibles en la paginación
+            selectedProduct: null,    // Producto seleccionado
+            cancelTokenSource: null   // Token para cancelar solicitudes anteriores
+        },
+        computed: {
+            visiblePages() {
+                let pages = [];
+                let start = Math.max(1, this.currentPage - Math.floor(this.maxVisiblePages / 2));
+                let end = Math.min(start + this.maxVisiblePages - 1, this.totalPages);
+                start = Math.max(1, end - this.maxVisiblePages + 1);
+    
+                for (let i = start; i <= end; i++) {
+                    pages.push(i);
+                }
+                return pages;
             }
         },
-        async verDetallesProducto(productId) {
-            try {
-                const response = await axios.get(`/api/producto-detalles/${productId}/`);
-                this.selectedProduct = response.data;
-                // Hacer scroll hacia la sección de detalles del producto
-                document.getElementById('detalles-producto').scrollIntoView({ behavior: 'smooth' });
-            } catch (error) {
-                console.error('Error al cargar detalles del producto:', error);
+        methods: {
+            // Buscar productos con paginación
+            async fetchProducts(page = 1) {
+                if (!this.searchQuery) {
+                    this.products = [];
+                    return;
+                }
+    
+                // Cancelar solicitudes anteriores si existen
+                if (this.cancelTokenSource) {
+                    this.cancelTokenSource.cancel("Cancelando solicitud anterior");
+                }
+    
+                this.cancelTokenSource = axios.CancelToken.source();
+    
+                try {
+                    const response = await axios.get(`/api/buscar-productos/`, {
+                        params: { page, q: this.searchQuery },
+                        cancelToken: this.cancelTokenSource.token
+                    });
+                    this.products = response.data.products;
+                    this.totalPages = response.data.total_pages;
+                    this.currentPage = response.data.current_page;
+                } catch (error) {
+                    if (axios.isCancel(error)) {
+                        console.log("Solicitud cancelada:", error.message);
+                    } else {
+                        console.error('Error al cargar productos:', error);
+                    }
+                }
+            },
+    
+            // Ver detalles de un producto
+            async verDetallesProducto(productId) {
+                try {
+                    const response = await axios.get(`/api/producto-detalles/${productId}/`);
+                    this.selectedProduct = response.data;
+    
+                    // Hacer scroll hacia la sección de detalles del producto
+                    const detalles = document.getElementById('detalles-producto');
+                    if (detalles) {
+                        detalles.scrollIntoView({ behavior: 'smooth' });
+                    }
+                } catch (error) {
+                    console.error('Error al cargar detalles del producto:', error);
+                }
+            },
+    
+            // Cargar bodegas al iniciar
+            async fetchBodegas() {
+                try {
+                    const response = await axios.get('/api/listar-bodegas/');
+                    this.bodegas = response.data.bodegas;
+                } catch (error) {
+                    console.error('Error al cargar bodegas:', error);
+                }
+            },
+    
+            // Reiniciar detalles del producto
+            resetSelectedProduct() {
+                this.selectedProduct = null;
             }
         },
-        async fetchBodegas() {
-            try {
-                const response = await axios.get('/api/listar-bodegas/');
-                this.bodegas = response.data.bodegas;
-            } catch (error) {
-                console.error('Error al cargar bodegas:', error);
+        mounted() {
+            this.fetchBodegas(); // Cargar las bodegas al iniciar la aplicación
+    
+            // Enfocar automáticamente en el input de búsqueda
+            const searchInput = this.$refs.searchInput;
+            if (searchInput) {
+                searchInput.focus();
             }
         }
-    },
-    mounted() {
-        this.fetchBodegas(); 
-        this.$refs.searchInput.focus(); // Cargar las bodegas al iniciar la aplicación
-    }
-});
-</script>
+    });
+    </script>
 {% endblock js %}
