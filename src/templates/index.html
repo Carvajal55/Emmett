@@ -30,6 +30,9 @@
                 <button @click="iniciarComparacion" class="btn btn-primary mt-3" :disabled="loading">
                     [[ loading ? 'Comparando...' : 'Comparar Stock en Bsale' ]]
                 </button>
+                <button @click="imprimirTabla" class="btn btn-secondary mt-3" v-if="comparacionResultado.length > 0">
+                    Imprimir Tabla
+                </button>
                 
                 <!-- Barra de progreso -->
                 <div class="progress mt-3" v-if="loading">
@@ -174,6 +177,58 @@
       mounted() {
       },
       methods: {
+        imprimirTabla() {
+            const tablaHTML = `
+                <html>
+                    <head>
+                        <title>Comparación de Stock</title>
+                        <style>
+                            table {
+                                width: 100%;
+                                border-collapse: collapse;
+                            }
+                            th, td {
+                                border: 1px solid black;
+                                padding: 8px;
+                                text-align: center;
+                            }
+                            th {
+                                background-color: #f2f2f2;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h3>Resumen de la Comparación</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>SKU</th>
+                                    <th>Stock Local</th>
+                                    <th>Stock Bsale</th>
+                                    <th>Diferencia</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${this.comparacionResultado.map(producto => `
+                                    <tr>
+                                        <td>${producto.sku}</td>
+                                        <td>${producto.stock_local}</td>
+                                        <td>${producto.stock_bsale}</td>
+                                        <td>${producto.diferencia}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </body>
+                </html>
+            `;
+
+            const nuevaVentana = window.open("", "_blank");
+            nuevaVentana.document.write(tablaHTML);
+            nuevaVentana.document.close();
+            nuevaVentana.print();
+            nuevaVentana.close();
+        },
         uploadFile(event) {
             this.file = event.target.files[0];
         },
@@ -200,7 +255,6 @@
         },
         iniciarComparacion() {
             this.loading = true;
-
             axios.get('/api/comparar-stock-bsale/')
                 .then(response => {
                     const data = response.data;
