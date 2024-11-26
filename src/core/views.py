@@ -867,6 +867,7 @@ def create_supplier(request):
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
+from .models import Products, Brand
 
 @csrf_exempt
 def crear_producto(request):
@@ -883,6 +884,11 @@ def crear_producto(request):
         largo = data.get("largo")
         profundidad = data.get("profundidad")
         peso = data.get("peso")
+
+        # Validar que la marca exista en la base de datos
+        marcas_existentes = [brand.name for brand in Brand.objects.all()]
+        if marca not in marcas_existentes:
+            return JsonResponse({"error": f"La marca '{marca}' no existe. Selecciona una marca válida."}, status=400)
 
         # Verificamos que la categoría esté definida
         if not categoria:
