@@ -2628,6 +2628,111 @@ def comparar_stock_bsale(request):
     except Exception as e:
         print(f"Error inesperado: {str(e)}")  # Mostrar el error en consola
         return JsonResponse({"error": str(e)}, status=500)
+    
+
+
+""" @csrf_exempt
+def comparar_stock_y_ajustar(request):
+try:
+    # Inicialización
+    print("Iniciando comparación y ajuste de stock...")
+    total_productos_locales = 0
+    productos_comparados = 0
+    productos_ajustados = 0
+    productos_con_diferencia_stock = []
+    processed_iderps = set()  # Para rastrear productos ya procesados
+
+    # Obtener productos locales
+    productos_locales = Products.objects.values('sku', 'iderp', 'currentstock')
+    productos_local_dict = {producto['iderp']: producto for producto in productos_locales}
+    total_productos_locales = len(productos_local_dict)
+    print(f"Productos locales obtenidos: {total_productos_locales}")
+
+    iderp_locales = set(productos_local_dict.keys())
+    if not iderp_locales:
+        print("No hay productos locales para comparar.")
+        return JsonResponse({
+            "message": "No hay productos locales para comparar.",
+            "resumen": {
+                "total_productos_locales": total_productos_locales,
+                "productos_comparados": 0,
+                "productos_ajustados": 0,
+                "productos_con_diferencias": 0,
+                "detalles": []
+            }
+        }, status=200)
+
+    # Procesar datos de Bsale
+    next_url = f'{BSALE_API_URL}/stocks.json'
+    while next_url:
+        print(f"Consultando Bsale en: {next_url}")
+        response = requests.get(next_url, headers={'access_token': BSALE_API_TOKEN})
+        if response.status_code != 200:
+            print(f"Error al obtener datos de Bsale: {response.status_code}")
+            return JsonResponse({
+                "message": f"Error al obtener datos de Bsale: {response.status_code}",
+                "resumen": {}
+            }, status=response.status_code)
+
+        data = response.json()
+        items = data.get('items', [])
+        print(f"Productos obtenidos de Bsale en este lote: {len(items)}")
+
+        for item in items:
+            variant = item.get('variant')
+            if not variant:
+                continue
+            iderp = variant.get('id')
+            bsale_stock = item.get('quantity', 0)
+
+            # Solo procesar productos locales y no procesados previamente
+            if iderp in iderp_locales and iderp not in processed_iderps:
+                processed_iderps.add(iderp)  # Marcar como procesado
+                productos_comparados += 1
+                producto_local = productos_local_dict[iderp]
+                diferencia_stock = bsale_stock - producto_local['currentstock']
+
+                if diferencia_stock != 0:
+                    productos_con_diferencia_stock.append({
+                        "sku": producto_local['sku'],
+                        "stock_local": producto_local['currentstock'],
+                        "stock_bsale": bsale_stock,
+                        "diferencia": diferencia_stock
+                    })
+                    print(f"Diferencia encontrada para SKU {producto_local['sku']}: {diferencia_stock}")
+
+                    # Si hay stock faltante en el local, registrar en Bsale
+                    if diferencia_stock > 0:
+                        print(f"Ajustando stock para SKU {producto_local['sku']}...")
+                        ajuste_response = registrar_recepcion_stock(
+                            request, producto_local['sku'], diferencia_stock
+                        )
+                        if ajuste_response.status_code in [200, 201]:
+                            productos_ajustados += 1
+                        else:
+                            print(f"Error al ajustar stock para SKU {producto_local['sku']}: {ajuste_response.content}")
+
+        next_url = data.get('next', None)
+
+    # Resumen final
+    resumen = {
+        "total_productos_locales": total_productos_locales,
+        "productos_comparados": productos_comparados,
+        "productos_ajustados": productos_ajustados,
+        "productos_con_diferencias": len(productos_con_diferencia_stock),
+        "detalles": productos_con_diferencia_stock
+    }
+    print("Comparación y ajuste completados. Resumen:")
+    print(resumen)
+
+    return JsonResponse({
+        "message": "Proceso completado.",
+        "resumen": resumen
+    }, status=200)
+
+except Exception as e:
+    print(f"Error inesperado: {str(e)}")  # Mostrar el error en consola
+    return JsonResponse({"error": str(e)}, status=500) """
 
 @csrf_exempt
 def actualizar_stock_local(request):
