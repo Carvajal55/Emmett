@@ -122,7 +122,8 @@
                 })
                 .then(response => {
                     if (response.data.resp === 1) {
-                        this.productos = response.data.productos;
+                        // Asignar lista invertida
+                        this.productos = [...response.data.productos].reverse();
                         this.currentPage = 1;
                         this.playSound('success');
                     } else {
