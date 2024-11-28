@@ -302,11 +302,11 @@ def buscar_productosAPI(request):
         Q(sku__icontains=query) | Q(nameproduct__icontains=query)
     ).prefetch_related('unique_products')
 
-    # Excluir ubicaciones que cuentan como "Narnia"
-    narnia_locations = ['XT99-99', 'NRN1-1']
+    # IDs de las bodegas válidas para stock
+    valid_bodega_ids = [10, 9, 7, 6, 5, 4, 2, 1]
 
-    # Obtener todos los sectores de la oficina
-    sectores = {sector.idsectoroffice: sector.namesector for sector in Sectoroffice.objects.all()}
+    # Obtener todos los sectores de la oficina, mapeados por su ID
+    sectores = {sector.idsectoroffice: sector for sector in Sectoroffice.objects.all()}
 
     # Paginación, 10 productos por página
     paginator = Paginator(productos, 10)
@@ -321,21 +321,27 @@ def buscar_productosAPI(request):
     productos_data = []
     for producto in productos_page:
         unique_products_data = []
-        for unique_product in producto.unique_products.filter(state=0).exclude(locationname__in=narnia_locations):
-            location_name = sectores.get(unique_product.location, 'Ubicación no encontrada')
+        stock_total = 0  # Contador para stock total en bodegas válidas
 
-            unique_products_data.append({
-                'superid': unique_product.superid,
-                'locationname': location_name
-            })
-        
+        for unique_product in producto.unique_products.filter(state=0):
+            # Obtener el sector asociado
+            sector = sectores.get(unique_product.location)
+
+            # Verificar si el producto está en un sector válido y si su bodega está permitida
+            if sector and sector.idoffice in valid_bodega_ids and sector.namesector not in ['XT99-99', 'NRN1-1']:
+                stock_total += 1
+                unique_products_data.append({
+                    'superid': unique_product.superid,
+                    'locationname': sector.namesector
+                })
+
         # Serialización de producto principal
         productos_data.append({
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice or 0,  # Default a 0 si no está definido
-            'stock_total': len(unique_products_data),  # Basado en productos únicos
+            'stock_total': stock_total,  # Solo cuenta stock en bodegas válidas
             'unique_products': unique_products_data,
             'prefixed': producto.prefixed or '',  # Campo opcional
             'brands': producto.brands or '',      # Campo opcional
@@ -1390,14 +1396,14 @@ def buscar_productos_por_sector(request):
 @csrf_exempt
 def search_products_by_sector(request):
     if request.method == 'POST':
-        # Parse the JSON body
+        # Parsear el cuerpo JSON
         try:
             body = json.loads(request.body)
-            term = body.get('searchTerm', '')
+            term = body.get('searchTerm', '').strip()
         except json.JSONDecodeError:
-            return JsonResponse({'resp': 3, 'msg': 'Error decoding JSON'})
+            return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON'})
 
-        print(f"Search term received: '{term}'")
+        print(f"Término de búsqueda recibido: '{term}'")
 
         # Verificar si el término tiene el formato correcto, comenzando con 'B-'
         if term.startswith('B-'):
@@ -1413,23 +1419,20 @@ def search_products_by_sector(request):
                 sector = Sectoroffice.objects.filter(namesector=name_sector, idoffice=id_office).first()
 
                 if sector:
-                    print(f"Sector found: {sector.namesector} with id {sector.idsectoroffice}")
+                    print(f"Sector encontrado: {sector.namesector} con id {sector.idsectoroffice}")
 
-                    # Buscar productos en Uniqueproducts asociados al sector encontrado, ordenados por ID
-                    productos = Uniqueproducts.objects.filter(location=sector.idsectoroffice).reverse()
+                    # Buscar productos en Uniqueproducts asociados al sector encontrado, ordenados por ID inverso
+                    productos = Uniqueproducts.objects.filter(location=sector.idsectoroffice).order_by('-id')  # Orden descendente
                     productos_data = []
 
                     for producto in productos:
-                        try:
-                            # Intentar acceder al producto relacionado
-                            productos_data.append({
-                                'superid': producto.superid,
-                                'sku': producto.product.sku if producto.product else "N/A",
-                                'name': producto.product.nameproduct if producto.product else "N/A"
-                            })
-                        except Products.DoesNotExist:
-                            print(f"No related Product found for Uniqueproduct with superid {producto.superid}")
-                            continue  # Ignorar este producto si no tiene un producto relacionado
+                        # Acceder al producto relacionado, manejar errores si no existe
+                        producto_data = {
+                            'superid': producto.superid,
+                            'sku': producto.product.sku if producto.product else "N/A",
+                            'name': producto.product.nameproduct if producto.product else "N/A"
+                        }
+                        productos_data.append(producto_data)
 
                     # Generar la respuesta
                     response_data = {
@@ -1639,58 +1642,82 @@ def anadir_producto_sector(request):
     return JsonResponse({'resp': 3, 'msg': 'Método no permitido.'})
 
 """ CUADRAR SETORES """
-
 @csrf_exempt
 def cuadrar_productos(request):
+    """
+    API para mover productos no escaneados a la bodega 'Narnia'.
+    """
     if request.method == 'POST':
         try:
-            body = json.loads(request.body)  # Decodificar el cuerpo JSON
-            superids = body.get('superids', [])  # Obtener la lista de superids de productos escaneados
-            sector_name = body.get('sector_id', '')  # Obtener el sector donde se está cuadrando
-        except json.JSONDecodeError:
-            return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON'})
+            # Decodificar el cuerpo JSON
+            body = json.loads(request.body)
+            superids = body.get('superids', [])  # Lista de superids escaneados
+            sector_name = body.get('sector_id', '')  # ID del sector a cuadrar
 
-        # Verificar que se proporcionaron los superids y el sector
-        if not superids or not sector_name:
-            return JsonResponse({'resp': 3, 'msg': 'Super IDs y sector son obligatorios.'})
+            if not superids or not sector_name:
+                return JsonResponse({'resp': 3, 'msg': 'Super IDs y sector son obligatorios.'})
+            
+            # Validar sector
+            if 'B-' in sector_name:
+                parts = sector_name.split('-')
+                if len(parts) == 4:
+                    id_office = parts[1]
+                    name_sector = parts[2] + '-' + parts[3]
 
-        # Dividir el sector para obtener idOffice y nameSector
-        if 'B-' in sector_name:
-            parts = sector_name.split('-')
-            if len(parts) == 4:
-                id_office = parts[1]
-                name_sector = parts[2] + '-' + parts[3]
+                    # Buscar el sector
+                    sector = Sectoroffice.objects.filter(namesector=name_sector, idoffice=id_office).first()
+                    if not sector:
+                        return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado.'})
 
-                # Buscar el sector
-                sector = Sectoroffice.objects.filter(namesector=name_sector, idoffice=id_office).first()
-
-                if sector:
-                    # Productos en Narnia
-                    productos_en_narnia = []
-
-                    # Iterar por los productos en el sector actual
-                    productos = Uniqueproducts.objects.filter(location=sector.idsectoroffice)
-
-                    for producto in productos:
+                    # Buscar productos en el sector
+                    productos_en_sector = Uniqueproducts.objects.filter(location=sector.idsectoroffice)
+                    
+                    # Buscar o crear el sector "Narnia"
+                    sector_narnia, created = Sectoroffice.objects.get_or_create(
+                        idsectoroffice=99999,
+                        defaults={
+                            'idoffice': 9999,
+                            'namesector': 'Narnia',
+                            'zone': 'NARN',
+                            'floor': 0,
+                            'section': 0,
+                            'description': 'Sector virtual para productos no escaneados o sin ubicación asignada',
+                            'state': 1,
+                            'namedescriptive': 'Productos no clasificados (Narnia)'
+                        }
+                    )
+                    
+                    productos_movidos = []
+                    
+                    for producto in productos_en_sector:
                         if producto.superid not in superids:
-                            # El producto no fue escaneado, así que lo movemos a "Narnia"
-                            producto.location = get_narnia_id()  # Función que obtiene el ID de Narnia
+                            # Mover producto al sector "Narnia"
+                            producto.location = sector_narnia.idsectoroffice
+                            producto.locationname = sector_narnia.namesector
                             producto.save()
-                            productos_en_narnia.append(producto)
-
-                    if productos_en_narnia:
-                        # Enviar un correo con los productos que fueron enviados a Narnia
-                        enviar_correo_a_narnia(productos_en_narnia, sector)
-
-                    return JsonResponse({'resp': 1, 'msg': 'Cuadratura realizada con éxito.'})
+                            productos_movidos.append({
+                                'superid': producto.superid,
+                                'sku': producto.product.sku if producto.product else None,
+                                'name': producto.product.nameproduct if producto.product else None
+                            })
+                    
+                    return JsonResponse({
+                        'resp': 1,
+                        'msg': 'Productos movidos exitosamente a Narnia.',
+                        'productos_movidos': productos_movidos
+                    })
                 else:
-                    return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado.'})
+                    return JsonResponse({'resp': 3, 'msg': 'Formato de sector incorrecto.'})
             else:
-                return JsonResponse({'resp': 3, 'msg': 'Formato de sector incorrecto.'})
-        else:
-            return JsonResponse({'resp': 3, 'msg': 'El formato del sector no es válido.'})
+                return JsonResponse({'resp': 3, 'msg': 'El formato del sector no es válido.'})
+        
+        except json.JSONDecodeError:
+            return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON.'})
+        except Exception as e:
+            return JsonResponse({'resp': 3, 'msg': f'Error inesperado: {str(e)}'})
 
     return JsonResponse({'resp': 3, 'msg': 'Método no permitido.'})
+
 
 # Función para obtener el ID del sector "Narnia"
 def get_narnia_id():
