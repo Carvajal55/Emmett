@@ -711,7 +711,11 @@ def aprobar_factura(request):
         try:
             # Parsear los datos enviados desde el frontend
             data = json.loads(request.body)
+            factura_id = data.get('factura_id')  # ID de la factura enviada desde el frontend
             detalles = data.get('detalles', [])
+
+            if not factura_id:
+                return JsonResponse({'error': 'No se proporcionó el ID de la factura.'}, status=400)
 
             if not detalles:
                 return JsonResponse({'error': 'No se proporcionaron detalles para actualizar.'}, status=400)
@@ -739,11 +743,20 @@ def aprobar_factura(request):
                     # Agregar los SKUs no encontrados a una lista separada
                     productos_no_encontrados.append(sku)
 
+            # Cambiar el estado de la factura a "Aprobada" (1)
+            try:
+                factura = Purchase.objects.get(id=factura_id)
+                factura.status = 1  # Estado "Aprobada"
+                factura.save()
+            except Purchase.DoesNotExist:
+                return JsonResponse({'error': 'Factura no encontrada.'}, status=404)
+
             # Retornar la respuesta exitosa con los resultados
             return JsonResponse({
                 'message': 'Factura aprobada con éxito.',
                 'productos_actualizados': productos_actualizados,
-                'productos_no_encontrados': productos_no_encontrados
+                'productos_no_encontrados': productos_no_encontrados,
+                'factura_status': factura.status
             }, status=200)
 
         except json.JSONDecodeError:
