@@ -43,38 +43,36 @@
         </div>
     </div>
    <!-- Modal -->
-    <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog" aria-labelledby="modalPreciosLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalPreciosLabel">Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+   <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog" aria-labelledby="modalPreciosLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalPreciosLabel">Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div v-for="(precio, index) in listasPrecios" :key="index" class="form-group">
+                    <label :for="'precio-' + precio.id">[[ precio.label ]]</label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        v-model="precio.valor"
+                        @input="recalcularMargen(precio)"
+                        :id="'precio-' + precio.id"
+                        placeholder="Ingrese precio"
+                    />
+                    <p><strong>Margen:</strong> [[ precio.margen || 0 ]]%</p>
+                    <button class="btn btn-primary mt-2" @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)">
+                        Guardar para [[ precio.label ]]
                     </button>
                 </div>
-                <div class="modal-body">
-                    <div v-for="(precio, index) in listasPrecios" :key="index" class="form-group">
-                        <label :for="'precio-' + precio.id">[[ precio.label ]]</label>
-                        <input
-                            type="number"
-                            class="form-control"
-                            v-model="precio.valor"
-                            @input="recalcularMargen(precio)"
-                            :id="'precio-' + precio.id"
-                            placeholder="Ingrese precio"
-                        />
-                        <p><strong>Margen:</strong> [[ precio.margen || 0 ]]%</p>
-                        <button class="btn btn-primary mt-2" @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)">
-                            Guardar para [[ precio.label ]]
-                        </button>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>
+</div>
 
     <!-- Detalles de la factura -->
     <table v-if="detalles.length > 0" class="table table-striped">
@@ -85,7 +83,7 @@
                 <th>PRODUCTO</th>
                 <th>CANTIDAD</th>
                 <th>COSTO</th>
-                <!-- <th>ÚLTIMO COSTO</th> -->
+                <th>ÚLTIMO COSTO</th>
                 <th>ÚLTIMO PRECIO</th>
                 <th>PRECIO BSALE</th> <!-- Nueva columna -->
                 <th>TOTAL</th>
@@ -101,7 +99,7 @@
                 <td>[[ detalle.model ]]</td>
                 <td>[[ detalle.qty ]]</td>
                 <td>[[ formatCurrency(detalle.cost) ]]</td>
-                <!-- <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td> --> <!-- lastCost -->
+                <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td> <!-- lastCost -->
                 <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td> <!-- lastPrice -->
                 <td>[[ formatCurrency(detalle.bsalePrice || 0) ]]</td> <!-- bsalePrice -->
                 <td>[[ formatCurrency(calcularTotal(detalle.cost, detalle.qty)) ]]</td>
@@ -215,7 +213,7 @@
                 }
 
                 const data = {
-                    idERP: detalle.idERP,
+                    iderp: detalle.iderp,
                     sku: detalle.sku,
                     //type: 3, // Lista base Bsale Emmett DEV
                     type: 2,
@@ -293,8 +291,16 @@
                         this.$set(detalle, "lastCost", parseFloat(response.data.lastCost) || 0);
                         this.$set(detalle, "lastPrice", parseFloat(response.data.lastPrice) || 0);
                         this.$set(detalle, "bsalePrice", response.data.bsalePrice || "No disponible");
+                        this.$set(detalle, "precioBase", response.data.bsalePrice || 0); // Asegura que sea un número válido
 
-                        console.log("Detalle actualizado:", detalle); // Verifica los valores asignados
+                        // Solo llama a calcularMargen si los datos son válidos
+                        if (detalle.cost && detalle.precioBase) {
+                            this.calcularMargen(detalle);
+                        } else {
+                            console.warn(`No se puede calcular margen: faltan datos para el detalle con SKU ${detalle.sku}`);
+                        }
+
+                        console.log("Detalle actualizado con margen:", detalle); // Verifica los valores asignados
                     })
                     .catch(error => {
                         console.error("Error al obtener datos del producto:", error);
@@ -303,6 +309,8 @@
                         this.$set(detalle, "lastCost", 0);
                         this.$set(detalle, "lastPrice", 0);
                         this.$set(detalle, "bsalePrice", "No disponible");
+                        this.$set(detalle, "precioBase", 0); // Precio base predeterminado
+                        this.$set(detalle, "margen", 0); // Margen predeterminado
                     });
             },
             formatCurrency(value) {
@@ -337,27 +345,37 @@
                 if (precioBaseNeto > 0) {
                     const margen = ((precioBaseNeto - costoNeto) / precioBaseNeto) * 100; // Fórmula del margen
                     detalle.margen = margen.toFixed(2); // Redondea a 2 decimales
+
+                    // Imprime los valores utilizados en la ecuación
+                    console.log(`Cálculo del margen para SKU ${detalle.sku}:`);
+                    console.log(`Costo Neto: ${costoNeto}, Precio Base Neto: ${precioBaseNeto}`);
+                    console.log(`Margen calculado: ${margen}%`);
                 } else {
                     detalle.margen = 0; // Si el precio base neto es 0, el margen también lo es
+
+                    // Imprime un mensaje si no es posible calcular el margen
+                    console.log(`No se puede calcular el margen para SKU ${detalle.sku}: Precio Base Neto es 0.`);
                 }
-                console.log(`Margen calculado para SKU ${detalle.sku}:`, detalle.margen);
             },
             // Función para obtener los detalles de la factura
             obtenerFactura() {
-                console.log("Obteniendo factura con ID:", this.idFactura); // Log para verificar el ID
+                console.log("Obteniendo factura con ID:", this.idFactura);
 
                 let formData = new FormData();
-                formData.append("id", this.idFactura); // Pasar el ID de la factura
+                formData.append("id", this.idFactura);
 
                 axios.post("/api/obtener_factura/", formData)
                     .then(response => {
                         this.factura = response.data; // Asignar los datos de la factura
-                        this.detalles = response.data.details; // Asignar los detalles
+                        this.detalles = response.data.details.map(detalle => ({
+                            ...detalle,
+                            precioBase: detalle.bsalePrice || '000' // Precargar el precio base con el valor de bsalePrice
+                        }));
                         console.log("Datos de la factura:", response.data);
 
-                        // Llamar a obtenerDatosProducto para cada detalle una vez que se hayan cargado
+                        // Llamar a obtenerDatosProducto para cada detalle
                         this.detalles.forEach(detalle => {
-                            this.obtenerDatosProducto(detalle); // Aquí llamamos a obtenerDatosProducto
+                            this.obtenerDatosProducto(detalle);
                         });
                     })
                     .catch(error => {
