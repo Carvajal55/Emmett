@@ -432,7 +432,9 @@ def producto_detalles(request, product_id):
 def actualizar_precio(request):
     try:
         # Cargar los datos enviados por el frontend
+        print("Inicio de la función 'actualizar_precio'")
         data = json.loads(request.body)
+        print(f"Datos recibidos: {data}")
 
         id_erp = data.get('iderp')
         sku = data.get('sku')
@@ -441,6 +443,7 @@ def actualizar_precio(request):
 
         # Validar los datos recibidos
         if not id_erp or not sku or not b_price or not type:
+            print("Error: Datos incompletos")
             return JsonResponse({'error': 'Datos incompletos'}, status=400)
 
         # Paso 1: Construir el URL para obtener los costos en Bsale
@@ -449,16 +452,22 @@ def actualizar_precio(request):
             'access_token': BSALE_API_TOKEN,  # Usar 'access_token' en lugar de 'Authorization'
             'Content-Type': 'application/json'
         }
+        print(f"URL de consulta de costos: {url_costs}")
+        print(f"Headers enviados: {headers}")
 
         # Realizar la solicitud GET para obtener información del documento
         response = requests.get(url_costs, headers=headers)
+        print(f"Respuesta de la consulta GET: {response.status_code}")
+        print(f"Contenido de la respuesta GET: {response.text}")
 
         # Verificar el estado de la respuesta
         if response.status_code != 200:
+            print("Error al obtener datos de Bsale")
             return JsonResponse({'error': 'Error al obtener datos de Bsale', 'detalle': response.text}, status=response.status_code)
 
         # Procesar los datos recibidos de Bsale
         bsale_data = response.json()
+        print(f"Datos procesados de Bsale: {bsale_data}")
         items = bsale_data.get('items', [])
         if items:
             product_id = items[0].get('id')
@@ -469,7 +478,7 @@ def actualizar_precio(request):
 
         # Paso 2: Construir la URL para actualizar el precio en Bsale
         url_update_price = f"{BSALE_API_URL}/price_lists/{type}/details/{product_id}.json"
-        print(url_update_price)
+        print(f"URL para actualizar precio: {url_update_price}")
 
         # Paso 3: Calcular el precio base sin IVA
         variant_value = float(b_price) / 1.19  # Convertir b_price a float antes de dividir
@@ -477,29 +486,40 @@ def actualizar_precio(request):
             'variantValue': variant_value,
             "id": product_id
         }
+        print(f"Datos para la actualización (PUT): {update_data}")
 
         # Paso 4: Realizar la solicitud PUT para actualizar el precio
         put_response = requests.put(url_update_price, headers=headers, json=update_data)
+        print(f"Respuesta de la solicitud PUT: {put_response.status_code}")
+        print(f"Contenido de la respuesta PUT: {put_response.text}")
 
         # Verificar el estado de la solicitud PUT
         if put_response.status_code != 200:
+            print("Error al actualizar el precio en Bsale")
             return JsonResponse({'error': 'Error al actualizar el precio en Bsale', 'detalle': put_response.text}, status=put_response.status_code)
 
         # Obtener la respuesta de la actualización
         updated_data = put_response.json()
+        print(f"Datos actualizados en Bsale: {updated_data}")
 
         # Paso 5: Actualizar el lastPrice en la base de datos local
         from .models import Products  # Importa el modelo si no está ya importado
         try:
+            print(f"Buscando el producto con SKU: {sku}")
             product = Products.objects.get(sku=sku)
+            print(f"Producto encontrado: {product}")
             product.lastprice = float(b_price)  # Convertir b_price a float
             product.save()
+            print(f"Producto actualizado en la base de datos local: {product}")
         except ValueError:
+            print(f"Error: El valor proporcionado para lastprice ({b_price}) no es válido")
             return JsonResponse({'error': f'El valor proporcionado para lastprice ({b_price}) no es válido.'}, status=400)
         except Products.DoesNotExist:
+            print(f"Error: Producto con SKU {sku} no encontrado en la base de datos local")
             return JsonResponse({'error': f'Producto con SKU {sku} no encontrado en la base de datos'}, status=404)
 
         # Retornar la respuesta exitosa
+        print("Precio actualizado correctamente")
         return JsonResponse({
             'message': 'Precio actualizado correctamente en Bsale y lastPrice actualizado en la base de datos local',
             'bsale_data': bsale_data,
@@ -507,8 +527,10 @@ def actualizar_precio(request):
         }, status=200)
 
     except json.JSONDecodeError:
+        print("Error: Datos inválidos")
         return JsonResponse({'error': 'Datos inválidos'}, status=400)
     except Exception as e:
+        print(f"Error inesperado: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
 def listar_compras(request):
@@ -686,21 +708,49 @@ def rechazar_factura(request):
 @csrf_exempt
 def aprobar_factura(request):
     if request.method == 'POST':
-        # Revisar si el id está en el POST
-        factura_id = request.POST.get('id')
-        if not factura_id:
-            return JsonResponse({'error': 'ID de factura no proporcionado.'}, status=400)
-
         try:
-            # Buscar la factura con el ID proporcionado
-            factura = Purchase.objects.get(id=factura_id)
-            # Cambiar el estado a "Aprobada"
-            factura.status = 1
-            factura.save()
-            return JsonResponse({'message': 'Factura aprobada con éxito.'})
-        except Purchase.DoesNotExist:
-            # Si no se encuentra la factura, devolver un mensaje de error
-            return JsonResponse({'error': 'Factura no encontrada.'}, status=404)
+            # Parsear los datos enviados desde el frontend
+            data = json.loads(request.body)
+            detalles = data.get('detalles', [])
+
+            if not detalles:
+                return JsonResponse({'error': 'No se proporcionaron detalles para actualizar.'}, status=400)
+
+            # Lista para almacenar los resultados
+            productos_actualizados = []
+            productos_no_encontrados = []
+
+            for detalle in detalles:
+                sku = detalle.get('sku')
+                costo = detalle.get('cost')
+
+                if not sku or costo is None:
+                    continue  # Ignorar detalles incompletos
+
+                try:
+                    # Buscar el producto por SKU y actualizar el costo
+                    producto = Products.objects.get(sku=sku)
+                    producto.lastcost = float(costo)
+                    producto.save()
+
+                    # Agregar el producto a la lista de actualizados
+                    productos_actualizados.append({'sku': producto.sku, 'lastcost': producto.lastcost})
+                except Products.DoesNotExist:
+                    # Agregar los SKUs no encontrados a una lista separada
+                    productos_no_encontrados.append(sku)
+
+            # Retornar la respuesta exitosa con los resultados
+            return JsonResponse({
+                'message': 'Factura aprobada con éxito.',
+                'productos_actualizados': productos_actualizados,
+                'productos_no_encontrados': productos_no_encontrados
+            }, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Datos enviados no son válidos.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 @csrf_exempt
@@ -877,6 +927,7 @@ def create_supplier(request):
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 from .models import Products, Brand
+from datetime import datetime
 
 @csrf_exempt
 def crear_producto(request):

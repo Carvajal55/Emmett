@@ -178,7 +178,7 @@
                 }
 
                 const data = {
-                    idERP: detalle.idERP,
+                    iderp: detalle.iderp,
                     sku: detalle.sku,
                     type: type, // ID de la lista
                     bPrice: bPrice
@@ -421,12 +421,17 @@
             },
             // Función para aprobar la factura
             aprobarFactura() {
-                let formData = new FormData();
-                formData.append('id', this.idFactura);
+                const detalles = this.detalles.map(detalle => ({
+                    sku: detalle.sku,
+                    cost: detalle.cost
+                }));
 
-                axios.post('/api/aprobar-factura/', formData)
+                axios.post('/api/aprobar-factura/', { detalles })
                     .then(response => {
                         console.log(response.data.message);
+                        console.log('Productos actualizados:', response.data.productos_actualizados);
+                        console.log('Productos no encontrados:', response.data.productos_no_encontrados);
+
                         Swal.fire({
                             title: 'Factura Aprobada',
                             text: 'La factura ha sido aprobada con éxito.',
