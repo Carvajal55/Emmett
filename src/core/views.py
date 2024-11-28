@@ -44,6 +44,8 @@ from datetime import datetime, timedelta
 import qrcode
 import io
 from dotenv import load_dotenv
+import datetime
+
 
 
 # Carga el archivo .env
