@@ -53,6 +53,7 @@ load_dotenv()
 
 # Obtiene el token desde las variables de entorno
 BSALE_API_TOKEN = os.getenv('BSALE_API_TOKEN')
+BSALE_API_URL = "https://api.bsale.cl/v1"  # URL base de Bsale
 
 
 
@@ -433,7 +434,7 @@ def actualizar_precio(request):
         # Cargar los datos enviados por el frontend
         data = json.loads(request.body)
 
-        id_erp = data.get('idERP')
+        id_erp = data.get('iderp')
         sku = data.get('sku')
         b_price = data.get('bPrice')
         type = data.get('type')
@@ -1130,7 +1131,7 @@ def get_products(request):
     # Filtrar productos según la búsqueda por SKU o nombre
     products = Products.objects.filter(
         Q(sku__icontains=query) | Q(nameproduct__icontains=query)
-    ).values('id', 'sku', 'nameproduct', 'brands', 'codebar', 'lastprice')
+    ).values('id', 'sku', 'nameproduct', 'brands', 'codebar', 'lastprice','iderp')
 
     # Crear paginador
     paginator = Paginator(products, page_size)
@@ -2229,7 +2230,6 @@ def dispatch_consumption(request):
 
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
 
-BSALE_API_URL = "https://api.bsale.cl/v1"  # URL base de Bsale
 #BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
 
 
@@ -2893,7 +2893,9 @@ BSALE_API_TOKEN = 'BSALE_API_TOKEN' """
 def obtener_datos_producto(request):
     if request.method == "POST":
         sku = request.POST.get("sku")
-        price_list_id = 3  # ID fijo de la lista de precios
+        #price_list_id = 3  # ID fijo de la lista de precios Emmett
+        price_list_id = 2  # ID fijo de la lista de precios Soundstore
+
 
         if not sku:
             return JsonResponse({"error": "El SKU es obligatorio"}, status=400)

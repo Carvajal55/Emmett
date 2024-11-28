@@ -221,6 +221,8 @@
 
         <!-- Campo de búsqueda de proveedor -->
         <div>
+            <h3>Buscar Proveedor</h3>
+
             <!-- Campo de búsqueda -->
             <input 
                 type="text" 
@@ -540,6 +542,7 @@
             nuevoProducto: {
                 marcaBusqueda: '',
                 marcaSeleccionada: null,
+                costo: null,
                 sku: '',
                 nombre: '',
                 marca: '',
@@ -802,6 +805,7 @@
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
             agregarProducto(producto) {
+                console.log(producto.iderp)
                 const productoExistente = this.productosDocumento.find(p => p.sku === producto.sku);
                 if (productoExistente) {
                     Swal.fire({
@@ -814,8 +818,9 @@
                     const nuevoProducto = {
                         model: producto.nameproduct,
                         sku: producto.sku,
+                        iderp:producto.iderp,
                         cantidad: 1, // Cantidad esperada, inicializada con 1
-                        costo: 0, // Precio del producto
+                        costo: null, // Precio del producto
                         descuento: descuentoGeneral, // Asignar el descuento general al producto
                         entrega: false,
                         received_quantity: 0, // Cantidad recibida inicialmente en 0
@@ -992,6 +997,7 @@
                     });
             },
             enviarDatos() {
+
                 const jsonData = {
                     headers: {
                         supplier: this.form.rutProveedor,
@@ -1023,7 +1029,7 @@
                         deliveryItem: producto.entrega,
                         checkItem: producto.entrega ? "true" : "false",
                         sku: producto.sku,
-                        idERP: "",
+                        iderp:producto.iderp || "",
                         model: producto.model,
                         idPro: ""
                     })),
