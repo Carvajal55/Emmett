@@ -953,7 +953,7 @@ def crear_producto(request):
         precio = data.get("precio")
         marca = data.get("marca")
         proveedor_id = data.get("proveedor")
-        categoria = data.get("categoria")  # Obtiene la categoría desde los datos del frontend
+        categoria = data.get("categoria")
         alto = data.get("alto")
         largo = data.get("largo")
         profundidad = data.get("profundidad")
@@ -981,10 +981,10 @@ def crear_producto(request):
             "code": sku,
             "barCode": bar_code,
             "price": precio,
-            "height": alto,  # Alto en cm
-            "width": largo,  # Largo en cm (ancho)
-            "depth": profundidad,  # Profundidad en cm
-            "weight": peso  # Peso en kg
+            "height": alto,
+            "width": largo,
+            "depth": profundidad,
+            "weight": peso
         }
 
         headers = {
@@ -993,29 +993,10 @@ def crear_producto(request):
         }
 
         # Crear el Producto en Bsale
-        print("Enviando datos para crear producto en Bsale:", bsale_product_data)
         response_product = requests.post(f"{BSALE_API_URL}/products.json", json=bsale_product_data, headers=headers)
-        print("Respuesta de creación de producto:", response_product.status_code, response_product.json())
-        
+
         if response_product.status_code == 201:
             bsale_product = response_product.json()
-
-            # Guardar el producto en la base de datos local
-            nuevo_producto = Products.objects.create(
-                sku=sku,
-                nameproduct=nombre_producto,
-                brands=marca,
-                codebar=bar_code,
-                iderp=bsale_product["id"],  # Guardamos el id de Bsale en la base de datos
-                lastprice=precio,
-                codsupplier=proveedor_id,
-                createdate=datetime.now().date(),
-                alto=alto,
-                largo=largo,
-                profundidad=profundidad,
-                peso=peso,
-            )
-            print("Producto guardado en base de datos local:", nuevo_producto)
 
             # Crear la Variante en Bsale asociada al producto
             bsale_variant_data = {
@@ -1027,14 +1008,26 @@ def crear_producto(request):
                 "allowNegativeStock": 0
             }
 
-            print("Enviando datos para crear variante en Bsale:", bsale_variant_data)
             response_variant = requests.post(f"{BSALE_API_URL}/variants.json", json=bsale_variant_data, headers=headers)
-            print("Respuesta de creación de variante:", response_variant.status_code, response_variant.json())
 
-            # Verificar si la variante fue creada correctamente
             if response_variant.status_code == 201:
                 bsale_variant = response_variant.json()
-                print("Variante creada en Bsale con éxito:", bsale_variant)
+
+                # Guardar el producto en la base de datos local con el idERP como el ID de la variante
+                nuevo_producto = Products.objects.create(
+                    sku=sku,
+                    nameproduct=nombre_producto,
+                    brands=marca,
+                    codebar=bar_code,
+                    iderp=bsale_variant["id"],  # ID de la variante en lugar del producto
+                    lastprice=precio,
+                    codsupplier=proveedor_id,
+                    createdate=datetime.now().date(),
+                    alto=alto,
+                    largo=largo,
+                    profundidad=profundidad,
+                    peso=peso,
+                )
 
                 return JsonResponse({"message": "Producto y variante creados exitosamente", "product": nuevo_producto.sku, "variant_id": bsale_variant["id"]}, status=201)
             else:
@@ -2958,8 +2951,8 @@ BSALE_API_TOKEN = 'BSALE_API_TOKEN' """
 def obtener_datos_producto(request):
     if request.method == "POST":
         sku = request.POST.get("sku")
-        #price_list_id = 3  # ID fijo de la lista de precios Emmett
-        price_list_id = 2  # ID fijo de la lista de precios Soundstore
+        price_list_id = 3  # ID fijo de la lista de precios Emmett
+        #price_list_id = 2  # ID fijo de la lista de precios Soundstore
 
 
         if not sku:
