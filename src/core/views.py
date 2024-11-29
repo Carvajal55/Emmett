@@ -436,26 +436,25 @@ def actualizar_precio(request):
         data = json.loads(request.body)
         print(f"Datos recibidos: {data}")
 
-        id_erp = data.get('iderp')
+        id_erp = data.get('iderp')  # ID de la variante
         sku = data.get('sku')
-        b_price = data.get('bPrice')
-        type = data.get('type')
+        b_price = data.get('bPrice')  # Precio bruto con impuestos
+        type = data.get('type')  # Tipo de lista de precios
 
         # Validar los datos recibidos
         if not id_erp or not sku or not b_price or not type:
             print("Error: Datos incompletos")
             return JsonResponse({'error': 'Datos incompletos'}, status=400)
 
-        # Paso 1: Construir el URL para obtener los costos en Bsale
+        # Paso 1: Construir el URL para obtener los detalles del precio en Bsale
         url_costs = f"{BSALE_API_URL}/price_lists/{type}/details.json?variantid={id_erp}"
         headers = {
-            'access_token': BSALE_API_TOKEN,  # Usar 'access_token' en lugar de 'Authorization'
+            'access_token': BSALE_API_TOKEN,
             'Content-Type': 'application/json'
         }
         print(f"URL de consulta de costos: {url_costs}")
-        print(f"Headers enviados: {headers}")
 
-        # Realizar la solicitud GET para obtener información del documento
+        # Realizar la solicitud GET para obtener información del detalle
         response = requests.get(url_costs, headers=headers)
         print(f"Respuesta de la consulta GET: {response.status_code}")
         print(f"Contenido de la respuesta GET: {response.text}")
@@ -467,24 +466,28 @@ def actualizar_precio(request):
 
         # Procesar los datos recibidos de Bsale
         bsale_data = response.json()
-        print(f"Datos procesados de Bsale: {bsale_data}")
         items = bsale_data.get('items', [])
-        if items:
-            product_id = items[0].get('id')
-            print(f"ID del producto en el primer ítem: {product_id}")
-        else:
+        if not items:
             print("No se encontraron ítems en la respuesta de Bsale")
             return JsonResponse({'error': 'No se encontró ningún ítem en la respuesta de Bsale'}, status=404)
 
+        # Obtener id_detalle desde el primer ítem
+        id_detalle = items[0].get('id')
+        if not id_detalle:
+            print("Error: No se encontró id_detalle en la respuesta")
+            return JsonResponse({'error': 'No se encontró id_detalle en la respuesta de Bsale'}, status=404)
+
+        print(f"ID detalle obtenido: {id_detalle}")
+
         # Paso 2: Construir la URL para actualizar el precio en Bsale
-        url_update_price = f"{BSALE_API_URL}/price_lists/{type}/details/{product_id}.json"
+        url_update_price = f"{BSALE_API_URL}/price_lists/{type}/details/{id_detalle}.json"
         print(f"URL para actualizar precio: {url_update_price}")
 
         # Paso 3: Calcular el precio base sin IVA
-        variant_value = float(b_price) / 1.19  # Convertir b_price a float antes de dividir
+        variant_value = float(b_price) / 1.19
         update_data = {
             'variantValue': variant_value,
-            "id": product_id
+            "id": id_detalle
         }
         print(f"Datos para la actualización (PUT): {update_data}")
 
@@ -508,21 +511,20 @@ def actualizar_precio(request):
             print(f"Buscando el producto con SKU: {sku}")
             product = Products.objects.get(sku=sku)
             print(f"Producto encontrado: {product}")
-            product.lastprice = float(b_price)  # Convertir b_price a float
+            product.lastprice = float(b_price)
             product.save()
             print(f"Producto actualizado en la base de datos local: {product}")
-        except ValueError:
-            print(f"Error: El valor proporcionado para lastprice ({b_price}) no es válido")
-            return JsonResponse({'error': f'El valor proporcionado para lastprice ({b_price}) no es válido.'}, status=400)
         except Products.DoesNotExist:
             print(f"Error: Producto con SKU {sku} no encontrado en la base de datos local")
             return JsonResponse({'error': f'Producto con SKU {sku} no encontrado en la base de datos'}, status=404)
+        except ValueError:
+            print(f"Error: El valor proporcionado para lastprice ({b_price}) no es válido")
+            return JsonResponse({'error': f'El valor proporcionado para lastprice ({b_price}) no es válido.'}, status=400)
 
         # Retornar la respuesta exitosa
         print("Precio actualizado correctamente")
         return JsonResponse({
             'message': 'Precio actualizado correctamente en Bsale y lastPrice actualizado en la base de datos local',
-            'bsale_data': bsale_data,
             'updated_data': updated_data
         }, status=200)
 
@@ -532,7 +534,6 @@ def actualizar_precio(request):
     except Exception as e:
         print(f"Error inesperado: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
-
 def listar_compras(request):
     # Obtener parámetros de filtro y paginación desde el request
     status = request.GET.get('status')  # Aceptará '0', '1', '2', '3' o 'all'

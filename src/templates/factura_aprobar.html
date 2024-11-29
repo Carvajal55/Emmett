@@ -281,7 +281,7 @@
 
                 let formData = new FormData();
                 formData.append("sku", detalle.sku);
-                formData.append("price_list_id", 3); // Enviar la lista de precios fija (3)
+                formData.append("price_list_id", 2); // Enviar la lista de precios fija (3)
 
                 axios.post("/api/obtener_datos_producto/", formData)
                     .then(response => {
