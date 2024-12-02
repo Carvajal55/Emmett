@@ -90,6 +90,9 @@
                 <th>PRECIO BASE</th>
                 <th>MARGEN</th>
                 <th>Accion</th>
+                <button class="btn btn-primary mb-3" @click="actualizarPreciosBaseMasivo">
+                    Actualizar Todos los Precios Base
+                </button>
             </tr>
         </thead>
         <tbody>
@@ -456,6 +459,53 @@
                 const idFactura = urlParts[urlParts.length - 2];  // El ID de la factura está en la penúltima parte de la URL
                 return idFactura;
             },
+            actualizarPreciosBaseMasivo() {
+                // Validar si hay detalles en la lista
+                if (this.detalles.length === 0) {
+                    Swal.fire({
+                        title: 'Error',
+                        text: 'No hay productos en la lista para actualizar.',
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+                    return;
+                }
+
+                // Preparar los datos para enviar al backend
+                const data = this.detalles.map(detalle => {
+                    if (!detalle.precioBase) {
+                        console.warn(`El producto con SKU ${detalle.sku} no tiene precio base.`);
+                    }
+                    return {
+                        iderp: detalle.iderp,
+                        sku: detalle.sku,
+                        type: 3, // Lista base Bsale Emmett DEV
+                        bPrice: detalle.precioBase || 0 // Asegurar que siempre haya un valor
+                    };
+                });
+
+                // Enviar solicitud al backend
+                axios.post('/api/actualizar_precio_masivo/', { detalles: data })
+                    .then(response => {
+                        console.log('Precios base actualizados correctamente:', response.data);
+                        Swal.fire({
+                            title: 'Éxito',
+                            text: 'Todos los precios base se actualizaron correctamente.',
+                            icon: 'success',
+                            confirmButtonText: 'OK'
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error al actualizar los precios base masivamente:', error);
+                        Swal.fire({
+                            title: 'Error',
+                            text: 'Hubo un problema al actualizar los precios base.',
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        });
+                    });
+            }
+
         },
         mounted() {
             console.log("Componente montado");  // Verificar que el mounted se ejecuta

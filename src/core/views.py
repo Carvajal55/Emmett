@@ -842,6 +842,92 @@ def obtener_factura(request):
 """ Ingresar Documentos """
 
 @csrf_exempt
+def actualizar_precio_masivo(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            detalles = data.get('detalles', [])
+
+            if not detalles:
+                return JsonResponse({'status': 'error', 'message': 'No se proporcionaron detalles para actualizar.'}, status=400)
+
+            errores = []
+            actualizados = []
+
+            for detalle in detalles:
+                id_erp = detalle.get('iderp')
+                sku = detalle.get('sku')
+                b_price = detalle.get('bPrice')
+                type = detalle.get('type', 3)  # Lista base predeterminada
+
+                if not id_erp or not sku or not b_price:
+                    errores.append({'sku': sku, 'message': 'Datos incompletos'})
+                    continue
+
+                try:
+                    # Paso 1: Consultar el detalle de la lista de precios en Bsale
+                    url_costs = f"{BSALE_API_URL}/price_lists/{type}/details.json?variantid={id_erp}"
+                    headers = {
+                        'access_token': BSALE_API_TOKEN,
+                        'Content-Type': 'application/json'
+                    }
+
+                    response = requests.get(url_costs, headers=headers)
+                    if response.status_code != 200:
+                        errores.append({'sku': sku, 'message': 'Error al obtener datos de Bsale'})
+                        continue
+
+                    bsale_data = response.json()
+                    items = bsale_data.get('items', [])
+                    if not items:
+                        errores.append({'sku': sku, 'message': 'No se encontró ningún ítem en Bsale'})
+                        continue
+
+                    id_detalle = items[0].get('id')
+                    if not id_detalle:
+                        errores.append({'sku': sku, 'message': 'No se encontró id_detalle en Bsale'})
+                        continue
+
+                    # Paso 2: Actualizar el precio en Bsale
+                    url_update_price = f"{BSALE_API_URL}/price_lists/{type}/details/{id_detalle}.json"
+                    variant_value = float(b_price) / 1.19
+                    update_data = {'variantValue': variant_value, "id": id_detalle}
+
+                    put_response = requests.put(url_update_price, headers=headers, json=update_data)
+                    if put_response.status_code != 200:
+                        errores.append({'sku': sku, 'message': 'Error al actualizar el precio en Bsale'})
+                        continue
+
+                    # Paso 3: Actualizar el precio en la base de datos local
+                    try:
+                        product = Products.objects.get(sku=sku)
+                        product.lastprice = float(b_price)
+                        product.save()
+                        actualizados.append({'sku': sku, 'message': 'Precio actualizado correctamente'})
+                    except Products.DoesNotExist:
+                        errores.append({'sku': sku, 'message': 'Producto no encontrado en la base de datos local'})
+                    except ValueError:
+                        errores.append({'sku': sku, 'message': f'Valor inválido para Precio Base: {b_price}'})
+
+                except Exception as e:
+                    errores.append({'sku': sku, 'message': f'Error inesperado: {str(e)}'})
+
+            # Respuesta final
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Precios procesados.',
+                'actualizados': actualizados,
+                'errores': errores
+            }, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Datos inválidos'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+
+@csrf_exempt
 def create_category(request):
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -2475,12 +2561,8 @@ def imprimir_etiqueta(request):
         codebar = request.POST.get('codebar', '')
         url_json = request.POST.get('urlJson')  # Ruta del archivo JSON
 
-         # Verificar que el SKU, cantidad y URL del JSON sean válidos
+        # Validaciones iniciales
         if not sku or qty <= 0 or not url_json:
-            return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
-        
-        # Verificar que el SKU y la cantidad sean válidos
-        if not sku or qty <= 0:
             return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
 
         # Obtener el producto correspondiente del modelo Products
@@ -2498,7 +2580,11 @@ def imprimir_etiqueta(request):
         # Obtener el último correlativo y SuperID para el producto
         last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
-        base_superid = last_unique_product.superid[:-len(str(last_unique_product.correlative))] if last_unique_product else sku
+        base_numeric_sku = ''.join(filter(str.isdigit, sku))  # Extraer números del SKU
+        if not base_numeric_sku:
+            return JsonResponse({'error': 'El SKU no contiene números válidos.'}, status=400)
+
+        base_superid = f"{base_numeric_sku}e"
 
         # Crear el PDF con tamaño 10.2 cm x 5 cm
         page_width, page_height = 102 * mm, 50 * mm
@@ -2506,11 +2592,11 @@ def imprimir_etiqueta(request):
 
         super_ids = []
         for i in range(qty):
-            # Calcular el SuperID y actualizar el correlativo
-            super_id = f"{base_superid}{current_correlative}"
+            # Generar SuperID
+            super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
             super_ids.append(super_id)
 
-            # Parte izquierda de la etiqueta
+            # Parte izquierda de la etiqueta (SKU y código de barras horizontal)
             x_sku_left, y_sku_left = 5 * mm, 35 * mm
             barcode_sku_left = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
             barcode_sku_left.drawOn(pdf, x_sku_left, y_sku_left)
@@ -2523,8 +2609,6 @@ def imprimir_etiqueta(request):
             x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -2 * mm
             barcode_superid_left = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
             barcode_superid_left.drawOn(pdf, y_superid_rotated_left, -x_superid_rotated_left)
-
-            # Rotar el texto del SuperID
             pdf.setFont("Helvetica", 6)
             pdf.drawString(y_superid_rotated_left + 15, -x_superid_rotated_left - 15, f"SuperID: {super_id}")
             pdf.restoreState()
@@ -2535,15 +2619,13 @@ def imprimir_etiqueta(request):
                 barcode_sku_right = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
                 barcode_sku_right.drawOn(pdf, x_sku_right, y_sku_right)
                 pdf.setFont("Helvetica", 6)
-                pdf.drawString(x_sku_right + 20 , y_sku_right - 10, f"SKU: {sku}")
+                pdf.drawString(x_sku_right + 20, y_sku_right - 10, f"SKU: {sku}")
 
                 pdf.saveState()
                 pdf.rotate(90)
                 x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -2 * mm
                 barcode_superid_right = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
                 barcode_superid_right.drawOn(pdf, y_superid_rotated_right, -x_superid_rotated_right)
-
-                # Rotar el texto del SuperID
                 pdf.setFont("Helvetica", 6)
                 pdf.drawString(y_superid_rotated_right + 15, -x_superid_rotated_right - 15, f"SuperID: {super_id}")
                 pdf.restoreState()
@@ -2559,59 +2641,43 @@ def imprimir_etiqueta(request):
                 observation="Etiqueta generada automáticamente"
             )
 
-            # Incrementar el correlativo para el siguiente
+            # Incrementar el correlativo
             current_correlative += 1
 
-            # Añadir una nueva página solo si es necesario (después de imprimir ambos productos en la página actual)
+            # Añadir una nueva página si es necesario
             if i % 2 == 1 and i < qty - 1:
                 pdf.showPage()
 
         pdf.save()
 
-        # Modificar el archivo JSON para marcar los productos como impresos
+        # Modificar el archivo JSON para marcar el producto como impreso
         try:
             with open(url_json, 'r+') as json_file:
                 data = json.load(json_file)
-                # Cambiar el atributo `printed` a True para todos los detalles
                 for detail in data.get('details', []):
                     if detail.get('sku') == sku:
                         detail['printed'] = True
-                
-                # Cambiar el estado general del invoice a "printed"
-                data['invoice_printed'] = True
-                data['type'] = 3
-                
-                # Sobrescribir el archivo JSON con los cambios
                 json_file.seek(0)
                 json.dump(data, json_file, indent=4)
                 json_file.truncate()
-        except FileNotFoundError:
-            return JsonResponse({'error': 'El archivo JSON no existe.'}, status=404)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Error al leer o modificar el archivo JSON.'}, status=400)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            return JsonResponse({'error': f'Error al procesar el archivo JSON: {str(e)}'}, status=400)
 
-        # Llamar a `registrar_recepcion_stock` con `sku` y `qty`
-        response_stock = registrar_recepcion_stock(request, sku, qty)
-
-        # Verificar el estado de la respuesta para mostrar en el mensaje final
-        if response_stock.status_code == 200:
-            msg_stock = "Stock registrado en Bsale con éxito."
-        else:
-            msg_stock = f"Error al registrar stock en Bsale: {response_stock.json().get('msg', 'Error desconocido')}"
-        # Actualizar el estado de la factura en el modelo `Purchase`
+        # Actualizar el estado de la factura si todos los productos están impresos
         try:
-            factura = Purchase.objects.get(urljson=url_json)  # O usa otro campo, como `number`
-            factura.status = 3  # Cambiar el estado a "procesado"
-            factura.save()
+            factura = Purchase.objects.get(urljson=url_json)
+            if all(detail.get('printed') for detail in data.get('details', [])):
+                factura.status = 3  # Procesado
+                factura.save()
         except Purchase.DoesNotExist:
-            return JsonResponse({'error': 'Factura no encontrada para actualizar el estado.'}, status=404)
-        # Devolver la URL del archivo creada, superid, y el estado de la recepción de stock
+            pass  # Si no existe la factura, no hacemos nada
+
+        # Devolver la URL del PDF generado
         pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
         return JsonResponse({
             'urlPdf': pdf_url,
-            'superid': super_ids,
-            'sku': sku,
-            'msg_stock': msg_stock
+            'superids': super_ids,
+            'sku': sku
         })
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)

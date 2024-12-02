@@ -79,6 +79,9 @@ urlpatterns = [
     path('api/get-document-lines/<int:document_id>/', core_views.get_document_lines, name='get_document_lines'),
     path('api/save-document-lines/', core_views.save_document_lines, name='save_document_lines'),
     path('api/actualizar_precio/', core_views.actualizar_precio, name='actualizar_precio'),
+    path('api/actualizar_precio_masivo/', core_views.actualizar_precio_masivo, name='actualizar_precio_masivo'),
+
+
 
 
     # Sectorizar 
