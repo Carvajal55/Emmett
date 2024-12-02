@@ -61,6 +61,8 @@ urlpatterns = [
     path('factura/aprobar/<int:id>/', core_views.factura_aprobar_view, name='factura_aprobar'),
     #Imprimir etiquetas
     path('api/imprimir-etiqueta/', core_views.imprimir_etiqueta, name='imprimir_etiqueta'),
+    path('api/imprimir-etiquetaqr/', core_views.imprimir_etiqueta_qr, name='imprimir_etiqueta_qr'),
+
     #Ingresar Documentos
     path('api/create-category/', core_views.create_category, name='create_category'),
     path('api/create-brand/', core_views.create_brand, name='create_brand'),

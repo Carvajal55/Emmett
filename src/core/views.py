@@ -1604,6 +1604,64 @@ def search_products_by_sector(request):
     # Responder si el método no es POST
     return JsonResponse({'resp': 3, 'msg': 'Método no permitido'})
 
+# @csrf_exempt
+# def add_product_to_sector(request):
+#     if request.method == 'POST':
+#         try:
+#             # Decodificar JSON
+#             body = json.loads(request.body)
+#             productos = body.get('productos', [])
+#             sector_name = body.get('sector', '').strip()
+#         except json.JSONDecodeError:
+#             return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON.'}, status=400)
+
+#         # Validar datos
+#         if not productos or not sector_name:
+#             return JsonResponse({'resp': 3, 'msg': 'El Super ID del producto y el sector son obligatorios.'}, status=400)
+#         if not sector_name.startswith('B-') or sector_name.count('-') != 3:
+#             return JsonResponse({'resp': 3, 'msg': 'Formato de sector incorrecto.'}, status=400)
+
+#         # Dividir sector_name
+#         try:
+#             _, id_office, zone_floor, section = sector_name.split('-')
+#             name_sector = f'{zone_floor}-{section}'
+#         except ValueError:
+#             return JsonResponse({'resp': 3, 'msg': 'Formato de sector incorrecto.'}, status=400)
+
+#         # Buscar el sector
+#         sector = Sectoroffice.objects.filter(namesector=name_sector, idoffice=id_office).only('idsectoroffice').first()
+#         if not sector:
+#             return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado.'}, status=404)
+
+#         # Procesar productos
+#         superids = [producto.get('superid') for producto in productos if producto.get('superid')]
+#         if not superids:
+#             return JsonResponse({'resp': 3, 'msg': 'No se proporcionaron Super IDs válidos.'}, status=400)
+
+#         # Buscar productos en bloque
+#         productos_encontrados = Uniqueproducts.objects.filter(superid__in=superids).only('superid', 'location', 'id')
+#         encontrados_ids = set(productos_encontrados.values_list('superid', flat=True))
+#         no_encontrados = list(set(superids) - encontrados_ids)
+
+#         # Actualizar productos encontrados en bloque
+#         productos_encontrados.update(location=sector.idsectoroffice)
+
+#         # Responder
+#         msg = 'Todos los productos fueron añadidos con éxito.'
+#         resp_code = 1
+#         if no_encontrados:
+#             msg = f'Algunos productos no fueron encontrados: {", ".join(no_encontrados)}'
+#             resp_code = 2
+
+#         return JsonResponse({
+#             'resp': resp_code,
+#             'msg': msg,
+#             'productos_actualizados': len(encontrados_ids),
+#             'productos_no_encontrados': no_encontrados
+#         }, status=200)
+
+#     return JsonResponse({'resp': 3, 'msg': 'Método no permitido.'}, status=405)
+
 @csrf_exempt
 def add_product_to_sector(request):
     if request.method == 'POST':
@@ -2548,6 +2606,132 @@ def validate_superid_simplified(request):
 
 
 """Imprimir Etiquetas"""
+from reportlab.lib.utils import ImageReader
+
+
+@csrf_exempt
+def imprimir_etiqueta_qr(request):
+    if request.method == 'POST':
+        # Obtener los datos enviados desde el front-end
+        sku = request.POST.get('sku')
+        model = request.POST.get('model')
+        qty = int(request.POST.get('qty', 1))
+        codebar = request.POST.get('codebar', '')
+        url_json = request.POST.get('urlJson')  # Ruta del archivo JSON
+
+        # Validaciones iniciales
+        if not sku or qty <= 0 or not url_json:
+            return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
+
+        # Obtener el producto correspondiente del modelo Products
+        try:
+            producto = Products.objects.get(sku=sku)
+        except Products.DoesNotExist:
+            return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
+
+        # Crear el nombre y la ruta del archivo PDF
+        pdf_filename = f'etiqueta_{sku}.pdf'
+        relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
+        absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
+        os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+
+        # Obtener el último correlativo y SuperID para el producto
+        last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
+        current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
+        base_numeric_sku = ''.join(filter(str.isdigit, sku))  # Extraer números del SKU
+        if not base_numeric_sku:
+            return JsonResponse({'error': 'El SKU no contiene números válidos.'}, status=400)
+
+        base_superid = f"{base_numeric_sku}e"
+
+        # Crear el PDF con tamaño 10.2 cm x 5 cm
+        page_width, page_height = 102 * mm, 50 * mm
+        pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
+
+        super_ids = []
+        for i in range(qty):
+            # Generar SuperID
+            super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
+            super_ids.append(super_id)
+
+            # Parte izquierda de la etiqueta (Código de barras para SKU)
+            x_sku, y_sku = 5 * mm, 35 * mm
+            barcode_sku = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
+            barcode_sku.drawOn(pdf, x_sku, y_sku)
+            pdf.setFont("Helvetica", 6)
+            pdf.drawString(x_sku + 20, y_sku - 10, f"SKU: {sku}")
+
+            # Parte derecha de la etiqueta (Código QR para SuperID)
+            x_qr, y_qr = 60 * mm, 10 * mm
+            qr_code = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=1
+            )
+            qr_code.add_data(super_id)
+            qr_code.make(fit=True)
+            qr_img = qr_code.make_image(fill='black', back_color='white')
+
+            qr_img_buffer = io.BytesIO()
+            qr_code.make_image(fill='black', back_color='white').save(qr_img_buffer, format='PNG')
+            qr_img_buffer.seek(0)
+            try:
+                pdf.drawImage(ImageReader(qr_img_buffer), x_qr, y_qr, 25 * mm, 25 * mm)
+            except Exception as e:
+                return JsonResponse({'error': f'Error al insertar QR en PDF: {str(e)}'}, status=500)
+
+            # Guardar el nuevo UniqueProduct
+            Uniqueproducts.objects.create(
+                product=producto,
+                superid=super_id,
+                correlative=current_correlative,
+                state=0,
+                cost=producto.lastcost,
+                locationname="Almacen",
+                observation="Etiqueta generada automáticamente"
+            )
+
+            # Incrementar el correlativo
+            current_correlative += 1
+
+            # Añadir una nueva página si es necesario
+            if i < qty - 1:
+                pdf.showPage()
+
+        pdf.save()
+
+        # Modificar el archivo JSON para marcar el producto como impreso
+        try:
+            with open(url_json, 'r+') as json_file:
+                data = json.load(json_file)
+                for detail in data.get('details', []):
+                    if detail.get('sku') == sku:
+                        detail['printed'] = True
+                json_file.seek(0)
+                json.dump(data, json_file, indent=4)
+                json_file.truncate()
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            return JsonResponse({'error': f'Error al procesar el archivo JSON: {str(e)}'}, status=400)
+
+        # Actualizar el estado de la factura si todos los productos están impresos
+        try:
+            factura = Purchase.objects.get(urljson=url_json)
+            if all(detail.get('printed') for detail in data.get('details', [])):
+                factura.status = 3  # Procesado
+                factura.save()
+        except Purchase.DoesNotExist:
+            pass  # Si no existe la factura, no hacemos nada
+
+        # Devolver la URL del PDF generado
+        pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
+        return JsonResponse({
+            'urlPdf': pdf_url,
+            'superids': super_ids,
+            'sku': sku
+        })
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 
 
