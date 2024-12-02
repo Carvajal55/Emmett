@@ -122,16 +122,16 @@
                 })
                 .then(response => {
                     if (response.data.resp === 1) {
-                        // Asignar lista invertida
-                        this.productos = [...response.data.productos].reverse();
-                        this.currentPage = 1;
+                        // Asignar lista sin invertir, para que los nuevos productos estén al inicio
+                        this.productos = [...response.data.productos];
+                        this.currentPage = 1; // Reiniciar a la primera página
                         this.playSound('success');
                     } else {
                         console.error(response.data.msg);
                         this.productos = [];
                         this.playSound('error');
                     }
-                    this.setFocus();  // Vuelve el foco al input después de la búsqueda
+                    this.setFocus();  // Asegura el foco después de la búsqueda
                 })
                 .catch(error => {
                     console.error('Error al buscar productos:', error);
