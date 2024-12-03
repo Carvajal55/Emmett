@@ -2020,27 +2020,7 @@ def obtener_stock_local_por_superid(sku):
         print(f"El SKU {sku} no tiene productos únicos asociados.")
         return None
     
-def actualizar_stock_bsale(variant_id, stock):
-    """Función para actualizar el stock en Bsale usando el variant_id"""
-    url = f"https://api.bsale.cl/v1/variants/{variant_id}/stock.json"
-    headers = {
-        'access_token': BSALE_API_TOKEN , # Reemplaza con tu token
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-    }
-    
-    data = {
-        'quantityAvailable': stock  # Stock actualizado
-    }
-    
-    response = requests.put(url, headers=headers, json=data)
-    
-    if response.status_code == 200:
-        return True
-    else:
-        print(f"Error al actualizar stock en Bsale. Status code: {response.status_code}")
-        return False
-    
+
 
 BSALE_API_URL = 'https://api.bsale.io/v1'
 
@@ -2075,7 +2055,7 @@ def obtener_stock_bsale(variant_id):
         return None
 
 # Función para actualizar el stock en Bsale
-def actualizar_stock_bsale(variant_id, office_id, new_stock):
+def actualizar_stock_bsale(variant_id, office_id, new_stock, cost):
     url = f"{BSALE_API_URL}/stocks/receptions.json"
     headers = {
         'access_token': BSALE_API_TOKEN,
@@ -2091,16 +2071,20 @@ def actualizar_stock_bsale(variant_id, office_id, new_stock):
             {
                 "quantity": new_stock,
                 "variantId": variant_id,
-                "cost": 3200
+                "cost": cost
             }
         ]
     }
-    response = requests.put(url, headers=headers, json=data)
     
-    if response.status_code == 200:
+    print(f"Enviando a Bsale: {data}")  # Para depuración
+    response = requests.post(url, headers=headers, json=data)
+    
+    if response.status_code == 201:
+        print("Stock actualizado exitosamente en Bsale.")
         return response.json()
     else:
         print(f"Error al actualizar stock en Bsale. Status code: {response.status_code}")
+        print(f"Response content: {response.content}")
         return None
     
 def calcular_stock_local(sku):
@@ -2748,7 +2732,7 @@ def imprimir_etiqueta(request):
         # Validaciones iniciales
         if not sku or qty <= 0 or not url_json:
             return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
-
+        
         # Obtener el producto correspondiente del modelo Products
         try:
             producto = Products.objects.get(sku=sku)
@@ -2834,6 +2818,17 @@ def imprimir_etiqueta(request):
 
         pdf.save()
 
+        # Actualizar el stock en Bsale
+        office_id = 1  # ID de la oficina en Bsale, cámbialo según sea necesario
+        variant_id = producto.iderp  # Supongamos que el ID del producto es el mismo que la variante en Bsale
+        cost = producto.lastcost
+        print(variant_id, office_id, qty,cost,"DATOS PARA BSALE")
+        bsale_response = actualizar_stock_bsale(variant_id, office_id, qty,cost)
+
+        if not bsale_response:
+            return JsonResponse({'error': 'Etiqueta creada, pero no se pudo actualizar stock en Bsale.'}, status=500)
+
+
         # Modificar el archivo JSON para marcar el producto como impreso
         try:
             with open(url_json, 'r+') as json_file:
@@ -2849,7 +2844,11 @@ def imprimir_etiqueta(request):
 
         # Actualizar el estado de la factura si todos los productos están impresos
         try:
-            factura = Purchase.objects.get(urljson=url_json)
+            facturas = Purchase.objects.filter(urljson=url_json)
+            if not facturas.exists():
+                return JsonResponse({'error': 'No se encontraron facturas asociadas.'}, status=404)
+
+            factura = facturas.first()  # Obtener la primera factura si hay múltiples
             if all(detail.get('printed') for detail in data.get('details', [])):
                 factura.status = 3  # Procesado
                 factura.save()
