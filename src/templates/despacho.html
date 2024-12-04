@@ -117,23 +117,24 @@
             <table class="table mt-3">
                 <thead>
                     <tr>
+                        <th>SuperID</th>
                         <th>SKU</th>
-                        <th>Producto</th>
-                        <th>Precio</th>
-                        <th>Cantidad</th>
-                        <th>Escaneado</th>
+                        <th>Descripción</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="product in products" :key="product.code">
+                    <tr v-for="(product, index) in products" :key="index">
+                        <td>[[ product.superid ]]</td>
                         <td>[[ product.code ]]</td>
                         <td>[[ product.description ]]</td>
-                        <td>[[ product.totalAmount ]]</td>
-                        <td>[[ product.quantity ]]</td>
-                        <td>[[ product.count || 0 ]]</td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm" @click="removeProduct(index)">Eliminar</button>
+                        </td>
                     </tr>
                 </tbody>
             </table>
+            
         </div>
 </body>
 {% endblock %}
