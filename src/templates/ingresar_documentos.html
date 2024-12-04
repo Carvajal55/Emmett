@@ -309,8 +309,13 @@
             </div>
 
             <div class="col-2">
-                <label for="dctoGeneral" class="form-label">Descuento</label>
-                <input class="form-control" type="number" v-model="form.descuentoGeneral" value="0">
+                <label for="dctoGeneral" class="form-label">Descuento General (%)</label>
+                <input 
+                    class="form-control" 
+                    type="number" 
+                    v-model.number="form.descuentoGeneral" 
+                    @input="aplicarDescuentoGeneral"
+                >
             </div>
 
             <div class="col-3">
@@ -449,7 +454,7 @@
                                 <th style="width: 10%; padding: 0.3rem;">SKU</th>
                                 <th style="width: 15%; padding: 0.3rem;">Nombre</th>
                                 <th style="width: 10%; padding: 0.3rem;">Marca</th>
-                                <th style="width: 10%; padding: 0.3rem;">Precio</th>
+                                <th style="width: 10%; padding: 0.3rem;">U.Precio</th>
                                 <th style="width: 5%; padding: 0.3rem;">Agregar</th>
                             </tr>
                         </thead>
@@ -458,7 +463,7 @@
                                 <td style="padding: 0.3rem;">[[ producto.sku ]]</td>
                                 <td class="text-truncate" style="padding: 0.3rem;">[[ producto.nameproduct ]]</td>
                                 <td style="padding: 0.3rem;">[[ producto.brands ]]</td>
-                                <td style="padding: 0.3rem;">[[ formatCurrency(producto.lastprice) ]]</td>
+                                <td style="padding: 0.3rem;">[[ formatCurrency(producto.lastcost) ]]</td>
                                 <td style="padding: 0.3rem;">
                                     <button class="btn btn-primary btn-sm" @click="agregarProducto(producto)">Agregar</button>
                                 </td>
@@ -581,29 +586,24 @@
 
         },
         watch: {
-            searchQuery(newQuery) {
-                this.searchProveedores(newQuery);
-                this.searchProveedoresProd(newQuery);
+            "form.descuentoGeneral": {
+                handler(newValue) {
+                    console.log("Aplicando descuento general:", newValue);
+                    this.aplicarDescuentoGeneral();
+                },
+                immediate: true, // Ejecutar al cargar la página
             },
-            searchQueryProd(newQuery) {
-                this.searchProveedoresProd(newQuery);
+            productosDocumento: {
+                handler() {
+                    console.log("Productos modificados. Recalculando subtotales.");
+                    this.recalcularTodosLosSubtotales();
+                },
+                deep: true, // Observar cambios en el array y sus objetos
             },
-            
-            "form.descuentoGeneral"(newValue) {
-                this.productosDocumento.forEach((producto, index) => {
-                    if (!producto.descuento) {
-                        // Solo aplica el descuento general si no hay descuento específico
-                        this.calcularSubtotalProducto(index);
-                    }
-                });
-            }
         },
         computed: {
             
-            // Propiedad computada que suma todos los subtotales
-            totalSubtotales() {
-                return this.productosDocumento.reduce((total, producto) => total + (producto.subtotal || 0), 0);
-            },
+           
             formularioValido() {
                 // Verifica que las fechas, número de documento y al menos un producto estén presentes
                 const { fechaEmision, fechaVencimiento, numeroDocumento } = this.form;
@@ -615,10 +615,18 @@
                 );
             },
             totalSubtotales() {
+                // Suma todos los subtotales de los productos
                 return this.productosDocumento.reduce((total, producto) => total + (producto.subtotal || 0), 0);
-            }
+            },
         },
         methods: {
+            aplicarDescuentoGeneral() {
+                this.productosDocumento.forEach((producto, index) => {
+                    // Si no hay descuento específico, aplica el descuento general
+                    producto.descuento = this.form.descuentoGeneral || 0;
+                    this.calcularSubtotalProducto(index);
+                });
+            },
             async crearCategoria() {
                 if (!this.nuevaCategoria) {
                     Swal.fire('Error', 'El nombre de la categoría no puede estar vacío.', 'error');
@@ -716,10 +724,13 @@
                     Swal.fire('Error', 'No se encontró la factura.', 'error');
                 }
             },
+            // Actualizar descuentos para todos los productos
             actualizarDescuentoProductos(descuentoGeneral) {
-                this.detalles.forEach(detalle => {
-                    detalle.dcto = descuentoGeneral; // Actualizar el descuento de cada producto
-                    detalle.cost_with_discount = detalle.cost - (detalle.cost * (descuentoGeneral / 100)); // Recalcular el costo con descuento
+                this.productosDocumento.forEach((producto, index) => {
+                    if (!producto.descuento) {
+                        producto.descuento = descuentoGeneral; // Asignar descuento general si no tiene uno específico
+                    }
+                    this.calcularSubtotalProducto(index);
                 });
             },
             verificarCompleto(index) {
@@ -728,24 +739,24 @@
             },
             calcularSubtotalProducto(index) {
                 const producto = this.productosDocumento[index];
-                const cantidad = producto.cantidad || 0;
-                const costoOriginal = producto.costo || 0;
 
-                // Usa el descuento del producto si existe; si no, aplica el descuento general
-                const descuento = producto.descuento || this.form.descuentoGeneral || 0;
+                // Usa el descuento del producto o el general (por defecto, 0%)
+                const descuento = producto.descuento || 0;
 
-                // Costo con descuento aplicado
-                const costoConDescuento = costoOriginal * (1 - descuento / 100);
+                // Validar el descuento (evita NaN o vacíos)
+                const descuentoAplicado = isNaN(descuento) || descuento === '' ? 0 : parseFloat(descuento);
 
-                // Actualiza el costo con descuento en el objeto del producto
-                producto.costo = costoConDescuento;
+                // Calcular el costo con descuento
+                const costoConDescuento = (producto.costo || 0) * (1 - descuentoAplicado / 100);
 
-                // Calcula el subtotal con el costo actualizado
-                producto.subtotal = cantidad * costoConDescuento;
+                // Actualizar el subtotal considerando la cantidad
+                producto.subtotal = (producto.cantidad || 0) * costoConDescuento;
             },
+
+
+
             calcularTotalSubtotales() {
-                const total = this.productosDocumento.reduce((acc, producto) => acc + (producto.subtotal || 0), 0);
-                console.log("Total de todos los subtotales:", total);
+                return this.productosDocumento.reduce((total, producto) => total + (producto.subtotal || 0), 0);
             },
            
             seleccionarCategoria(categoria) {
@@ -756,6 +767,12 @@
                     }
                 }
             },
+            recalcularTodosLosSubtotales() {
+                this.productosDocumento.forEach((_, index) => {
+                    this.calcularSubtotalProducto(index);
+                });
+            },
+
             searchProductos() {
                 axios.get('/api/get-products/', {
                     params: {
@@ -805,8 +822,9 @@
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
             agregarProducto(producto) {
-                console.log(producto.iderp)
-                const productoExistente = this.productosDocumento.find(p => p.sku === producto.sku);
+                console.log(producto.iderp);
+                const productoExistente = this.productosDocumento.find((p) => p.sku === producto.sku);
+
                 if (productoExistente) {
                     Swal.fire({
                         icon: 'warning',
@@ -818,24 +836,22 @@
                     const nuevoProducto = {
                         model: producto.nameproduct,
                         sku: producto.sku,
-                        iderp:producto.iderp,
+                        iderp: producto.iderp,
                         cantidad: 1, // Cantidad esperada, inicializada con 1
-                        costo: null, // Precio del producto
+                        costo: "", // Precio del producto
                         descuento: descuentoGeneral, // Asignar el descuento general al producto
-                        entrega: false,
-                        received_quantity: 0, // Cantidad recibida inicialmente en 0
+                        subtotal: 0, // Subtotal inicial
+                        recibido: 0, // Cantidad recibida
                         completo: false,
                     };
 
-                    // Calcular el subtotal con descuento
-                    nuevoProducto.subtotal = nuevoProducto.cantidad * nuevoProducto.costo * (1 - nuevoProducto.descuento / 100);
-
-                    this.productosDocumento.push(nuevoProducto);
+                    // Calcular el subtotal inicial del producto
+                    this.calcularSubtotalProducto(this.productosDocumento.push(nuevoProducto) - 1);
                 }
             },
+
             eliminarProducto(sku) {
-                this.productosDocumento = this.productosDocumento.filter(producto => producto.sku !== sku);
-                this.calcularSubtotal(); // Actualiza el subtotal después de eliminar
+                this.productosDocumento = this.productosDocumento.filter((producto) => producto.sku !== sku);
             },
             limpiarCeldas() {
                 this.form = {
