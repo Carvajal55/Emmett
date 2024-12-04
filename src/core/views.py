@@ -2299,16 +2299,12 @@ def format_table(details):
 def dispatch_consumption(request):
     if request.method == "POST":
         try:
-            # Obtener los datos del request
             data = json.loads(request.body)
-            n_document = data.get('nDocument')
+            n_document = data.get('nDocument', 0)
             type_document = data.get('typeDocument')
             company = data.get('company')
             products = data.get('products', [])
-            if not n_document:
-                n_document = 0
 
-            # Verificar o crear el sector "Narnia"
             sector_narnia, created = Sectoroffice.objects.get_or_create(
                 zone="NARN",
                 defaults={
@@ -2317,98 +2313,69 @@ def dispatch_consumption(request):
                     'floor': 0,
                     'section': 0,
                     'namesector': "Narnia",
-                    'state': 1  # Estado activo o predeterminado
+                    'state': 1
                 }
             )
             print(f"Sector 'Narnia' idsectoroffice: {sector_narnia.idsectoroffice}")
 
-            # Iniciar una transacción atómica
             with transaction.atomic():
-                # Procesar cada producto para el consumo en Bsale
                 for product in products:
                     superid = product.get('superid')
-                    cantidad = int(product.get('quantity', 1))  # Cantidad a descontar (1 por defecto)
+                    cantidad = int(product.get('quantity', 1))
 
-                    # Verificar si el superid existe en Uniqueproducts
-                    unique_product = Uniqueproducts.objects.select_related('product').filter(superid=superid).first()
+                    unique_product = Uniqueproducts.objects.select_related('product').filter(superid=superid, state=0).first()
 
                     if not unique_product:
-                        print(f"SuperID {superid} no encontrado en la base de datos.")
-                        return JsonResponse({'title': 'SuperID no encontrado', 'icon': 'error', 'row': 0})
+                        print(f"SuperID {superid} no encontrado o ya despachado.")
+                        return JsonResponse({'title': 'SuperID no encontrado o ya despachado', 'icon': 'error'})
 
-                    # Si el location es None, asignarlo al sector "Narnia"
                     if unique_product.location is None:
                         unique_product.location = sector_narnia.idsectoroffice
-                        unique_product.save()  # Guardar el cambio en la base de datos
-                        print(f"Producto con SuperID {superid} reasignado a 'Narnia' (Location ID: {sector_narnia.idsectoroffice})")
+                        unique_product.save()
+                        print(f"Producto con SuperID {superid} asignado a 'Narnia' (Location ID: {sector_narnia.idsectoroffice})")
 
-                    # Obtener el Sectoroffice relacionado usando el location de unique_product
                     sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
                     if not sector:
-                        print(f"Sector no encontrado para el Location ID {unique_product.location}")
                         return JsonResponse({'title': 'Sector no encontrado para el producto', 'icon': 'error'})
 
-                    idoffice = sector.idoffice
-                    print(f"ID de Oficina obtenido: {idoffice}")
-
-                    # Obtener el iderp del producto asociado
                     product_instance = unique_product.product
-                    iderp = product_instance.iderp  # Aquí se obtiene el iderp
-                    print(f"Producto asociado: {product_instance}, SKU: {product_instance.sku}, ID ERP: {iderp}")
+                    stock_disponible = Uniqueproducts.objects.filter(product=product_instance, state=0).count()
 
-                    if not iderp:
-                        return JsonResponse({'title': 'El producto asociado no tiene un ID ERP válido', 'icon': 'error', 'row': 0})
-
-                    # Calcular el stock como el conteo de Uniqueproducts asociados
-                    stock_disponible = Uniqueproducts.objects.filter(product=product_instance, state=1).count()
-                    print(f"Stock disponible para el producto {product_instance.sku}: {stock_disponible} unidades")
-
-                    # Validar que el producto tenga suficiente stock antes de continuar
                     if stock_disponible < cantidad:
-                        print(f"Error: El producto {product_instance.sku} no tiene suficiente stock. Stock actual: {stock_disponible}")
+                        print(f"Error: Producto {product_instance.sku} no tiene suficiente stock. Stock actual: {stock_disponible}")
                         return JsonResponse({
                             'title': 'Stock insuficiente',
                             'icon': 'error',
                             'message': f'El producto {product_instance.sku} no tiene suficiente stock disponible.'
                         })
 
-                    # Preparar los datos para enviar a Bsale
                     data_bsale = {
                         "note": f"Despacho desde empresa {company}",
-                        "officeId": 1,  # ID de la oficina actual
-                        "details": [
-                            {
-                                "quantity": cantidad,
-                                "variantId": iderp  # Usar iderp para el consumo en Bsale
-                            }
-                        ]
+                        "officeId": 1,
+                        "details": [{"quantity": cantidad, "variantId": product_instance.iderp}]
                     }
                     print(f"Datos enviados a Bsale: {json.dumps(data_bsale, indent=2)}")
 
-                    # Hacer la solicitud POST a Bsale usando la URL de consumo correcta
-                    headers = { 
+                    headers = {
                         "access_token": BSALE_API_TOKEN,
                         "Content-Type": "application/json"
                     }
 
                     response = requests.post("https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale)
-                    
-                    # Verificar si la respuesta de Bsale es exitosa
+
                     if response.status_code not in [200, 201]:
-                        print(f"Error al consumir en Bsale: {response.status_code} - {response.text}")
                         raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
 
-                    # Mover el producto al sector "Narnia" actualizando su campo `location` con `sector_narnia.idsectoroffice`
                     unique_product.location = sector_narnia.idsectoroffice
                     unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
                     unique_product.typedocout = type_document
                     unique_product.ndocout = n_document
                     unique_product.datelastinventory = timezone.now()
-                    unique_product.state = 1  # Estado de "descontado"
+                    unique_product.state = 1
                     unique_product.ncompany = company
                     unique_product.save()
+                    print(f"Producto {unique_product.superid} despachado y movido a 'Narnia'.")
 
-                    print(f"Producto {unique_product.superid} movido al sector 'Narnia' con location ID {unique_product.location}")
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
         except Exception as e:
