@@ -367,57 +367,47 @@ def buscar_productosAPI(request):
 
 def producto_detalles(request, product_id):
     try:
-        # Obtener el producto con sus productos únicos relacionados
         producto = Products.objects.prefetch_related('unique_products').get(id=product_id)
-        
-        # Filtrar solo las bodegas con los IDs específicos
+
         bodega_ids_included = [1, 2, 4, 6, 9, 10]
         bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included)
         bodega_mapping = {bodega.idoffice: bodega.name for bodega in bodegas}
 
-        # Obtener todas las ubicaciones (sectores) para usarlas en el mapeo
         sectores = Sectoroffice.objects.all()
         sector_mapping = {sector.idsectoroffice: sector for sector in sectores}
 
-        # Excluir productos en la bodega "Narnia" o en sectores con `zone="NARN"`
         excluded_sectors = Sectoroffice.objects.filter(namesector="XT99-99") | Sectoroffice.objects.filter(zone="NARN") | Sectoroffice.objects.filter(zone="NRN")
         unique_products = producto.unique_products.exclude(location__in=excluded_sectors.values_list('idsectoroffice', flat=True))
-        
-        # Inicializar el stock solo para las bodegas seleccionadas
+
         bodegas_stock = {bodega.idoffice: 0 for bodega in bodegas}
-        
-        # Calcular el stock de cada bodega seleccionada contando la cantidad de `superid` asociados a cada sector (ubicación)
+
+        unique_products_data = []
         for unique_product in unique_products:
-            # Obtener el sector asociado a la ubicación (location) del producto
             sector = sector_mapping.get(unique_product.location)
-
-            # Solo procesar si el sector no es "Narnia" y si el sector es válido
-            if sector and sector.namesector != "XT99-99" and sector.zone != "NARN" and sector.zone != "NRN":
-                bodega_name = bodega_mapping.get(sector.idoffice, 'Bodega desconocida')  # Usar el idOffice del sector para obtener el nombre de la bodega
-
-                # Incrementar el stock en la bodega correspondiente (contando el `superid`) solo si está en las bodegas seleccionadas
+            if sector and isinstance(sector, Sectoroffice):
+                bodega_name = bodega_mapping.get(sector.idoffice, 'Bodega desconocida')
                 if sector.idoffice in bodegas_stock:
-                    bodegas_stock[sector.idoffice] += 1  # Incrementar 1 por cada `superid` encontrado
-                unique_product.bodega = bodega_name  # Asociar la bodega al producto único
+                    bodegas_stock[sector.idoffice] += 1
+                unique_products_data.append({
+                    'superid': unique_product.superid,
+                    'locationname': sector.namesector,
+                    'bodega': bodega_name,
+                })
             else:
-                # Si el sector es "Narnia" o no está en el mapeo, lo excluimos de la respuesta
-                continue
+                unique_products_data.append({
+                    'superid': unique_product.superid,
+                    'locationname': 'Ubicación no encontrada',
+                    'bodega': 'Bodega desconocida',
+                })
 
-        # Crear la respuesta con los detalles del producto considerando solo las bodegas especificadas
         response_data = {
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice,
-            'stock_total': sum(bodegas_stock.values()),  # Stock total sumando solo las bodegas especificadas
-            'bodegas': {bodega_mapping[bodega_id]: stock for bodega_id, stock in bodegas_stock.items()},  # Información de stock por bodega seleccionada
-            'unique_products': [
-                {
-                    'superid': unique_product.superid,
-                    'locationname': sector_mapping.get(unique_product.location, 'Ubicación no encontrada').namesector,  # Nombre del sector
-                    'bodega': unique_product.bodega,  # Nombre de la bodega asociada
-                } for unique_product in unique_products
-            ]
+            'stock_total': sum(bodegas_stock.values()),
+            'bodegas': {bodega_mapping[bodega_id]: stock for bodega_id, stock in bodegas_stock.items()},
+            'unique_products': unique_products_data,
         }
 
         return JsonResponse(response_data)
@@ -1665,7 +1655,6 @@ def search_products_by_sector(request):
 @csrf_exempt
 def add_product_to_sector(request):
     if request.method == 'POST':
-        # Verificar si los datos vienen en formato JSON
         try:
             body = json.loads(request.body)  # Decodificar el cuerpo JSON
             productos = body.get('productos', [])  # Obtener la lista de productos
@@ -1673,33 +1662,27 @@ def add_product_to_sector(request):
         except json.JSONDecodeError:
             return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON'})
 
-        # Verificar que se proporcionaron los productos y el sector
         if not productos or not sector_name:
             return JsonResponse({'resp': 3, 'msg': 'El Super ID del producto y el sector son obligatorios.'})
 
-        # Dividir el sector para obtener idOffice y nameSector
         if 'B-' in sector_name:
             parts = sector_name.split('-')
             if len(parts) == 4:
                 id_office = parts[1]
                 name_sector = parts[2] + '-' + parts[3]
 
-                # Buscar el sector
                 sector = Sectoroffice.objects.filter(namesector=name_sector, idoffice=id_office).first()
 
                 if sector:
                     productos_no_encontrados = []
                     productos_actualizados = 0
 
-                    # Procesar cada producto en la lista de productos
                     for producto_data in productos:
                         superid = producto_data.get('superid', '')
                         if superid:
-                            # Buscar el producto por superid
                             producto = Uniqueproducts.objects.filter(superid=superid).first()
 
                             if producto:
-                                # Asociar el producto al sector actualizando el campo 'location'
                                 producto.location = sector.idsectoroffice
                                 producto.save()
                                 productos_actualizados += 1
@@ -1708,16 +1691,20 @@ def add_product_to_sector(request):
                         else:
                             productos_no_encontrados.append(superid)
 
-                    # Preparar el mensaje de respuesta
                     if productos_no_encontrados:
                         return JsonResponse({
                             'resp': 2,
                             'msg': f'Algunos productos no fueron encontrados: {", ".join(productos_no_encontrados)}',
-                            'productos_actualizados': productos_actualizados
+                            'productos_actualizados': productos_actualizados,
+                            'sector': sector.namesector
                         })
                     else:
-                        return JsonResponse({'resp': 1, 'msg': 'Todos los productos fueron añadidos con éxito.'})
-
+                        return JsonResponse({
+                            'resp': 1,
+                            'msg': 'Todos los productos fueron añadidos con éxito.',
+                            'productos_actualizados': productos_actualizados,
+                            'sector': sector.namesector
+                        })
                 else:
                     return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado.'})
             else:
@@ -2349,6 +2336,12 @@ def dispatch_consumption(request):
                         print(f"SuperID {superid} no encontrado en la base de datos.")
                         return JsonResponse({'title': 'SuperID no encontrado', 'icon': 'error', 'row': 0})
 
+                    # Si el location es None, asignarlo al sector "Narnia"
+                    if unique_product.location is None:
+                        unique_product.location = sector_narnia.idsectoroffice
+                        unique_product.save()  # Guardar el cambio en la base de datos
+                        print(f"Producto con SuperID {superid} reasignado a 'Narnia' (Location ID: {sector_narnia.idsectoroffice})")
+
                     # Obtener el Sectoroffice relacionado usando el location de unique_product
                     sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
                     if not sector:
@@ -2366,6 +2359,19 @@ def dispatch_consumption(request):
                     if not iderp:
                         return JsonResponse({'title': 'El producto asociado no tiene un ID ERP válido', 'icon': 'error', 'row': 0})
 
+                    # Calcular el stock como el conteo de Uniqueproducts asociados
+                    stock_disponible = Uniqueproducts.objects.filter(product=product_instance, state=1).count()
+                    print(f"Stock disponible para el producto {product_instance.sku}: {stock_disponible} unidades")
+
+                    # Validar que el producto tenga suficiente stock antes de continuar
+                    if stock_disponible < cantidad:
+                        print(f"Error: El producto {product_instance.sku} no tiene suficiente stock. Stock actual: {stock_disponible}")
+                        return JsonResponse({
+                            'title': 'Stock insuficiente',
+                            'icon': 'error',
+                            'message': f'El producto {product_instance.sku} no tiene suficiente stock disponible.'
+                        })
+
                     # Preparar los datos para enviar a Bsale
                     data_bsale = {
                         "note": f"Despacho desde empresa {company}",
@@ -2377,6 +2383,7 @@ def dispatch_consumption(request):
                             }
                         ]
                     }
+                    print(f"Datos enviados a Bsale: {json.dumps(data_bsale, indent=2)}")
 
                     # Hacer la solicitud POST a Bsale usando la URL de consumo correcta
                     headers = { 
@@ -2401,13 +2408,7 @@ def dispatch_consumption(request):
                     unique_product.ncompany = company
                     unique_product.save()
 
-                    # Reducir el stock del producto relacionado en el modelo Products
-                    if product_instance.currentstock > 0:
-                        product_instance.currentstock -= cantidad  # Reduce en la cantidad consumida
-                        product_instance.save()  # Guarda el cambio en el stock
-
                     print(f"Producto {unique_product.superid} movido al sector 'Narnia' con location ID {unique_product.location}")
-                    print(f"Stock actualizado para producto {product_instance.sku}: {product_instance.stock} unidades restantes")
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
         except Exception as e:
@@ -2415,7 +2416,6 @@ def dispatch_consumption(request):
             return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
-
 #BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
 
 
