@@ -355,9 +355,23 @@
                 <input class="form-control" type="number" v-model="form.cantidadCheque" value="0">
             </div>
 
-            <div class="col-4">
-                <label for="subtotal" class="form-label">SUBTOTAL</label>
-                <input class="form-control" type="text" :value="formatCurrency(totalSubtotales)" readonly>
+            <div class="col-2">
+                <label for="subtotalSinIva" class="form-label">Subtotal (Sin IVA)</label>
+                <input
+                    class="form-control"
+                    type="text"
+                    :value="formatCurrency(totalSubtotales)"
+                    readonly
+                />
+            </div>
+            <div class="col-2">
+                <label for="subtotalConIva" class="form-label">Subtotal (Con IVA)</label>
+                <input
+                    class="form-control"
+                    type="text"
+                    :value="formatCurrency(subtotalConIva)"
+                    readonly
+                />
             </div>
         </div>
 
@@ -586,6 +600,13 @@
 
         },
         watch: {
+            searchQuery(newQuery) {
+                this.searchProveedores(newQuery);
+                this.searchProveedoresProd(newQuery);
+            },
+            searchQueryProd(newQuery) {
+                this.searchProveedoresProd(newQuery);
+            },
             "form.descuentoGeneral": {
                 handler(newValue) {
                     console.log("Aplicando descuento general:", newValue);
@@ -617,6 +638,10 @@
             totalSubtotales() {
                 // Suma todos los subtotales de los productos
                 return this.productosDocumento.reduce((total, producto) => total + (producto.subtotal || 0), 0);
+            },
+            subtotalConIva() {
+                const iva = 0.19; // Cambia esto al porcentaje de IVA que uses (19% por ejemplo)
+                return this.totalSubtotales * (1 + iva);
             },
         },
         methods: {
