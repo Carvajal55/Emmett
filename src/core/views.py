@@ -1265,7 +1265,7 @@ def get_products(request):
     # Filtrar productos según la búsqueda por SKU o nombre
     products = Products.objects.filter(
         Q(sku__icontains=query) | Q(nameproduct__icontains=query)
-    ).values('id', 'sku', 'nameproduct', 'brands', 'codebar', 'lastprice','iderp')
+    ).values('id', 'sku', 'nameproduct', 'brands', 'codebar', 'lastprice','iderp','lastcost')
 
     # Crear paginador
     paginator = Paginator(products, page_size)
@@ -2299,43 +2299,50 @@ def format_table(details):
 def dispatch_consumption(request):
     if request.method == "POST":
         try:
+            # Obtener los datos del request
             data = json.loads(request.body)
             n_document = data.get('nDocument', 0)
             type_document = data.get('typeDocument')
             company = data.get('company')
             products = data.get('products', [])
 
-            sector_narnia, created = Sectoroffice.objects.get_or_create(
-                zone="NARN",
+            # Verificar o crear el sector "Despachados"
+            sector_despachados, created = Sectoroffice.objects.get_or_create(
+                zone="DESP",
                 defaults={
                     'idoffice': 0,
                     'iduserresponsible': 0,
                     'floor': 0,
                     'section': 0,
-                    'namesector': "Narnia",
+                    'namesector': "Despachados",
                     'state': 1
                 }
             )
-            print(f"Sector 'Narnia' idsectoroffice: {sector_narnia.idsectoroffice}")
+            print(f"Sector 'Despachados' idsectoroffice: {sector_despachados.idsectoroffice}")
 
+            # Iniciar una transacción atómica
             with transaction.atomic():
                 for product in products:
                     superid = product.get('superid')
                     cantidad = int(product.get('quantity', 1))
 
+                    # Verificar si el superid existe en Uniqueproducts con estado 0
                     unique_product = Uniqueproducts.objects.select_related('product').filter(superid=superid, state=0).first()
 
                     if not unique_product:
                         print(f"SuperID {superid} no encontrado o ya despachado.")
                         return JsonResponse({'title': 'SuperID no encontrado o ya despachado', 'icon': 'error'})
 
+                    # Si el location es None, asignarlo al sector "Despachados"
                     if unique_product.location is None:
-                        unique_product.location = sector_narnia.idsectoroffice
+                        unique_product.location = sector_despachados.idsectoroffice
                         unique_product.save()
-                        print(f"Producto con SuperID {superid} asignado a 'Narnia' (Location ID: {sector_narnia.idsectoroffice})")
+                        print(f"Producto con SuperID {superid} asignado a 'Despachados' (Location ID: {sector_despachados.idsectoroffice})")
 
+                    # Obtener el Sectoroffice relacionado usando el location de unique_product
                     sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
                     if not sector:
+                        print(f"Sector no encontrado para el Location ID {unique_product.location}")
                         return JsonResponse({'title': 'Sector no encontrado para el producto', 'icon': 'error'})
 
                     product_instance = unique_product.product
@@ -2349,6 +2356,7 @@ def dispatch_consumption(request):
                             'message': f'El producto {product_instance.sku} no tiene suficiente stock disponible.'
                         })
 
+                    # Preparar los datos para enviar a Bsale
                     data_bsale = {
                         "note": f"Despacho desde empresa {company}",
                         "officeId": 1,
@@ -2366,7 +2374,8 @@ def dispatch_consumption(request):
                     if response.status_code not in [200, 201]:
                         raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
 
-                    unique_product.location = sector_narnia.idsectoroffice
+                    # Mover el producto al sector "Despachados" y actualizar su estado
+                    unique_product.location = sector_despachados.idsectoroffice
                     unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
                     unique_product.typedocout = type_document
                     unique_product.ndocout = n_document
@@ -2374,7 +2383,8 @@ def dispatch_consumption(request):
                     unique_product.state = 1
                     unique_product.ncompany = company
                     unique_product.save()
-                    print(f"Producto {unique_product.superid} despachado y movido a 'Narnia'.")
+
+                    print(f"Producto {unique_product.superid} despachado y movido al sector 'Despachados'.")
 
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
