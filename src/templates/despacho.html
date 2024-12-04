@@ -35,8 +35,8 @@
             </div>   
             <div>
                 <label for="sidProduct">ID Producto</label>
-                <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid" class="form-control">
-            </div>       
+                <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid(false)" class="form-control">
+            </div>             
             
             <button @click="dispatchConsumption" class="mt-3 btn btn-success">Despachar</button>
             {% if request.user.usuario.rol == 'VENTAS' %}
@@ -68,72 +68,72 @@
                     </div>
                 </div>
             </div>
-            <!-- Modal para "Despacho Interno" -->
-            <div class="modal fade" id="internalDispatchModal" tabindex="-1" aria-labelledby="internalDispatchModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="internalDispatchModalLabel">Despacho Interno</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+           
+        <!-- Modal para "Despacho Interno" -->
+        <div class="modal fade" id="internalDispatchModal" tabindex="-1" aria-labelledby="internalDispatchModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="internalDispatchModalLabel">Despacho Interno</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="input-group mb-3">
+                            <input type="text" v-model="sid" class="form-control" @keyup.enter="validateAndLinkSuperid(true)" placeholder="Ingrese SuperID">
+                            <button type="button" class="btn btn-primary" @click="validateAndLinkSuperid(true)">Agregar</button>
                         </div>
-                        <div class="modal-body">
-                            <!-- Formulario para agregar un SuperID -->
-                            <div class="input-group mb-3">
-                                <input type="text" v-model="sid" class="form-control" @keyup.enter="validateAndLinkSuperid" placeholder="Ingrese SuperID">
-                            </div>
+                        
+                        
 
-                            <!-- Tabla de productos para despacho interno -->
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>SuperID</th>
-                                        <th>Code (SKU)</th>
-                                        <th>Cantidad</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(product, index) in products" :key="index">
-                                        <td>[[ product.superid ]]</td>
-                                        <td>[[ product.code ]]</td>
-                                        <td>
-                                            <input type="number" v-model="product.quantity" class="form-control" min="1">
-                                        </td>
-                                        <td>
-                                            <button type="button" class="btn btn-danger btn-sm" @click="removeInternalProduct(index)">Eliminar</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                            <button type="button" class="btn btn-primary" @click="dispatchConsumption">Realizar Descuento</button>
-                        </div>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>SuperID</th>
+                                    <th>SKU</th>
+                                    <th>Descripción</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(product, index) in internalProducts" :key="index">
+                                    <td>[[ product.superid ]]</td>
+                                    <td>[[ product.code ]]</td>
+                                    <td>[[ product.description ]]</td>
+                                    <td>
+                                        <button type="button" class="btn btn-danger btn-sm" @click="removeInternalProduct(index)">Eliminar</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="button" class="btn btn-primary" @click="dispatchInternalProducts">Despachar Internamente</button>
                     </div>
                 </div>
             </div>
+        </div>
             
-            <table class="table mt-3">
-                <thead>
-                    <tr>
-                        <th>SuperID</th>
-                        <th>SKU</th>
-                        <th>Descripción</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(product, index) in products" :key="index">
-                        <td>[[ product.superid ]]</td>
-                        <td>[[ product.code ]]</td>
-                        <td>[[ product.description ]]</td>
-                        <td>
-                            <button type="button" class="btn btn-danger btn-sm" @click="removeProduct(index)">Eliminar</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        <table class="table mt-3">
+            <thead>
+                <tr>
+                    <th>SuperID</th>
+                    <th>SKU</th>
+                    <th>Descripción</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="(product, index) in products" :key="index">
+                    <td>[[ product.superid ]]</td>
+                    <td>[[ product.code ]]</td>
+                    <td>[[ product.description ]]</td>
+                    <td>
+                        <button type="button" class="btn btn-danger btn-sm" @click="removeProduct(index)">Eliminar</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
             
         </div>
 </body>
@@ -168,6 +168,9 @@
             requestDynamicKeyAccess() {
                 new bootstrap.Modal(document.getElementById('dynamicKeyModal')).show();
             },
+            removeInternalProduct(index) {
+                this.internalProducts.splice(index, 1); // Eliminar producto de la lista interna
+            },
             validateDynamicKey() {
                 axios.post('/api/validate-dynamic-key/', { key: this.dynamicKey })
                     .then(response => {
@@ -198,6 +201,26 @@
                         console.error(error);
                     });
             },
+            dispatchInternalProducts() {
+                const payload = this.internalProducts.map(product => ({
+                    superid: product.superid
+                }));
+
+                axios.post('/api/dispatch-consumption/', { products: payload })
+                    .then(response => {
+                        if (response.data.icon === 'success') {
+                            Swal.fire('Éxito', 'Productos despachados internamente con éxito.', 'success');
+                            this.internalProducts = []; // Limpiar la lista después del despacho
+                        } else {
+                            Swal.fire('Error', response.data.title, response.data.icon);
+                        }
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'Error al despachar los productos internamente.', 'error');
+                        console.error(error);
+                    });
+            },
+
             fetchDetails() {
                 this.products = [];
                 axios.get('/api/consult-bsale-document/', {
@@ -217,45 +240,54 @@
                     console.error(error);
                 });
             },
-            validateAndLinkSuperid() {
+            validateAndLinkSuperid(isInternal = false) {
+
+                if (isInternal === undefined) {
+                    isInternal = false;
+                }
+
+                console.log('Contexto detectado (isInternal):', isInternal);
+                console.log('SID Escaneado:', this.sid);
+               
+
                 const superidToValidate = this.sid;
-                const documentProducts = this.nDocument ? this.products.map(product => product.code) : []; 
 
-                axios.post('/api/validate-superid/', {
-                    sid: superidToValidate,
-                    document_products: documentProducts
-                }).then(response => {
-                    if (response.data.icon === 'success') {
-                        const productSku = response.data.sku;
+                axios.post('/api/validate-superid/', { sid: superidToValidate })
+                    .then(response => {
+                        if (response.data.icon === 'success') {
+                            const productSku = response.data.sku;
+                            const productDescription = response.data.description;
 
-                        if (this.nDocument) {
-                            const productInList = this.products.find(product => product.code === productSku);
-                            if (productInList && productInList.count < productInList.quantity) {
-                                productInList.count += 1;
-                                productInList.superid = this.sid;
-                                this.sid = '';
-                            } else {
-                                Swal.fire('Advertencia', 'No se puede escanear más de la cantidad total.', 'warning');
-                            }
-                        } else {
-                            if (!this.products.some(product => product.code === productSku)) {
-                                this.products.push({
+                            // Seleccionar la lista de destino según el contexto
+                            const targetList = isInternal ? this.internalProducts : this.products;
+
+                            console.log('Lista seleccionada antes de agregar:', targetList);
+
+                            // Verificar si el SuperID ya está en la lista correspondiente
+                            if (!targetList.some(product => product.superid === superidToValidate)) {
+                                targetList.push({
                                     superid: superidToValidate,
                                     code: productSku,
-                                    quantity: 1
+                                    description: productDescription
                                 });
-                                this.newProduct.superid = '';
+                                console.log('Producto agregado:', {
+                                    superid: superidToValidate,
+                                    code: productSku,
+                                    description: productDescription
+                                });
+                                this.sid = ''; // Limpiar el campo de entrada
                             } else {
-                                Swal.fire('Advertencia', 'Este producto ya fue agregado.', 'warning');
+                                const context = isInternal ? 'interno' : 'principal';
+                                Swal.fire('Advertencia', `Este SuperID ya fue escaneado en el despacho ${context}.`, 'warning');
                             }
+                        } else {
+                            Swal.fire('Error', response.data.title, response.data.icon);
                         }
-                    } else {
-                        Swal.fire('Error', response.data.title, response.data.icon);
-                    }
-                }).catch(error => {
-                    Swal.fire('Error', 'Error al validar el SuperID.', 'error');
-                    console.error(error);
-                });
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'Error al validar el SuperID.', 'error');
+                        console.error(error);
+                    });
             },
             dispatchConsumption() {
                 const payload = this.products.map(product => ({
