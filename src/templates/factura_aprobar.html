@@ -82,6 +82,7 @@
                 <th>SKU</th>
                 <th>PRODUCTO</th>
                 <th>CANTIDAD</th>
+                <th>DCTO</th>
                 <th>COSTO</th>
                 <th>ÚLTIMO COSTO</th>
                 <th>ÚLTIMO PRECIO</th>
@@ -101,6 +102,7 @@
                 <td>[[ detalle.sku ]]</td>
                 <td>[[ detalle.model ]]</td>
                 <td>[[ detalle.qty ]]</td>
+                <td>[[ detalle.dctoItem ]] %</td>
                 <td>[[ formatCurrency(detalle.cost) ]]</td>
                 <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td> <!-- lastCost -->
                 <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td> <!-- lastPrice -->
