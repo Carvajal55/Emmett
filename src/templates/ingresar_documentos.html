@@ -776,6 +776,8 @@
 
                 // Actualizar el subtotal considerando la cantidad
                 producto.subtotal = (producto.cantidad || 0) * costoConDescuento;
+
+                console.log(`Producto SKU: ${producto.sku}, Subtotal Calculado: ${producto.subtotal}`);
             },
 
 
@@ -1038,7 +1040,6 @@
                     });
             },
             enviarDatos() {
-
                 const jsonData = {
                     headers: {
                         supplier: this.form.rutProveedor,
@@ -1070,12 +1071,14 @@
                         deliveryItem: producto.entrega,
                         checkItem: producto.entrega ? "true" : "false",
                         sku: producto.sku,
-                        iderp:producto.iderp || "",
+                        iderp: producto.iderp || "",
                         model: producto.model,
                         idPro: ""
                     })),
                     type: "1"
                 };
+
+                console.log("Datos enviados:", jsonData);
 
                 axios.post('/api/generar-json/', jsonData)
                     .then(response => {
@@ -1086,7 +1089,6 @@
                             confirmButtonText: 'OK'
                         }).then(() => {
                             window.location.href = "{% url 'recepciones_pendientes' %}";
-
                         });
                     })
                     .catch(error => {
@@ -1098,7 +1100,6 @@
                             confirmButtonText: 'OK'
                         });
                     });
-
             },
             mostrarTodosLosProveedores() {
                 // Obtener la lista completa de proveedores
