@@ -294,7 +294,8 @@
                         this.$set(detalle, "lastCost", parseFloat(response.data.lastCost) || 0);
                         this.$set(detalle, "lastPrice", parseFloat(response.data.lastPrice) || 0);
                         this.$set(detalle, "bsalePrice", response.data.bsalePrice || "No disponible");
-                        this.$set(detalle, "precioBase", response.data.bsalePrice || 0); // Asegura que sea un número válido
+                        this.$set(detalle, "precioBase", parseFloat(response.data.bsalePrice) || 0); // Asegura que sea 0 si no es válido
+ // Asegura que sea un número válido
 
                         // Solo llama a calcularMargen si los datos son válidos
                         if (detalle.cost && detalle.precioBase) {
@@ -317,6 +318,9 @@
                     });
             },
             formatCurrency(value) {
+                if (!value || isNaN(value)) {
+                    return "0";
+                }
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
             recalcularMargen(precio) {
