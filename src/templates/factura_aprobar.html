@@ -83,13 +83,15 @@
                 <th>PRODUCTO</th>
                 <th>CANTIDAD</th>
                 <th>DCTO</th>
-                <th>COSTO</th>
+                <th>COSTO REAL</th>
+                <th>COSTO </th>
                 <th>ÚLTIMO COSTO</th>
                 <th>ÚLTIMO PRECIO</th>
                 <th>PRECIO BSALE</th> <!-- Nueva columna -->
                 <th>TOTAL</th>
                 <th>PRECIO BASE</th>
                 <th>MARGEN</th>
+                <th>STOCK</th>
                 <th>Accion</th>
                 <button class="btn btn-primary mb-3" @click="actualizarPreciosBaseMasivo">
                     Actualizar Todos los Precios Base
@@ -103,11 +105,12 @@
                 <td>[[ detalle.model ]]</td>
                 <td>[[ detalle.qty ]]</td>
                 <td>[[ detalle.dctoItem ]] %</td>
+                <td>[[formatCurrency(detalle.cost_with_discount) ]]</td>
                 <td>[[ formatCurrency(detalle.cost) ]]</td>
                 <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td> <!-- lastCost -->
                 <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td> <!-- lastPrice -->
                 <td>[[ formatCurrency(detalle.bsalePrice || 0) ]]</td> <!-- bsalePrice -->
-                <td>[[ formatCurrency(calcularTotal(detalle.cost, detalle.qty)) ]]</td>
+                <td>[[ formatCurrency(calcularTotal(detalle.cost_with_discount, detalle.qty)) ]]</td>
                 <td>
                     <input
                         type="number"
@@ -121,6 +124,7 @@
                    
                 </td>
                 <td>[[ detalle.margen ]]%</td>
+                <td>[[ detalle.totalStock ]]</td>
                 <td>
                     <button
                         class="btn btn-info"
@@ -164,6 +168,7 @@
             ], // ID de la factura guardado
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
+            stockProductos: {}
         },
         mounted() {
             console.log("Componente montado"); // Verificar que el mounted se ejecuta
@@ -174,6 +179,8 @@
             } else {
                 console.error("No se pudo obtener el ID de la factura desde la URL");
             }
+
+            
         },
         methods: {
             actualizarListaPrecio(detalle, type, bPrice) {
@@ -294,6 +301,7 @@
 
                         // Usa this.$set para garantizar reactividad
                         this.$set(detalle, "lastCost", parseFloat(response.data.lastCost) || 0);
+                        this.$set(detalle, "totalStock", parseFloat(response.data.totalStock) || 0);
                         this.$set(detalle, "lastPrice", parseFloat(response.data.lastPrice) || 0);
                         this.$set(detalle, "bsalePrice", response.data.bsalePrice || "No disponible");
                         this.$set(detalle, "precioBase", parseFloat(response.data.bsalePrice) || 0); // Asegura que sea 0 si no es válido
@@ -313,6 +321,7 @@
 
                         // Valores predeterminados en caso de error
                         this.$set(detalle, "lastCost", 0);
+                        this.$set(detalle, "totalStock", 0);
                         this.$set(detalle, "lastPrice", 0);
                         this.$set(detalle, "bsalePrice", "No disponible");
                         this.$set(detalle, "precioBase", 0); // Precio base predeterminado

@@ -78,6 +78,8 @@ urlpatterns = [
     path('api/get-product/', core_views.get_product_by_sku, name='get_product_by_sku'),
     path('api/load-draft/', core_views.load_draft, name='load_draft'),
     path('api/load-xml/', core_views.load_xml, name='load_xml'),
+    #Aprobar 
+    path('api/calcular_stock_bodegas/',core_views.calcular_stock_bodegas, name='calcular_stock_bodegas'),
     path('api/get-document-lines/<int:document_id>/', core_views.get_document_lines, name='get_document_lines'),
     path('api/save-document-lines/', core_views.save_document_lines, name='save_document_lines'),
     path('api/actualizar_precio/', core_views.actualizar_precio, name='actualizar_precio'),

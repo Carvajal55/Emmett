@@ -696,6 +696,30 @@ def rechazar_factura(request):
             return JsonResponse({'error': 'Factura no encontrada.'}, status=404)
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
+
+#Aprobar Facturas
+
+def calcular_stock_bodegas(request):
+    """
+    Calcula el stock total de los productos que están en las bodegas especificadas.
+    """
+    try:
+        # IDs de las bodegas que se deben incluir en el cálculo
+        bodegas_ids = [10, 9, 7, 6, 5, 4, 2, 1]
+
+        # Filtrar los productos en las bodegas especificadas
+        productos_bodegas = Uniqueproducts.objects.filter(locationname__in=bodegas_ids)
+
+        # Extraer los IDs de los productos relacionados
+        productos_ids = productos_bodegas.values_list('product_id', flat=True)
+
+        # Calcular el stock total de los productos filtrados
+        total_stock = Products.objects.filter(idproduct__in=productos_ids).aggregate(total=models.Sum('currentstock'))['total'] or 0
+
+        return JsonResponse({"success": True, "total_stock": total_stock}, status=200)
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
 @csrf_exempt
 def aprobar_factura(request):
     if request.method == 'POST':
@@ -3172,58 +3196,60 @@ def buscar_sector(request):
 """  BSALE_API_URL = 'https://api.bsale.io/v1'
 BSALE_API_TOKEN = 'BSALE_API_TOKEN' """
 #mover luego
+
+from django.db.models import Sum
 #  
 @csrf_exempt
 def obtener_datos_producto(request):
-    if request.method == "POST":
-        sku = request.POST.get("sku")
-        price_list_id = 3  # ID fijo de la lista de precios Emmett
-        #price_list_id = 2  # ID fijo de la lista de precios Soundstore
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
 
+    sku = request.POST.get("sku")
+    if not sku:
+        return JsonResponse({"error": "El SKU es obligatorio"}, status=400)
 
-        if not sku:
-            return JsonResponse({"error": "El SKU es obligatorio"}, status=400)
+    try:
+        # Obtener datos del producto
+        producto = Products.objects.prefetch_related('unique_products').get(sku=sku)
+
+        # Calcular el stock total
+        valid_bodega_ids = [10, 9, 7, 6, 5, 4, 2, 1]
+        sectores = {sector.idsectoroffice: sector for sector in Sectoroffice.objects.all()}
+        stock_total = sum(
+            1 for unique_product in producto.unique_products.filter(state=0)
+            if sectores.get(unique_product.location) and sectores[unique_product.location].idoffice in valid_bodega_ids
+        )
+
+        # Consultar precio en Bsale
+        price_list_id = 3  # ID fijo de la lista de precios
+        bsale_url = f"https://api.bsale.cl/v1/price_lists/{price_list_id}/details.json"
+        headers = {
+            "Content-Type": "application/json",
+            "access_token": BSALE_API_TOKEN
+        }
+        params = {"code": sku}
 
         try:
-            # Obtener datos del producto en el modelo Products
-            producto = Products.objects.get(sku=sku)
-            last_cost = producto.lastcost
-            last_price = producto.lastprice
-
-            # Consultar precio en Bsale
-            bsale_url = f"https://api.bsale.cl/v1/price_lists/{price_list_id}/details.json"
-            headers = {
-                "Content-Type": "application/json",
-                "access_token": BSALE_API_TOKEN
-            }
-            params = {"code": sku}
-
             bsale_response = requests.get(bsale_url, headers=headers, params=params)
-            if bsale_response.status_code == 200:
-                bsale_data = bsale_response.json()
-                items = bsale_data.get("items", [])
+            bsale_response.raise_for_status()
+            bsale_data = bsale_response.json()
+            bsale_price = bsale_data.get("items", [{}])[0].get("variantValueWithTaxes", "No disponible")
+        except requests.exceptions.RequestException:
+            bsale_price = "No disponible"
 
-                if items:
-                    # Obtener el primer item y su precio con impuestos
-                    bsale_price = items[0].get("variantValueWithTaxes", "No disponible")
-                else:
-                    bsale_price = "No disponible"
-            else:
-                bsale_price = "No disponible"
+        # Respuesta simplificada
+        return JsonResponse({
+            "sku": producto.sku,
+            "lastCost": producto.lastcost or 0,
+            "lastPrice": producto.lastprice or 0,
+            "bsalePrice": bsale_price,
+            "totalStock": stock_total
+        })
 
-            # Retornar datos combinados
-            return JsonResponse({
-                "sku": producto.sku,
-                "lastCost": last_cost,
-                "lastPrice": last_price,
-                "bsalePrice": bsale_price
-            })
-        except Products.DoesNotExist:
-            return JsonResponse({"error": "Producto no encontrado"}, status=404)
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
-
-    return JsonResponse({"error": "Método no permitido"}, status=405)
+    except Products.DoesNotExist:
+        return JsonResponse({"error": "Producto no encontrado"}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 #CREAR SECTORES
