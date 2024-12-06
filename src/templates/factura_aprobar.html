@@ -357,7 +357,7 @@
             // Función para calcular el margen basado en el precio base
             calcularMargen(detalle) {
                 // Verifica que los valores sean números válidos
-                const costoNeto = parseFloat(detalle.cost) || 0; 
+                const costoNeto = parseFloat(detalle.cost_with_discount) || 0; 
                 const precioBaseNeto = (parseFloat(detalle.precioBase) || 0) / 1.19; // Precio base sin IVA
 
                 if (precioBaseNeto > 0) {
