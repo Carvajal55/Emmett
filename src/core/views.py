@@ -393,12 +393,7 @@ def producto_detalles(request, product_id):
                     'locationname': sector.namesector,
                     'bodega': bodega_name,
                 })
-            else:
-                unique_products_data.append({
-                    'superid': unique_product.superid,
-                    'locationname': 'Ubicación no encontrada',
-                    'bodega': 'Bodega desconocida',
-                })
+            
 
         response_data = {
             'id': producto.id,
