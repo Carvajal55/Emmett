@@ -1248,30 +1248,33 @@ def generar_json(request):
             with open(absolute_file_path, 'w', encoding='utf-8') as json_file:
                 json.dump(data, json_file, ensure_ascii=False, indent=4)
 
-            # Crear el registro en la base de datos
-            purchase = Purchase.objects.create(
-                supplier=supplier,
-                suppliername=supplier_name,
+            # Buscar si la factura ya existe
+            purchase, created = Purchase.objects.update_or_create(
                 typedoc=type_document,
                 number=number_document,
-                observation=observation,
-                dateadd=timezone.now(),
-                dateproccess=date_purchase,
-                subtotal=subtotal_with_discount,  # Subtotal con descuento
-                urljson=relative_file_path,  # Guardar solo la ruta relativa en la base de datos
-                urlimg=url_img,
-                status=0,  # Estado predeterminado
+                defaults={
+                    'supplier': supplier,
+                    'suppliername': supplier_name,
+                    'observation': observation,
+                    'dateadd': timezone.now(),
+                    'dateproccess': date_purchase,
+                    'subtotal': subtotal_with_discount,  # Subtotal con descuento
+                    'urljson': relative_file_path,  # Guardar solo la ruta relativa en la base de datos
+                    'urlimg': url_img,
+                    'status': 0,  # Estado predeterminado
+                }
             )
 
             # Devolver la ruta del archivo creada y un mensaje de éxito
             return JsonResponse({
-                'message': 'Archivo JSON creado correctamente',
+                'message': 'Archivo JSON procesado correctamente',
                 'urlJson': relative_file_path,
                 'subtotalWithoutDiscount': subtotal_without_discount,
                 'subtotalWithDiscount': subtotal_with_discount,
                 'iva': iva_amount,
                 'subtotalBruto': subtotal_bruto,
-                'purchaseId': purchase.id
+                'purchaseId': purchase.id,
+                'action': 'created' if created else 'updated'  # Indicar si se creó o actualizó
             }, status=201)
 
         except Exception as e:

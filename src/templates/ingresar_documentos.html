@@ -516,6 +516,7 @@
         el: '#app',
         delimiters: ['[[', ']]'],
         data: {
+            facturaId: null, // ID de la factura cargada
             nuevaCategoria: '', // Para la nueva categoría
             nuevaMarca: '', 
             marcas: [],
@@ -704,11 +705,6 @@
                 }
             },
             async buscarFactura() {
-                if (!this.form.numeroDocumento || !this.form.tipoDocumento) {
-                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento.', 'error');
-                    return;
-                }
-
                 try {
                     const response = await axios.get('/api/get-factura/', {
                         params: {
@@ -717,32 +713,38 @@
                         },
                     });
 
-                    // Cargar datos de la factura en el formulario
                     const data = response.data;
-                    this.form.rutProveedor = data.headers.supplier;
-                    this.form.razonSocial = data.headers.supplierName;
-                    this.form.fechaEmision = data.headers.datePurchase;
-                    this.form.fechaVencimiento = data.headers.dateExpired;
-                    this.form.descuentoGeneral = data.headers.dcto;
-                    this.form.tipoPago = data.headers.typePay;
-                    this.form.numeroCheque = data.headers.nCheque;
-                    this.form.cantidadCheque = data.headers.qtyCheque;
-                    this.form.subtotal = data.headers.subtotal;
-                    this.form.observaciones = data.headers.observation;
 
-                    // Cargar los productos en la tabla
-                    this.productosDocumento = data.details.map((detalle) => ({
+                    // Guardar el ID de la factura en el estado
+                    this.facturaId = data.headers.idFactura;
+
+                    // Rellenar el formulario con los datos de la factura
+                    this.form = {
+                        rutProveedor: data.headers.supplier,
+                        razonSocial: data.headers.supplierName,
+                        tipoDocumento: data.headers.typeDocument,
+                        numeroDocumento: data.headers.nDocument,
+                        fechaEmision: data.headers.datePurchase,
+                        fechaVencimiento: data.headers.dateExpired,
+                        descuentoGeneral: data.headers.dcto,
+                        tipoPago: data.headers.typePay,
+                        numeroCheque: data.headers.nCheque,
+                        cantidadCheque: data.headers.qtyCheque,
+                        subtotal: data.headers.subtotal,
+                        observaciones: data.headers.observation,
+                    };
+
+                    this.productosDocumento = data.details.map(detalle => ({
                         model: detalle.model,
                         sku: detalle.sku,
-                        cantidad: parseInt(detalle.qty, 10),
-                        received_quantity: parseInt(detalle.received_quantity || 0, 10),
-                        costo: parseFloat(detalle.cost),
-                        descuento: parseFloat(detalle.dctoItem),
-                        subtotal: parseFloat(detalle.subtotalItem),
+                        cantidad: detalle.qty,
+                        received_quantity: detalle.received_quantity || 0,
+                        costo: detalle.cost,
+                        descuento: detalle.dctoItem,
+                        subtotal: detalle.subtotalItem,
                         completo: detalle.checkItem === "true",
                     }));
 
-                    this.facturaCargada = true;
                     Swal.fire('Éxito', 'Factura cargada correctamente.', 'success');
                 } catch (error) {
                     console.error('Error al buscar la factura:', error);
@@ -1041,12 +1043,13 @@
             },
             enviarDatos() {
                 const jsonData = {
+                    facturaId: this.facturaId, // Incluye el ID de la factura cargada
                     headers: {
                         supplier: this.form.rutProveedor,
                         supplierName: this.form.razonSocial,
                         typeDocument: this.form.tipoDocumento,
                         nDocument: this.form.numeroDocumento,
-                        dcto: this.form.descuentoGeneral, // Descuento general
+                        dcto: this.form.descuentoGeneral,
                         datePurchase: this.form.fechaEmision,
                         dateExpired: this.form.fechaVencimiento,
                         observation: this.form.observaciones,
@@ -1060,31 +1063,23 @@
                         userProcess: "Nombre Usuario",
                         urlImg: ""
                     },
-                    details: this.productosDocumento.map((producto) => ({
+                    details: this.productosDocumento.map(producto => ({
                         qty: producto.cantidad,
                         received_quantity: producto.received_quantity,
                         completo: producto.completo,
-                        cost: producto.costo, // Ahora el costo ya tiene el descuento aplicado
-                        codeBar: producto.codebar || '',
-                        dctoItem: producto.descuento || this.form.descuentoGeneral, // Descuento por producto
+                        cost: producto.costo,
+                        dctoItem: producto.descuento,
                         subtotalItem: producto.subtotal,
-                        deliveryItem: producto.entrega,
-                        checkItem: producto.entrega ? "true" : "false",
                         sku: producto.sku,
-                        iderp: producto.iderp || "",
                         model: producto.model,
-                        idPro: ""
                     })),
-                    type: "1"
                 };
-
-                console.log("Datos enviados:", jsonData);
 
                 axios.post('/api/generar-json/', jsonData)
                     .then(response => {
                         Swal.fire({
                             title: 'Éxito',
-                            text: 'El archivo JSON se ha generado correctamente.',
+                            text: 'La factura se ha guardado correctamente.',
                             icon: 'success',
                             confirmButtonText: 'OK'
                         }).then(() => {
@@ -1095,12 +1090,13 @@
                         console.error("Error al enviar los datos:", error);
                         Swal.fire({
                             title: 'Error',
-                            text: 'Hubo un problema al generar el archivo JSON.',
+                            text: 'Hubo un problema al guardar la factura.',
                             icon: 'error',
                             confirmButtonText: 'OK'
                         });
                     });
             },
+
             mostrarTodosLosProveedores() {
                 // Obtener la lista completa de proveedores
                 axios.get('/api/get-suppliers/')
