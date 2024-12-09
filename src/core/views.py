@@ -3246,7 +3246,9 @@ def obtener_datos_producto(request):
             "lastCost": producto.lastcost or 0,
             "lastPrice": producto.lastprice or 0,
             "bsalePrice": bsale_price,
-            "totalStock": stock_total
+            "totalStock": stock_total,
+            "iderp": producto.iderp
+
         })
 
     except Products.DoesNotExist:

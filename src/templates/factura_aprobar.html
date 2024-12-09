@@ -304,7 +304,9 @@
                         this.$set(detalle, "totalStock", parseFloat(response.data.totalStock) || 0);
                         this.$set(detalle, "lastPrice", parseFloat(response.data.lastPrice) || 0);
                         this.$set(detalle, "bsalePrice", response.data.bsalePrice || "No disponible");
-                        this.$set(detalle, "precioBase", parseFloat(response.data.bsalePrice) || 0); // Asegura que sea 0 si no es válido
+                        this.$set(detalle, "precioBase", parseFloat(response.data.bsalePrice) || 0);
+                        this.$set(detalle, "iderp",response.data.iderp || "No disponible");
+                         // Asegura que sea 0 si no es válido
  // Asegura que sea un número válido
 
                         // Solo llama a calcularMargen si los datos son válidos
