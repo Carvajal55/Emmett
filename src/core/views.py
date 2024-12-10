@@ -376,7 +376,7 @@ def producto_detalles(request, product_id):
         sectores = Sectoroffice.objects.all()
         sector_mapping = {sector.idsectoroffice: sector for sector in sectores}
 
-        excluded_sectors = Sectoroffice.objects.filter(namesector="XT99-99") | Sectoroffice.objects.filter(zone="NARN") | Sectoroffice.objects.filter(zone="NRN")
+        excluded_sectors = Sectoroffice.objects.filter(namesector="XT99-99") | Sectoroffice.objects.filter(zone="NARN") | Sectoroffice.objects.filter(zone="NRN") 
         unique_products = producto.unique_products.exclude(location__in=excluded_sectors.values_list('idsectoroffice', flat=True))
 
         bodegas_stock = {bodega.idoffice: 0 for bodega in bodegas}
@@ -3341,7 +3341,8 @@ def listar_sectores(request):
             'floor',
             'section',
             'namesector',
-            'description'
+            'description',
+            
         )
         
         # Agregar el nombre de la bodega basado en `idoffice`
@@ -3426,3 +3427,171 @@ def editar_producto(request, sku):
         return JsonResponse({'success': False, 'message': 'Error al procesar el cuerpo de la solicitud'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)
+    
+from reportlab.graphics.barcode.qr import QrCodeWidget
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics import renderPDF
+from reportlab.lib.pagesizes import mm
+from reportlab.pdfgen import canvas
+
+
+@csrf_exempt
+def imprimir_etiqueta_sector_simple(request):
+    if request.method == 'POST':
+        try:
+            # Leer los datos de la solicitud
+            data = json.loads(request.body)
+            sectores = data.get('sectores', [])  # Lista de sectores [{idsector, qty}, ...]
+
+            if not sectores:
+                return JsonResponse({'error': 'La lista de sectores es obligatoria.'}, status=400)
+
+            # Configuración del PDF
+            pdf_filename = 'etiquetas_sectores.pdf'
+            relative_file_path = os.path.join('models', 'sectores', pdf_filename)
+            absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
+            os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+
+            # Configuración de la página
+            page_width, page_height = 100 * mm, 50 * mm  # Tamaño de la página
+            pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
+
+            x_positions = [10 * mm, 60 * mm]  # Posiciones horizontales para los dos QR
+            y_position = 10 * mm  # Posición vertical
+
+            current_column = 0  # Controla si estamos en la primera o segunda columna
+
+            for sector_data in sectores:
+                idsector = sector_data.get('idsector')
+                qty = sector_data.get('qty', 1)
+
+                if not idsector or qty <= 0:
+                    continue
+
+                # Obtener la información del sector
+                try:
+                    sector = Sectoroffice.objects.get(idsectoroffice=idsector)
+                except Sectoroffice.DoesNotExist:
+                    continue
+
+                # Generar la etiqueta
+                etiqueta = f"B-{sector.idoffice}-{sector.zone}{sector.floor}-{sector.section}"
+
+                for _ in range(qty):
+                    # Generar el QR
+                    qr_code = QrCodeWidget(etiqueta)
+                    qr_bounds = qr_code.getBounds()
+                    qr_width = qr_bounds[2] - qr_bounds[0]
+                    qr_height = qr_bounds[3] - qr_bounds[1]
+
+                    # Tamaño del QR en el PDF
+                    qr_size = 40 * mm
+                    qr_x = x_positions[current_column]
+                    qr_y = y_position
+
+                    # Crear un dibujo para el QR
+                    qr_drawing = Drawing(qr_size, qr_size)
+                    qr_drawing.add(qr_code)
+                    qr_drawing.scale(qr_size / qr_width, qr_size / qr_height)
+
+                    # Dibujar el QR
+                    renderPDF.draw(qr_drawing, pdf, qr_x, qr_y)
+
+                    # Agregar el texto debajo del QR
+                    pdf.setFont("Helvetica", 10)
+                    pdf.drawCentredString(qr_x + (qr_size / 2), qr_y - 5 * mm, etiqueta)
+
+                    # Mover a la siguiente columna
+                    current_column += 1
+
+                    # Si hemos llenado dos columnas, pasamos a una nueva página
+                    if current_column >= len(x_positions):
+                        pdf.showPage()
+                        current_column = 0
+
+            pdf.save()
+
+            # Devolver la URL del PDF
+            pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
+            return JsonResponse({
+                'message': 'Etiquetas generadas correctamente.',
+                'urlPdf': pdf_url
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Formato JSON inválido.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+@csrf_exempt
+def imprimir_etiquetas_masivas(request):
+    if request.method == 'POST':
+        try:
+            # Leer los datos de la solicitud
+            data = json.loads(request.body)
+            sectores = data.get('sectores', [])  # Lista de sectores [{idsector, qty}, ...]
+            
+            if not sectores:
+                return JsonResponse({'error': 'La lista de sectores es obligatoria.'}, status=400)
+
+            # Configuración del PDF
+            pdf_filename = 'etiquetas_sectores.pdf'
+            relative_file_path = os.path.join('models', 'sectores', pdf_filename)
+            absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
+            os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+
+            page_width, page_height = 100 * mm, 50 * mm
+            pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
+
+            for sector_data in sectores:
+                idsector = sector_data.get('idsector')
+                qty = sector_data.get('qty', 1)
+
+                if not idsector or qty <= 0:
+                    continue
+
+                # Obtener la información del sector
+                try:
+                    sector = Sectoroffice.objects.get(idsectoroffice=idsector)
+                except Sectoroffice.DoesNotExist:
+                    continue
+
+                # Generar la etiqueta
+                etiqueta = f"B-{sector.idoffice}-{sector.zone}{sector.floor}-{sector.section}"
+
+                for _ in range(qty):
+                    # Generar el QR
+                    qr_code = QrCodeWidget(etiqueta)
+                    qr_bounds = qr_code.getBounds()
+                    qr_drawing = Drawing(0, 0)
+                    qr_drawing.add(qr_code)
+
+                    qr_size = 40 * mm
+                    qr_x = (page_width - qr_size) / 2
+                    qr_y = (page_height - qr_size - 10 * mm)
+
+                    # Dibujar el QR y el texto
+                    renderPDF.draw(qr_drawing, pdf, qr_x, qr_y)
+                    pdf.setFont("Helvetica", 10)
+                    pdf.drawCentredString(page_width / 2, qr_y - 5 * mm, etiqueta)
+
+                    # Añadir una nueva página si hay más etiquetas
+                    pdf.showPage()
+
+            pdf.save()
+
+            # Devolver la URL del PDF
+            pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
+            return JsonResponse({
+                'message': 'Etiquetas generadas correctamente.',
+                'urlPdf': pdf_url
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Formato JSON inválido.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
