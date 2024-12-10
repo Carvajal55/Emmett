@@ -3330,29 +3330,30 @@ def listar_bodegas(request):
         return JsonResponse({'error': str(e)}, status=500)
     
 
+from django.db.models import Subquery, OuterRef
 
 def listar_sectores(request):
     try:
-        # Obtener todos los sectores y unir con los nombres de las bodegas
-        sectores = Sectoroffice.objects.all().values(
-            'idsectoroffice',
-            'idoffice',
-            'zone',
-            'floor',
-            'section',
-            'namesector',
-            'description',
-            
+        # Anotar el nombre de la bodega usando una subconsulta
+        sectores = (
+            Sectoroffice.objects.annotate(
+                bodega_name=Subquery(
+                    Bodega.objects.filter(idoffice=OuterRef('idoffice')).values('name')[:1]
+                )
+            )
+            .values(
+                'idsectoroffice',
+                'idoffice',
+                'zone',
+                'floor',
+                'section',
+                'namesector',
+                'description',
+                'bodega_name',
+            )
         )
         
-        # Agregar el nombre de la bodega basado en `idoffice`
-        sectores_list = []
-        for sector in sectores:
-            bodega_name = Bodega.objects.filter(idoffice=sector['idoffice']).values_list('name', flat=True).first()
-            sector['bodega_name'] = bodega_name if bodega_name else 'Sin nombre'
-            sectores_list.append(sector)
-        
-        return JsonResponse(sectores_list, safe=False)
+        return JsonResponse(list(sectores), safe=False)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
