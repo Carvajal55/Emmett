@@ -3433,6 +3433,7 @@ from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
 from reportlab.lib.pagesizes import mm
 from reportlab.pdfgen import canvas
+from io import BytesIO
 
 
 @csrf_exempt
