@@ -8,7 +8,10 @@
 
     <!-- Input único para ingresar sector o agregar productos por Super ID -->
     <div class="form-group">
-        <input type="text" id="sectorOrProductInput" class="form-control" v-model="inputValue" placeholder="Escanea el sector (ej. B-1-G1-1) o el Super ID del producto" @keyup.enter="procesarInput" />
+        <input type="text" id="sectorOrProductInput" class="form-control" 
+       v-model="inputValue" 
+       placeholder="Escanea el SECTOR (EJ. B-1-G1-1) o el SUPER ID del producto" 
+       @keyup.enter="procesarInput" />
     </div>
 
     <!-- Mostrar el sector actual seleccionado -->
@@ -88,13 +91,8 @@
             this.setFocus();
         },
         methods: {
-            setFocus() {
-                this.$nextTick(() => {
-                    document.getElementById("sectorOrProductInput").focus();
-                });
-            },
             procesarInput() {
-                const valor = this.inputValue.trim();
+                const valor = this.inputValue.trim().toUpperCase(); // Convertir a mayúsculas
 
                 if (valor.startsWith('B-')) {
                     if (this.sectorSeleccionado === valor) {
@@ -115,7 +113,11 @@
                 this.inputValue = '';
                 this.setFocus();  // Asegura que el foco vuelva al input después de procesar
             },
-
+            setFocus() {
+                this.$nextTick(() => {
+                    document.getElementById("sectorOrProductInput").focus();
+                });
+            },
             buscarProductos() {
                 axios.post('/api/buscar-productos-sector/', {
                     searchTerm: this.sectorSeleccionado

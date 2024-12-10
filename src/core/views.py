@@ -3498,9 +3498,13 @@ def imprimir_etiqueta_sector_simple(request):
                     # Dibujar el QR
                     renderPDF.draw(qr_drawing, pdf, qr_x, qr_y)
 
-                    # Agregar el texto debajo del QR
-                    pdf.setFont("Helvetica", 10)
-                    pdf.drawCentredString(qr_x + (qr_size / 2), qr_y - 5 * mm, etiqueta)
+                    # Dibujar el texto debajo del QR
+                    pdf.setFont("Helvetica-Bold", 25)  # Texto en negrita y grande
+                    pdf.drawCentredString(
+                        qr_x + (qr_size / 2),  # Centrar horizontalmente
+                        qr_y - 5 * mm,       # Ajustar posición vertical
+                        etiqueta              # Texto del sector
+                    )
 
                     # Mover a la siguiente columna
                     current_column += 1
