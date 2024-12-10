@@ -127,8 +127,8 @@ urlpatterns = [
    path('api/listar-sectores/', core_views.listar_sectores, name='listar_sectores'),
    #Editar Productois
    path('api/editar-producto/<str:sku>/', core_views.editar_producto, name='editar_producto'),
-   
-    path('api/bulk-upload/<str:model_type>/', core_views.bulk_upload, name='bulk_upload'),
+   path('api/bulk-upload/<str:model_type>/', core_views.bulk_upload, name='bulk_upload'),
+   path('api/imprimir-etiqueta-sector-simple/', core_views.imprimir_etiqueta_sector_simple, name='imprimir_etiqueta_sector_simple'),
 
 
 
