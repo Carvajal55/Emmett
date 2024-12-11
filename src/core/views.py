@@ -3478,6 +3478,8 @@ def imprimir_etiqueta_sector_simple(request):
 
                 # Generar la etiqueta
                 etiqueta = f"B-{sector.idoffice}-{sector.zone}{sector.floor}-{sector.section}"
+                text_etiqueta = f"{sector.zone}{sector.floor}-{sector.section}"
+
 
                 for _ in range(qty):
                     # Generar el QR
@@ -3500,11 +3502,11 @@ def imprimir_etiqueta_sector_simple(request):
                     renderPDF.draw(qr_drawing, pdf, qr_x, qr_y)
 
                     # Dibujar el texto debajo del QR
-                    pdf.setFont("Helvetica-Bold", 25)  # Texto en negrita y grande
+                    pdf.setFont("Helvetica-Bold", 30)  # Texto en negrita y grande
                     pdf.drawCentredString(
                         qr_x + (qr_size / 2),  # Centrar horizontalmente
                         qr_y - 5 * mm,       # Ajustar posición vertical
-                        etiqueta              # Texto del sector
+                        text_etiqueta              # Texto del sector
                     )
 
                     # Mover a la siguiente columna
@@ -3601,3 +3603,83 @@ def imprimir_etiquetas_masivas(request):
             return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+
+#Revisar carga masiva base de datos
+import pandas as pd
+def cargar_excel(file_path):
+    errores = []  # Lista para almacenar los errores
+
+    try:
+        # Leer el archivo Excel
+        df = pd.read_excel(file_path)
+
+        # Recorrer cada fila del Excel
+        for index, row in df.iterrows():
+            sku = row['SKU']
+            id_unico = row['IDUnico']
+            id_sector_office = row['IDSectorOffice']
+
+            # Verificar si el SKU existe en la tabla Products
+            try:
+                product = Products.objects.get(sku=sku)
+            except Products.DoesNotExist:
+                errores.append({'SKU': sku, 'Error': 'SKU no encontrado', 'Sector': id_sector_office})
+                continue
+
+            # Verificar si el ID Sector Office existe
+            try:
+                sector = Sectoroffice.objects.get(idsectoroffice=id_sector_office)
+            except Sectoroffice.DoesNotExist:
+                errores.append({'SKU': sku, 'Error': 'Sector no encontrado', 'Sector': id_sector_office})
+                continue
+
+            # Crear o actualizar el Uniqueproduct
+            Uniqueproducts.objects.update_or_create(
+                superid=id_unico,
+                defaults={
+                    'product': product,
+                    'locationname': f"Sector {id_sector_office}",
+                    'state': 1,  # Estado predeterminado
+                }
+            )
+            print(f"Producto {sku} con ID único {id_unico} asignado al sector {id_sector_office}.")
+
+        # Generar PDF de errores si existen
+        if errores:
+            generar_pdf_errores(errores, "errores_carga.pdf")
+            print("Errores encontrados. Se ha generado un archivo PDF con los detalles.")
+
+        print("Carga completada.")
+    except Exception as e:
+        print(f"Error al procesar el Excel: {str(e)}")
+
+
+def generar_pdf_errores(errores, pdf_filename):
+    try:
+        # Ruta para guardar el PDF
+        pdf_path = os.path.join("media", pdf_filename)
+        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+
+        # Crear el PDF
+        pdf = canvas.Canvas(pdf_path, pagesize=letter)
+        pdf.setFont("Helvetica", 12)
+        pdf.drawString(50, 750, "Errores de Carga Masiva")
+        pdf.drawString(50, 730, "-------------------------------------------")
+
+        y_position = 710
+        for error in errores:
+            pdf.drawString(50, y_position, f"SKU: {error['SKU']}")
+            pdf.drawString(200, y_position, f"Error: {error['Error']}")
+            pdf.drawString(400, y_position, f"Sector: {error['Sector']}")
+            y_position -= 20
+
+            if y_position < 50:  # Crear nueva página si el espacio se agota
+                pdf.showPage()
+                pdf.setFont("Helvetica", 12)
+                y_position = 750
+
+        pdf.save()
+        print(f"Archivo PDF generado: {pdf_path}")
+    except Exception as e:
+        print(f"Error al generar el PDF: {str(e)}")
