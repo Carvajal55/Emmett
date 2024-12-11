@@ -1562,6 +1562,10 @@ def search_products_by_sector(request):
 
         print(f"Término de búsqueda recibido: '{term}'")
 
+        # Reemplazar ' por - en el término de búsqueda
+        term = term.replace("'", "-")
+        print(f"Término de búsqueda modificado: '{term}'")
+
         # Verificar si el término tiene el formato correcto, comenzando con 'B-'
         if term.startswith('B-'):
             parts = term.split('-')
