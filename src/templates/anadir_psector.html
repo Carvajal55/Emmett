@@ -92,7 +92,8 @@
         },
         methods: {
             procesarInput() {
-                const valor = this.inputValue.trim().toUpperCase(); // Convertir a mayúsculas
+                let valor = this.inputValue.trim().toUpperCase(); // Convertir a mayúsculas
+                valor = valor.replace(/'/g, '-'); // Reemplazar ' por -
 
                 if (valor.startsWith('B-')) {
                     if (this.sectorSeleccionado === valor) {
@@ -111,7 +112,7 @@
                 }
 
                 this.inputValue = '';
-                this.setFocus();  // Asegura que el foco vuelva al input después de procesar
+                this.setFocus(); // Asegura que el foco vuelva al input después de procesar
             },
             setFocus() {
                 this.$nextTick(() => {
