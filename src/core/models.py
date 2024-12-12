@@ -170,7 +170,7 @@ class Uniqueproducts(models.Model):
     superid = models.CharField(db_column='superID', max_length=45, blank=True, null=True)
     locationname = models.CharField(db_column='locationName', max_length=45, blank=True, null=True)
     correlative = models.IntegerField(blank=True, null=True)
-    printlabel = models.IntegerField(db_column='printLabel', blank=True, null=True)  # Field name made lowercase.
+    printlabel = models.CharField(db_column='printLabel', blank=True, null=True,max_length=255)  # Field name made lowercase.
     state = models.IntegerField(blank=True, null=True)
     cost = models.IntegerField(blank=True, null=True)
     soldvalue = models.IntegerField(db_column='soldValue', blank=True, null=True)  # Field name made lowercase.
