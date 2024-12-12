@@ -2642,14 +2642,14 @@ def imprimir_etiqueta_qr(request):
             super_ids.append(super_id)
 
             is_left = i % 2 == 0
-            x_offset = 10 * mm if is_left else 60 * mm
+            x_offset = 1 * mm if is_left else 51 * mm
 
             # Código de barras para el SKU
-            x_sku, y_sku = x_offset - 5 * mm, 35 * mm
-            barcode_sku = code128.Code128(sku, barWidth=0.2 * mm, barHeight=6 * mm)
+            x_sku, y_sku = x_offset - 6 * mm, 38 * mm
+            barcode_sku = code128.Code128(sku, barWidth=0.3 * mm, barHeight=7 * mm)
             barcode_sku.drawOn(pdf, x_sku, y_sku)
-            pdf.setFont("Helvetica", 6)
-            pdf.drawString(x_sku, y_sku + 20, f"SKU: {sku}")
+            pdf.setFont("Helvetica-Bold", 8)
+            pdf.drawString(x_sku + 15, y_sku + 22, f"{sku}")
 
             # Generar QR Code para el SuperID
             qr = qrcode.QRCode(
@@ -2669,20 +2669,26 @@ def imprimir_etiqueta_qr(request):
             qr_image = ImageReader(buffer)
 
             # Colocar el QR Code en la etiqueta
-            x_qr, y_qr = x_offset, 8 * mm
-            qr_width, qr_height = 25 * mm, 25 * mm
+            x_qr, y_qr = x_offset, 14 * mm
+            qr_width, qr_height = 23 * mm, 23 * mm
             pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
             # Texto del SuperID
-            pdf.setFont("Helvetica", 6)
-            pdf.drawString(x_qr, y_qr - 5, f"SuperID: {super_id}")
+            pdf.setFont("Helvetica-Bold", 8)
+            pdf.drawString(x_qr, y_qr - 10, f" {super_id}")
 
             # Texto adicional: Producto y Fecha (dateadd)
-            y_product_text = y_qr - 10  # Debajo del SuperID
+            y_product_text = y_qr - 20  # Debajo del SuperID
             y_date_text = y_product_text - 8
-            pdf.setFont("Helvetica", 6)
-            pdf.drawString(x_qr, y_product_text, f"Producto: {producto.nameproduct}")
-            pdf.drawString(x_qr, y_date_text, f"Fecha: {date.today().strftime('%d-%m-%Y')}")
+
+            # Texto del nombre del producto y iddocumentincome
+            pdf.setFont("Helvetica-Bold", 8)
+            pdf.drawString(x_qr, y_product_text, f"{producto.nameproduct}")
+            pdf.drawString(x_qr + 20 * mm, y_product_text, f"{number}")  # Campo iddocumentincome alineado a la derecha
+
+            # Texto de la fecha y el contador de etiquetas
+            pdf.drawString(x_qr, y_date_text, f"{date.today().strftime('%d-%m-%Y')}")
+            pdf.drawString(x_qr + 20 * mm, y_date_text, f"{i + 1} de {qty}")  # Contador alineado a la derecha
 
             # Guardar el nuevo UniqueProduct
             Uniqueproducts.objects.create(
