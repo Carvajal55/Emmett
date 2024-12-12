@@ -2599,35 +2599,32 @@ def validate_superid_simplified(request):
 
 """Imprimir Etiquetas"""
 from reportlab.lib.utils import ImageReader
-
+from datetime import date
 
 @csrf_exempt
 def imprimir_etiqueta_qr(request):
     if request.method == 'POST':
         # Obtener los datos enviados desde el front-end
         sku = request.POST.get('sku')
+        number = request.POST.get('number')
         model = request.POST.get('model')
         qty = int(request.POST.get('qty', 1))
         codebar = request.POST.get('codebar', '')
         url_json = request.POST.get('urlJson')  # Ruta del archivo JSON
 
-        # Validaciones iniciales
         if not sku or qty <= 0 or not url_json:
             return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
 
-        # Obtener el producto correspondiente del modelo Products
         try:
             producto = Products.objects.get(sku=sku)
         except Products.DoesNotExist:
             return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
 
-        # Crear el nombre y la ruta del archivo PDF
         pdf_filename = f'etiqueta_{sku}.pdf'
         relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
         absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
         os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
-        # Obtener el último correlativo y SuperID para el producto
         last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
         base_numeric_sku = ''.join(filter(str.isdigit, sku))  # Extraer números del SKU
@@ -2636,65 +2633,79 @@ def imprimir_etiqueta_qr(request):
 
         base_superid = f"{base_numeric_sku}e"
 
-        # Crear el PDF con tamaño 10.2 cm x 5 cm
         page_width, page_height = 102 * mm, 50 * mm
         pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
 
         super_ids = []
         for i in range(qty):
-            # Generar SuperID
             super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
             super_ids.append(super_id)
 
-            # Determinar posición en la etiqueta (lado izquierdo o derecho)
             is_left = i % 2 == 0
-            x_offset = 10 * mm if is_left else 60 * mm  # Ajustar posición horizontal
+            x_offset = 10 * mm if is_left else 60 * mm
 
             # Código de barras para el SKU
-            x_sku, y_sku = x_offset - 5 * mm, 30 * mm  # Ajustar posición
-            barcode_sku = code128.Code128(sku, barWidth=0.25 * mm, barHeight=8 * mm)
+            x_sku, y_sku = x_offset - 5 * mm, 35 * mm
+            barcode_sku = code128.Code128(sku, barWidth=0.2 * mm, barHeight=6 * mm)
             barcode_sku.drawOn(pdf, x_sku, y_sku)
             pdf.setFont("Helvetica", 6)
-            pdf.drawString(x_sku, y_sku - 10, f"SKU: {sku}")
+            pdf.drawString(x_sku, y_sku + 20, f"SKU: {sku}")
 
             # Generar QR Code para el SuperID
             qr = qrcode.QRCode(
                 version=1,
                 error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=4,
-                border=2,
+                box_size=6,
+                border=0,  # Sin borde blanco
             )
             qr.add_data(super_id)
             qr.make(fit=True)
 
-            # Convertir QR a imagen binaria
             qr_img = qr.make_image(fill_color="black", back_color="white")
             buffer = BytesIO()
             qr_img.save(buffer, format="PNG")
             buffer.seek(0)
 
-            # Usar ImageReader para leer la imagen desde BytesIO
             qr_image = ImageReader(buffer)
 
             # Colocar el QR Code en la etiqueta
-            x_qr, y_qr = x_offset, 10 * mm  # Ajustar posición del QR
-            qr_width, qr_height = 20 * mm, 20 * mm  # Tamaño del QR
+            x_qr, y_qr = x_offset, 8 * mm
+            qr_width, qr_height = 25 * mm, 25 * mm
             pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
-            # Texto del SuperID debajo del QR
+            # Texto del SuperID
             pdf.setFont("Helvetica", 6)
             pdf.drawString(x_qr, y_qr - 5, f"SuperID: {super_id}")
+
+            # Texto adicional: Producto y Fecha (dateadd)
+            y_product_text = y_qr - 10  # Debajo del SuperID
+            y_date_text = y_product_text - 8
+            pdf.setFont("Helvetica", 6)
+            pdf.drawString(x_qr, y_product_text, f"Producto: {producto.nameproduct}")
+            pdf.drawString(x_qr, y_date_text, f"Fecha: {date.today().strftime('%d-%m-%Y')}")
+
+            # Guardar el nuevo UniqueProduct
+            Uniqueproducts.objects.create(
+                product=producto,
+                superid=super_id,
+                correlative=current_correlative,
+                state=0,
+                cost=producto.lastcost,
+                locationname="Almacen",
+                observation="Etiqueta generada automáticamente",
+                printlabel=os.path.join(settings.MEDIA_URL, relative_file_path),  # Guardar URL en printlabel
+                iddocumentincome=number,
+                dateadd=date.today()
+            )
 
             # Incrementar el correlativo
             current_correlative += 1
 
-            # Añadir una nueva página después de dos etiquetas
             if not is_left and i < qty - 1:
                 pdf.showPage()
 
         pdf.save()
 
-        # Modificar el archivo JSON para marcar el producto como impreso
         try:
             with open(url_json, 'r+') as json_file:
                 data = json.load(json_file)
@@ -2707,16 +2718,14 @@ def imprimir_etiqueta_qr(request):
         except (FileNotFoundError, json.JSONDecodeError) as e:
             return JsonResponse({'error': f'Error al procesar el archivo JSON: {str(e)}'}, status=400)
 
-        # Actualizar el estado de la factura si todos los productos están impresos
         try:
             factura = Purchase.objects.get(urljson=url_json)
             if all(detail.get('printed') for detail in data.get('details', [])):
-                factura.status = 3  # Procesado
+                factura.status = 3
                 factura.save()
         except Purchase.DoesNotExist:
             pass
 
-        # Devolver la URL del PDF generado
         pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
         return JsonResponse({
             'urlPdf': pdf_url,
@@ -2725,6 +2734,7 @@ def imprimir_etiqueta_qr(request):
         })
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
 
 
 
