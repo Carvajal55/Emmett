@@ -601,8 +601,12 @@ def resumen_factura(request):
             with open(json_file_path, 'r') as file:
                 json_data = json.load(file)
                 
-                # Extraer el detalle de la factura
+                # Extraer los valores del header y detalles
+                header = json_data.get('headers', {})  # Asegurar que sea un diccionario
                 detalles = json_data.get('details', [])
+
+                # Extraer el número del documento del header
+                n_document = header.get('nDocument', None)  # Usar el nombre correcto de la clave
 
                 # Añadir el campo `printed` si no existe en cada detalle
                 for detalle in detalles:
@@ -610,7 +614,7 @@ def resumen_factura(request):
                         detalle['printed'] = False
 
                 # Determinar si la factura completa está marcada como impresa
-                json_data['invoice_printed'] = all(detalle.get('printed', False) for detalle in detalles)
+                invoice_printed = all(detalle.get('printed', False) for detalle in detalles)
 
                 # Guardar los cambios en el archivo JSON para que persista la estructura
                 with open(json_file_path, 'w') as file:
@@ -619,7 +623,8 @@ def resumen_factura(request):
                 # Enviar los detalles y la URL del JSON como respuesta
                 return JsonResponse({
                     'details': detalles,
-                    'invoice_printed': json_data['invoice_printed'],
+                    'number': n_document,  # Usar n_document en la respuesta
+                    'invoice_printed': invoice_printed,
                     'urlJson': url_json  # Incluye la URL del JSON en la respuesta
                 })
         else:
@@ -2641,49 +2646,50 @@ def imprimir_etiqueta_qr(request):
             super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
             super_ids.append(super_id)
 
-            # Parte izquierda de la etiqueta (Código de barras para SKU)
-            x_sku, y_sku = 5 * mm, 35 * mm
-            barcode_sku = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
+            # Determinar posición en la etiqueta (lado izquierdo o derecho)
+            is_left = i % 2 == 0
+            x_offset = 10 * mm if is_left else 60 * mm  # Ajustar posición horizontal
+
+            # Código de barras para el SKU
+            x_sku, y_sku = x_offset - 5 * mm, 30 * mm  # Ajustar posición
+            barcode_sku = code128.Code128(sku, barWidth=0.25 * mm, barHeight=8 * mm)
             barcode_sku.drawOn(pdf, x_sku, y_sku)
             pdf.setFont("Helvetica", 6)
-            pdf.drawString(x_sku + 20, y_sku - 10, f"SKU: {sku}")
+            pdf.drawString(x_sku, y_sku - 10, f"SKU: {sku}")
 
-            # Parte derecha de la etiqueta (Código QR para SuperID)
-            x_qr, y_qr = 60 * mm, 10 * mm
-            qr_code = qrcode.QRCode(
+            # Generar QR Code para el SuperID
+            qr = qrcode.QRCode(
                 version=1,
                 error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=1
+                box_size=4,
+                border=2,
             )
-            qr_code.add_data(super_id)
-            qr_code.make(fit=True)
-            qr_img = qr_code.make_image(fill='black', back_color='white')
+            qr.add_data(super_id)
+            qr.make(fit=True)
 
-            qr_img_buffer = io.BytesIO()
-            qr_code.make_image(fill='black', back_color='white').save(qr_img_buffer, format='PNG')
-            qr_img_buffer.seek(0)
-            try:
-                pdf.drawImage(ImageReader(qr_img_buffer), x_qr, y_qr, 25 * mm, 25 * mm)
-            except Exception as e:
-                return JsonResponse({'error': f'Error al insertar QR en PDF: {str(e)}'}, status=500)
+            # Convertir QR a imagen binaria
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            buffer = BytesIO()
+            qr_img.save(buffer, format="PNG")
+            buffer.seek(0)
 
-            # Guardar el nuevo UniqueProduct
-            Uniqueproducts.objects.create(
-                product=producto,
-                superid=super_id,
-                correlative=current_correlative,
-                state=0,
-                cost=producto.lastcost,
-                locationname="Almacen",
-                observation="Etiqueta generada automáticamente"
-            )
+            # Usar ImageReader para leer la imagen desde BytesIO
+            qr_image = ImageReader(buffer)
+
+            # Colocar el QR Code en la etiqueta
+            x_qr, y_qr = x_offset, 10 * mm  # Ajustar posición del QR
+            qr_width, qr_height = 20 * mm, 20 * mm  # Tamaño del QR
+            pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
+
+            # Texto del SuperID debajo del QR
+            pdf.setFont("Helvetica", 6)
+            pdf.drawString(x_qr, y_qr - 5, f"SuperID: {super_id}")
 
             # Incrementar el correlativo
             current_correlative += 1
 
-            # Añadir una nueva página si es necesario
-            if i < qty - 1:
+            # Añadir una nueva página después de dos etiquetas
+            if not is_left and i < qty - 1:
                 pdf.showPage()
 
         pdf.save()
@@ -2708,7 +2714,7 @@ def imprimir_etiqueta_qr(request):
                 factura.status = 3  # Procesado
                 factura.save()
         except Purchase.DoesNotExist:
-            pass  # Si no existe la factura, no hacemos nada
+            pass
 
         # Devolver la URL del PDF generado
         pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
@@ -2719,6 +2725,7 @@ def imprimir_etiqueta_qr(request):
         })
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
 
 
 
@@ -2809,7 +2816,8 @@ def imprimir_etiqueta(request):
                 state=0,
                 cost=producto.lastcost,
                 locationname="Almacen",
-                observation="Etiqueta generada automáticamente"
+                observation="Etiqueta generada automáticamente",
+                printlabel=os.path.join(settings.MEDIA_URL, relative_file_path)  # Guardar URL en printlabel
             )
 
             # Incrementar el correlativo

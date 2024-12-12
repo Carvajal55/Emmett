@@ -99,7 +99,7 @@
                             <td>[[ detalle.model ]]</td>
                             <td>[[ detalle.qty ]]</td>
                             <td>
-                                <button @click="imprimirDetalle(detalle)" class="btn btn-success btn-sm">Imprimir Etiqueta</button>
+                                <button @click="imprimirDetalle(detalle,factura)" class="btn btn-success btn-sm">Imprimir Etiqueta</button>
                             </td>
                             <td>
                                 <button @click="imprimirDetalleQR(detalle)" class="btn btn-success btn-sm">Imprimir Etiqueta QR</button>
@@ -185,8 +185,10 @@
             formatCurrency(value) {
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
                 },
-                imprimirDetalle(detalle) {
+            imprimirDetalle(detalle,factura) {
                     console.log("Imprimiendo detalle:", detalle);
+                    console.log("Imprimiendo Factura:", factura);
+
 
                     // Crear el formulario con los datos necesarios para la impresión
                     let formData = new FormData();
