@@ -72,7 +72,14 @@
                     <p><strong>SKU:</strong> [[ selectedProduct.sku ]]</p>
                     <p><strong>Precio:</strong> [[ selectedProduct.price ]]</p>
                     <p><strong>Stock Total:</strong> [[ selectedProduct.stock_total ]]</p>
-
+                
+                    <h6>Filtrar por Bodega</h6>
+                    <select v-model="selectedBodega" class="form-select mb-3">
+                        <option value="">Todas las Bodegas</option>
+                        <option v-for="(stock, bodega) in selectedProduct.bodegas" :key="bodega" :value="bodega">
+                            [[ bodega ]]
+                        </option>
+                    </select>
                     <h6>Stock por Bodega</h6>
                     <table class="table table-bordered">
                         <thead>
@@ -92,7 +99,7 @@
                             </tr>
                         </tbody>
                     </table>
-
+                
                     <h6>Super ID y Ubicaciones</h6>
                     <table class="table table-bordered">
                         <thead>
@@ -100,15 +107,13 @@
                                 <th>Super ID</th>
                                 <th>Ubicación</th>
                                 <th>Bodega</th>
-                                <!-- <th>Stock</th> -->
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(uniqueProduct, index) in selectedProduct.unique_products" :key="index">
+                            <tr v-for="(uniqueProduct, index) in filteredUniqueProducts" :key="index">
                                 <td>[[ uniqueProduct.superid ]]</td>
                                 <td>[[ uniqueProduct.locationname ]]</td>
                                 <td>[[ uniqueProduct.bodega ]]</td>
-                                <!-- <td>[[ uniqueProduct.stock ]]</td> -->
                             </tr>
                         </tbody>
                     </table>
@@ -135,7 +140,9 @@
             totalPages: 1,            // Total de páginas
             maxVisiblePages: 10,      // Máximo de páginas visibles en la paginación
             selectedProduct: null,    // Producto seleccionado
-            cancelTokenSource: null   // Token para cancelar solicitudes anteriores
+            cancelTokenSource: null,   // Token para cancelar solicitudes anteriores
+            selectedProduct: null,  // Producto seleccionado
+            selectedBodega: '', 
         },
         computed: {
             visiblePages() {
@@ -148,6 +155,21 @@
                     pages.push(i);
                 }
                 return pages;
+            },
+            filteredUniqueProducts() {
+                if (!this.selectedProduct || !this.selectedProduct.unique_products) {
+                    return []; // Si no hay producto seleccionado o no tiene unique_products, devuelve un array vacío
+                }
+
+                if (this.selectedBodega) {
+                    // Filtrar los productos únicos por la bodega seleccionada
+                    return this.selectedProduct.unique_products.filter(
+                        product => product.bodega === this.selectedBodega
+                    );
+                }
+
+                // Si no hay bodega seleccionada, devolver todos los productos únicos
+                return this.selectedProduct.unique_products;
             }
         },
         methods: {
@@ -187,7 +209,10 @@
                 try {
                     const response = await axios.get(`/api/producto-detalles/${productId}/`);
                     this.selectedProduct = response.data;
-    
+
+                    // Reiniciar el filtro de bodega al ver un nuevo producto
+                    this.selectedBodega = '';
+
                     // Hacer scroll hacia la sección de detalles del producto
                     const detalles = document.getElementById('detalles-producto');
                     if (detalles) {

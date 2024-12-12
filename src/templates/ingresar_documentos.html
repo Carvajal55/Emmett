@@ -105,6 +105,10 @@
                                 <label for="nombreProducto" class="form-label">Nombre Producto</label>
                                 <input type="text" class="form-control" v-model="nuevoProducto.nombre">
                             </div>
+                            <div class="col-6 mb-3">
+                                <label for="nombreProducto" class="form-label">Alias del Producto</label>
+                                <input type="text" class="form-control" v-model="nuevoProducto.alias">
+                            </div>
                             <!-- Marca -->
                             <div class="col-6 mb-3">
                                 <label for="marcaProducto" class="form-label">Marca</label>
@@ -976,7 +980,8 @@
                 // Construimos el objeto nuevoProducto con todos los datos del formulario
                 const nuevoProducto = {
                     sku: this.nuevoProducto.sku,            // SKU generado o ingresado
-                    nombre: this.nuevoProducto.nombre,      // Nombre del producto
+                    nombre: this.nuevoProducto.nombre,  
+                    alias: this.nuevoProducto.alias,      // Nombre del producto    // Nombre del producto
                     marca: this.nuevoProducto.marca,        // Marca del producto
                     precio: this.nuevoProducto.precio,      // Precio del producto
                     proveedor: this.nuevoProducto.proveedor, // ID del proveedor seleccionado

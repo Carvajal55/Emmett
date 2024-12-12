@@ -288,9 +288,8 @@ def listar_bodegas(request):
 
 def buscar_productosAPI(request):
     query = request.GET.get('q', '').strip()
-    page = request.GET.get('page', 1)
+    page = int(request.GET.get('page', 1))
 
-    # Validar si hay un término de búsqueda
     if not query:
         return JsonResponse({
             'products': [],
@@ -298,69 +297,68 @@ def buscar_productosAPI(request):
             'current_page': 1
         }, status=200)
 
-    # Filtrar productos por SKU o nombre
+    # Filtrar productos por SKU, nombre o prefijo
     productos = Products.objects.filter(
-        Q(sku__icontains=query) | Q(nameproduct__icontains=query)
-    ).prefetch_related('unique_products')
+        Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
+    ).prefetch_related(
+        'unique_products'
+    )
 
-    # IDs de las bodegas válidas para stock
-    valid_bodega_ids = [10, 9, 7, 6, 5, 4, 2, 1]
+    # Obtener los sectores válidos directamente
+    valid_sectores = Sectoroffice.objects.filter(
+        idoffice__in=[10, 9, 7, 6, 5, 4, 2, 1]
+    ).exclude(
+        namesector__in=['XT99-99', 'NRN1-1']
+    )
+    valid_sector_map = {sector.idsectoroffice: sector.namesector for sector in valid_sectores}
 
-    # Obtener todos los sectores de la oficina, mapeados por su ID
-    sectores = {sector.idsectoroffice: sector for sector in Sectoroffice.objects.all()}
-
-    # Paginación, 10 productos por página
+    # Paginación
     paginator = Paginator(productos, 10)
     try:
         productos_page = paginator.page(page)
-    except PageNotAnInteger:
+    except (EmptyPage, PageNotAnInteger):
         productos_page = paginator.page(1)
-    except EmptyPage:
-        productos_page = paginator.page(paginator.num_pages)
 
-    # Serializar los productos
+    # Serializar productos
     productos_data = []
     for producto in productos_page:
+        unique_products = producto.unique_products.filter(state=0)
+
+        # Procesar stock y ubicaciones válidas
+        stock_total = 0
         unique_products_data = []
-        stock_total = 0  # Contador para stock total en bodegas válidas
-
-        for unique_product in producto.unique_products.filter(state=0):
-            # Obtener el sector asociado
-            sector = sectores.get(unique_product.location)
-
-            # Verificar si el producto está en un sector válido y si su bodega está permitida
-            if sector and sector.idoffice in valid_bodega_ids and sector.namesector not in ['XT99-99', 'NRN1-1']:
+        for up in unique_products:
+            sector_name = valid_sector_map.get(up.location)
+            if sector_name:
                 stock_total += 1
                 unique_products_data.append({
-                    'superid': unique_product.superid,
-                    'locationname': sector.namesector
+                    'superid': up.superid,
+                    'locationname': sector_name,
                 })
 
-        # Serialización de producto principal
+        # Serializar producto principal
         productos_data.append({
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
-            'price': producto.lastprice or 0,  # Default a 0 si no está definido
-            'stock_total': stock_total,  # Solo cuenta stock en bodegas válidas
+            'price': producto.lastprice or 0,
+            'stock_total': stock_total,
             'unique_products': unique_products_data,
-            'prefixed': producto.prefixed or '',  # Campo opcional
-            'brands': producto.brands or '',      # Campo opcional
-            'iderp': producto.iderp or '',        # Campo opcional
-            'alto': producto.alto or 0,          # Campo opcional
-            'largo': producto.largo or 0,        # Campo opcional
-            'profundidad': producto.profundidad or 0,  # Campo opcional
-            'peso': producto.peso or 0           # Campo opcional
+            'prefixed': producto.prefixed or '',
+            'brands': producto.brands or '',
+            'iderp': producto.iderp or '',
+            'alto': producto.alto or 0,
+            'largo': producto.largo or 0,
+            'profundidad': producto.profundidad or 0,
+            'peso': producto.peso or 0,
         })
 
     # Respuesta JSON
-    response = {
+    return JsonResponse({
         'products': productos_data,
         'total_pages': paginator.num_pages,
         'current_page': productos_page.number,
-    }
-
-    return JsonResponse(response, safe=False)
+    }, safe=False)
 
 
 
@@ -1053,6 +1051,7 @@ def crear_producto(request):
         largo = data.get("largo")
         profundidad = data.get("profundidad")
         peso = data.get("peso")
+        alias = data.get("alias")
 
         # Validar que la marca exista en la base de datos
         marcas_existentes = [brand.name for brand in Brand.objects.all()]
@@ -1112,6 +1111,7 @@ def crear_producto(request):
                 nuevo_producto = Products.objects.create(
                     sku=sku,
                     nameproduct=nombre_producto,
+                    prefixed = alias,
                     brands=marca,
                     codebar=bar_code,
                     iderp=bsale_variant["id"],  # ID de la variante en lugar del producto
