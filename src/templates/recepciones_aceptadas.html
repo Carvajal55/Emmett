@@ -98,7 +98,7 @@
                             <td>[[ detalle.sku ]]</td>
                             <td>[[ detalle.model ]]</td>
                             <td>[[ detalle.qty ]]</td>
-                            <td>
+                            <td class="d-none">
                                 <button @click="imprimirDetalle(detalle,factura)" class="btn btn-success btn-sm">Imprimir Etiqueta</button>
                             </td>
                             <td>
@@ -169,7 +169,7 @@
                         
                         // Asignar `urlJson` a cada detalle
                         this.detallesFactura = this.facturaCompleta.details.map(detalle => {
-                            return { ...detalle, urlJson: this.facturaCompleta.urlJson };
+                            return { ...detalle, urlJson: this.facturaCompleta.urlJson,number: this.facturaCompleta.number };
                         });
 
                         // Mostrar el modal
@@ -185,9 +185,8 @@
             formatCurrency(value) {
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
                 },
-            imprimirDetalle(detalle,factura) {
+            imprimirDetalle(detalle) {
                     console.log("Imprimiendo detalle:", detalle);
-                    console.log("Imprimiendo Factura:", factura);
 
 
                     // Crear el formulario con los datos necesarios para la impresión
@@ -198,12 +197,14 @@
                     formData.append('codebar', detalle.codebar || '');
                     formData.append('urlJson', detalle.urlJson);
 
+
                     console.log("Datos enviados a la API:", {
                         sku: detalle.sku,
                         model: detalle.model,
                         qty: detalle.qty,
                         codebar: detalle.codebar || '',
-                        urlJson: detalle.urlJson
+                        urlJson: detalle.urlJson,
+                        number:factura.number
                     });
 
                     // Enviar la solicitud al backend para generar la etiqueta
@@ -277,13 +278,17 @@
                 formData.append('qty', detalle.qty);
                 formData.append('codebar', detalle.codebar || '');
                 formData.append('urlJson', detalle.urlJson);
+                formData.append('number', detalle.number);
+
+
 
                 console.log("Datos enviados a la API:", {
                     sku: detalle.sku,
                     model: detalle.model,
                     qty: detalle.qty,
                     codebar: detalle.codebar || '',
-                    urlJson: detalle.urlJson
+                    urlJson: detalle.urlJson,
+                    number: detalle.number
                 });
 
                 // Enviar la solicitud al backend para generar la etiqueta
