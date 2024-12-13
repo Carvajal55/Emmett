@@ -2668,7 +2668,7 @@ def imprimir_etiqueta_qr(request):
             pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
             # SKU
-            pdf.setFont("Helvetica-Bold", 8)
+            pdf.setFont("Helvetica-Bold", 10)
             pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{sku}")
 
             # Etiqueta contador
@@ -2679,20 +2679,20 @@ def imprimir_etiqueta_qr(request):
 
             # Nombre del producto
             y_product_text = y_qr - 15
-            pdf.setFont("Helvetica-Bold", 8)
+            pdf.setFont("Helvetica-Bold", 10)
             pdf.drawString(x_qr, y_product_text, f"{producto.nameproduct}")
             # Código de barras
             x_barcode = x_qr - 6 * mm  # Mover a la derecha o ajustar como desees
             y_barcode = y_qr - 50 # Ajustar a la misma altura del QR
-            barcode_sku = code128.Code128(sku, barWidth=0.3 * mm, barHeight=8 * mm)
+            barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
             barcode_sku.drawOn(pdf, x_barcode, y_barcode)
            
 
             # SuperID y número de documento
             y_super_id = y_barcode + 30
-            pdf.setFont("Helvetica-Bold", 8)
+            pdf.setFont("Helvetica-Bold",10)
             pdf.drawString(x_qr, y_super_id - 3, f"{super_id}")
-            pdf.drawString(x_qr + 25 * mm, y_super_id , f"{number}")
+            pdf.drawString(x_qr + 25 * mm, y_super_id -3 , f"{number}")
 
             # Guardar el nuevo UniqueProduct
             Uniqueproducts.objects.create(
@@ -2715,6 +2715,17 @@ def imprimir_etiqueta_qr(request):
                 pdf.showPage()
 
         pdf.save()
+
+        # Actualizar el stock en Bsale
+        office_id = 1  # ID de la oficina en Bsale, cámbialo según sea necesario
+        variant_id = producto.iderp  # Supongamos que el ID del producto es el mismo que la variante en Bsale
+        cost = producto.lastcost
+        print(variant_id, office_id, qty,cost,"DATOS PARA BSALE")
+        bsale_response = actualizar_stock_bsale(variant_id, office_id, qty,cost)
+
+        if not bsale_response:
+            return JsonResponse({'error': 'Etiqueta creada, pero no se pudo actualizar stock en Bsale.'}, status=500)
+
 
         try:
             with open(url_json, 'r+') as json_file:
