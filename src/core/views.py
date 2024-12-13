@@ -2642,20 +2642,18 @@ def imprimir_etiqueta_qr(request):
             super_ids.append(super_id)
 
             is_left = i % 2 == 0
-            x_offset = 1 * mm if is_left else 51 * mm
+            x_offset = 3 * mm if is_left else 56 * mm
 
-            # Código de barras para el SKU
-            x_sku, y_sku = x_offset - 6 * mm, 38 * mm
-            barcode_sku = code128.Code128(sku, barWidth=0.3 * mm, barHeight=7 * mm)
-            barcode_sku.drawOn(pdf, x_sku, y_sku)
-            pdf.setFont("Helvetica-Bold", 8)
-            pdf.drawString(x_sku + 15, y_sku + 22, f"{sku}")
+            # QR Code
+            x_qr, y_qr = x_offset, 25 * mm
+            x_bar = x_offset, 25 * mm
 
-            # Generar QR Code para el SuperID
+            qr_width, qr_height = 22 * mm, 22 * mm
+
             qr = qrcode.QRCode(
                 version=1,
                 error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=6,
+                box_size=5,
                 border=0,  # Sin borde blanco
             )
             qr.add_data(super_id)
@@ -2667,28 +2665,34 @@ def imprimir_etiqueta_qr(request):
             buffer.seek(0)
 
             qr_image = ImageReader(buffer)
-
-            # Colocar el QR Code en la etiqueta
-            x_qr, y_qr = x_offset, 14 * mm
-            qr_width, qr_height = 23 * mm, 23 * mm
             pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
-            # Texto del SuperID
+            # SKU
             pdf.setFont("Helvetica-Bold", 8)
-            pdf.drawString(x_qr, y_qr - 10, f" {super_id}")
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{sku}")
 
-            # Texto adicional: Producto y Fecha (dateadd)
-            y_product_text = y_qr - 20  # Debajo del SuperID
-            y_date_text = y_product_text - 8
+            # Etiqueta contador
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
 
-            # Texto del nombre del producto y iddocumentincome
+            # Fecha
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
+
+            # Nombre del producto
+            y_product_text = y_qr - 15
             pdf.setFont("Helvetica-Bold", 8)
             pdf.drawString(x_qr, y_product_text, f"{producto.nameproduct}")
-            pdf.drawString(x_qr + 20 * mm, y_product_text, f"{number}")  # Campo iddocumentincome alineado a la derecha
+            # Código de barras
+            x_barcode = x_qr - 6 * mm  # Mover a la derecha o ajustar como desees
+            y_barcode = y_qr - 50 # Ajustar a la misma altura del QR
+            barcode_sku = code128.Code128(sku, barWidth=0.3 * mm, barHeight=8 * mm)
+            barcode_sku.drawOn(pdf, x_barcode, y_barcode)
+           
 
-            # Texto de la fecha y el contador de etiquetas
-            pdf.drawString(x_qr, y_date_text, f"{date.today().strftime('%d-%m-%Y')}")
-            pdf.drawString(x_qr + 20 * mm, y_date_text, f"{i + 1} de {qty}")  # Contador alineado a la derecha
+            # SuperID y número de documento
+            y_super_id = y_barcode + 30
+            pdf.setFont("Helvetica-Bold", 8)
+            pdf.drawString(x_qr, y_super_id - 3, f"{super_id}")
+            pdf.drawString(x_qr + 25 * mm, y_super_id , f"{number}")
 
             # Guardar el nuevo UniqueProduct
             Uniqueproducts.objects.create(
@@ -2740,6 +2744,7 @@ def imprimir_etiqueta_qr(request):
         })
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
 
 
 
