@@ -4,6 +4,9 @@
 {% block content %}
 <body class="" >
     <head>
+        <audio id="successSound" src="{% static 'sounds/success.mp3' %}" preload="auto"></audio>
+        <audio id="errorSound" src="{% static 'sounds/error.mp3' %}" preload="auto"></audio>
+
         <meta charset="utf-8">
         <title>Despacho</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -108,7 +111,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                        <button type="button" class="btn btn-primary" @click="dispatchInternalProducts">Despachar Internamente</button>
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="">Despachar Internamente</button>
                     </div>
                 </div>
             </div>
@@ -240,75 +243,60 @@
                     console.error(error);
                 });
             },
-            validateAndLinkSuperid(isInternal = false) {
-
-                if (isInternal === undefined) {
-                    isInternal = false;
+            playSound(soundId) {
+                const audioElement = document.getElementById(soundId);
+                if (audioElement) {
+                    audioElement.play();
+                } else {
+                    console.error(`El sonido con ID ${soundId} no se encontró.`);
                 }
-
-                console.log('Contexto detectado (isInternal):', isInternal);
-                console.log('SID Escaneado:', this.sid);
-               
-
+            },
+            validateAndLinkSuperid(isInternal = false) {
                 const superidToValidate = this.sid;
 
                 axios.post('/api/validate-superid/', { sid: superidToValidate })
                     .then(response => {
                         if (response.data.icon === 'success') {
-                            const productSku = response.data.sku;
-                            const productDescription = response.data.description;
+                            const product = {
+                                superid: superidToValidate,
+                                code: response.data.sku,
+                                description: response.data.description
+                            };
 
-                            // Seleccionar la lista de destino según el contexto
-                            const targetList = isInternal ? this.internalProducts : this.products;
+                            // Llamar a dispatchConsumption directamente
+                            this.dispatchConsumption(product);
 
-                            console.log('Lista seleccionada antes de agregar:', targetList);
-
-                            // Verificar si el SuperID ya está en la lista correspondiente
-                            if (!targetList.some(product => product.superid === superidToValidate)) {
-                                targetList.push({
-                                    superid: superidToValidate,
-                                    code: productSku,
-                                    description: productDescription
-                                });
-                                console.log('Producto agregado:', {
-                                    superid: superidToValidate,
-                                    code: productSku,
-                                    description: productDescription
-                                });
-                                this.sid = ''; // Limpiar el campo de entrada
-                            } else {
-                                const context = isInternal ? 'interno' : 'principal';
-                                Swal.fire('Advertencia', `Este SuperID ya fue escaneado en el despacho ${context}.`, 'warning');
-                            }
+                            this.sid = ''; // Limpiar el campo de entrada
                         } else {
                             Swal.fire('Error', response.data.title, response.data.icon);
+                            this.playSound('errorSound'); // Reproducir sonido de error
                         }
                     })
                     .catch(error => {
                         Swal.fire('Error', 'Error al validar el SuperID.', 'error');
+                        this.playSound('errorSound'); // Reproducir sonido de error
                         console.error(error);
                     });
             },
-            dispatchConsumption() {
-                const payload = this.products.map(product => ({
-                    code: product.code,
-                    quantity: product.count,
-                    superid: product.superid
-                }));
-                
+            dispatchConsumption(product) {
                 axios.post('/api/dispatch-consumption/', {
                     nDocument: this.nDocument,
                     typeDocument: this.typeDocument,
                     company: this.company,
-                    products: payload
-                }).then(response => {
+                    products: [product] // Enviamos el producto como un array con un solo elemento
+                })
+                .then(response => {
                     if (response.data.icon === 'success') {
-                        Swal.fire('Éxito', 'Productos despachados con éxito.', 'success');
+                        Swal.fire('Éxito', `Producto ${product.code} despachado con éxito.`, 'success');
+                        this.playSound('successSound'); // Reproducir sonido de éxito
                     } else {
                         Swal.fire('Error', response.data.title, response.data.icon);
+                        this.playSound('errorSound'); // Reproducir sonido de error
                     }
-                }).catch(error => {
-                    Swal.fire('Error', 'Error al despachar los productos.', 'error');
+                })
+                .catch(error => {
+                    Swal.fire('Error', 'Error al despachar el producto.', 'error');
+                    this.playSound('errorSound'); // Reproducir sonido de error
                     console.error(error);
                 });
             },

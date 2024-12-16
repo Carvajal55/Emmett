@@ -4,6 +4,8 @@
 {% block content %}
 <div id="app" class="m-2">
     <audio id="successSound" src="{% static 'sounds/success.mp3' %}" preload="auto"></audio>
+    <audio id="errorSound" src="{% static 'sounds/error.mp3' %}" preload="auto"></audio>
+
     <h3>Gestión de Productos por Sector</h3>
 
     <!-- Input único para ingresar sector o agregar productos por Super ID -->
@@ -55,10 +57,6 @@
             </ul>
         </nav>
     </div>
-
-    <!-- Elementos de audio para sonidos de éxito y error -->
-    <audio id="successSound" src="{% static 'sounds/success.mp3' %}"></audio>
-    <audio id="errorSound" src="{% static 'sounds/error.mp3' %}"></audio>
 </div>
 {% endblock content %}
 
@@ -92,8 +90,8 @@
         },
         methods: {
             procesarInput() {
-                let valor = this.inputValue.trim().toUpperCase(); // Convertir a mayúsculas
-                valor = valor.replace(/'/g, '-'); // Reemplazar ' por -
+                let valor = this.inputValue.trim().toUpperCase();
+                valor = valor.replace(/'/g, '-');
 
                 if (valor.startsWith('B-')) {
                     if (this.sectorSeleccionado === valor) {
@@ -112,7 +110,17 @@
                 }
 
                 this.inputValue = '';
-                this.setFocus(); // Asegura que el foco vuelva al input después de procesar
+                this.setFocus();
+            },
+            setFocus() {
+                this.$nextTick(() => {
+                    const inputElement = document.getElementById("sectorOrProductInput");
+                    if (inputElement) {
+                        inputElement.focus();
+                    } else {
+                        console.error("El elemento sectorOrProductInput no se encontró.");
+                    }
+                });
             },
             setFocus() {
                 this.$nextTick(() => {
@@ -125,24 +133,22 @@
                 })
                 .then(response => {
                     if (response.data.resp === 1) {
-                        // Asignar lista sin invertir, para que los nuevos productos estén al inicio
                         this.productos = [...response.data.productos];
-                        this.currentPage = 1; // Reiniciar a la primera página
+                        this.currentPage = 1;
                         this.playSound('success');
                     } else {
                         console.error(response.data.msg);
                         this.productos = [];
                         this.playSound('error');
                     }
-                    this.setFocus();  // Asegura el foco después de la búsqueda
+                    this.setFocus();
                 })
                 .catch(error => {
                     console.error('Error al buscar productos:', error);
                     this.playSound('error');
-                    this.setFocus();  // Asegura el foco en caso de error
+                    this.setFocus();
                 });
             },
-
             agregarProductoPorSuperID(superid) {
                 if (!this.sectorSeleccionado) {
                     alert('Selecciona un sector antes de agregar productos.');
@@ -156,36 +162,33 @@
                 })
                 .then(response => {
                     if (response.data.resp === 1) {
-                        this.buscarProductos(); // Refresca la lista de productos en el sector
+                        this.buscarProductos();
                         this.playSound('success');
                     } else {
                         console.error(response.data.msg);
                         this.playSound('error');
                     }
-                    this.setFocus();  // Vuelve el foco al input después de agregar productos
+                    this.setFocus();
                 })
                 .catch(error => {
                     console.error('Error al agregar producto:', error);
                     this.playSound('error');
-                    this.setFocus();  // Asegura el foco en caso de error
+                    this.setFocus();
                 });
             },
-
             changePage(page) {
                 if (page > 0 && page <= this.totalPages) {
                     this.currentPage = page;
                 }
-                this.setFocus();  // Asegura el foco al cambiar de página
+                this.setFocus();
             },
-
             limpiarSeleccion() {
                 this.sectorSeleccionado = '';
                 this.productos = [];
                 this.currentPage = 1;
                 console.log("Selección limpiada, puedes ingresar un nuevo sector.");
-                this.setFocus();  // Foco después de limpiar
+                this.setFocus();
             },
-
             playSound(type) {
                 const audioElement = type === 'success' ? document.getElementById('successSound') : document.getElementById('errorSound');
                 audioElement.currentTime = 0;
@@ -195,4 +198,3 @@
     });
 </script>
 {% endblock js %}
-<!-- B-1-G1-1 -->
