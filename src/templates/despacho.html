@@ -51,6 +51,7 @@
                 <!-- Botón sin clave, visible solo para ADMIN y BODEGA -->
                 <button @click="openInternalDispatchModal" class="mt-3 btn btn-primary">Despacho Interno</button>
             {% endif %}
+            
 
 
             <!-- Modal para ingresar la clave dinámica -->
@@ -58,10 +59,12 @@
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
+                            
                             <h5 class="modal-title" id="dynamicKeyModalLabel">Acceso al Despacho Interno</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
+                            
                             <input type="text" v-model="dynamicKey" placeholder="Ingrese la clave de acceso" class="form-control" />
                         </div>
                         <div class="modal-footer">
@@ -78,9 +81,16 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="internalDispatchModalLabel">Despacho Interno</h5>
+                        
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <div v-show="alertasuccess" class="alert alert-success">
+                            <strong>Success!</strong> 
+                        </div>
+                        <div v-show="alertaerror" class="alert alert-danger">
+                            <strong>Danger!</strong> 
+                          </div>
                         <div class="input-group mb-3">
                             <input type="text" v-model="sid" class="form-control" @keyup.enter="validateAndLinkSuperid(true)" placeholder="Ingrese SuperID">
                             <button type="button" class="btn btn-primary" @click="validateAndLinkSuperid(true)">Agregar</button>
@@ -157,7 +167,9 @@
             sid: null,
             products: [],
             newProduct: { superid: '', code: '', quantity: 1 },
-            internalProducts: [] // Lista de productos para despacho interno
+            internalProducts: [], // Lista de productos para despacho interno
+            alertasuccess:false,
+            alertaerror:false,
         },
         watch: {
             typeDocument() {
@@ -279,6 +291,7 @@
                     });
             },
             dispatchConsumption(product) {
+                this.alerta = false;
                 axios.post('/api/dispatch-consumption/', {
                     nDocument: this.nDocument,
                     typeDocument: this.typeDocument,
@@ -287,7 +300,8 @@
                 })
                 .then(response => {
                     if (response.data.icon === 'success') {
-                        Swal.fire('Éxito', `Producto ${product.code} despachado con éxito.`, 'success');
+                        this.alertasuccess = true;
+
                         this.playSound('successSound'); // Reproducir sonido de éxito
                     } else {
                         Swal.fire('Error', response.data.title, response.data.icon);
@@ -295,7 +309,7 @@
                     }
                 })
                 .catch(error => {
-                    Swal.fire('Error', 'Error al despachar el producto.', 'error');
+                    this.alertaerror = true;
                     this.playSound('errorSound'); // Reproducir sonido de error
                     console.error(error);
                 });
