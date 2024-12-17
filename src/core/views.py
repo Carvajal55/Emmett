@@ -45,6 +45,7 @@ import qrcode
 import io
 from dotenv import load_dotenv
 import datetime
+from datetime import timedelta
 
 
 
@@ -3648,6 +3649,200 @@ def imprimir_etiquetas_masivas(request):
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
+from django.core.serializers.json import DjangoJSONEncoder
+
+def backup_unique_products_view(request):
+    try:
+        backup_file = "uniqueproducts_backup.json"
+        
+        # Extraer todos los registros de Uniqueproducts
+        unique_products = list(Uniqueproducts.objects.all().values())
+        
+        # Guardar los datos en un archivo JSON con un encoder que maneje datetime
+        with open(backup_file, 'w') as f:
+            json.dump(unique_products, f, indent=4, cls=DjangoJSONEncoder)
+        
+        return JsonResponse({"status": "success", "message": f"Respaldo creado en {backup_file}"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)})
+    
+@csrf_exempt
+def restore_unique_products_view(request):
+    try:
+        if request.method != 'POST':
+            return JsonResponse({"status": "error", "message": "Método no permitido."})
+
+        # Obtener el archivo cargado desde el request
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
+
+        # Leer el contenido del archivo y cargarlo como JSON
+        print("Leyendo el archivo de respaldo...")
+        file_data = uploaded_file.read().decode('utf-8')
+        unique_products = json.loads(file_data)
+        print(f"Archivo leído correctamente. Total de registros: {len(unique_products)}")
+
+        # Eliminar registros actuales
+        print("Eliminando registros existentes...")
+        Uniqueproducts.objects.all().delete()
+        print("Registros eliminados correctamente.")
+
+        # Procesar e insertar registros en lotes
+        restored_products = []
+        missing_products = []  # Almacenar los IDs de productos faltantes
+        BATCH_SIZE = 5000  # Tamaño del lote para inserción
+
+        print("Iniciando la restauración de registros...")
+        for index, record in enumerate(tqdm(unique_products, desc="Procesando registros", unit="registro")):
+            product_id = record.pop("product_id")
+
+            try:
+                product = Products.objects.get(id=product_id)  # Buscar producto relacionado
+                restored_products.append(Uniqueproducts(product=product, **record))
+            except Products.DoesNotExist:
+                missing_products.append(product_id)  # Registrar producto faltante
+
+            # Insertar en la base de datos cada BATCH_SIZE registros
+            if len(restored_products) >= BATCH_SIZE:
+                Uniqueproducts.objects.bulk_create(restored_products)
+                restored_products = []  # Reiniciar la lista
+                print(f"Lote de {BATCH_SIZE} registros insertado...")
+
+        # Insertar los registros restantes
+        if restored_products:
+            Uniqueproducts.objects.bulk_create(restored_products)
+            print(f"Último lote de {len(restored_products)} registros insertado.")
+
+        print("Restauración completada.")
+        return JsonResponse({
+            "status": "success",
+            "message": f"Se han restaurado los registros correctamente.",
+            "missing_products": missing_products
+        })
+
+    except Exception as e:
+        print(f"Error durante la restauración: {e}")
+        return JsonResponse({"status": "error", "message": str(e)})
+
+def normalize_keys(data):
+    """Convierte las claves de un diccionario o lista de diccionarios a minúsculas."""
+    if isinstance(data, list):
+        return [normalize_keys(item) for item in data]
+    elif isinstance(data, dict):
+        return {key.lower(): normalize_keys(value) for key, value in data.items()}
+    else:
+        return data
+
+@csrf_exempt
+def restore_unique_products_view(request):
+    try:
+        if request.method != 'POST':
+            return JsonResponse({"status": "error", "message": "Método no permitido."})
+
+        # Obtener el archivo cargado desde el request
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
+
+        # Leer el contenido del archivo y cargarlo como JSON
+        print("Leyendo el archivo de respaldo...")
+        file_data = uploaded_file.read().decode('utf-8')
+        unique_products = json.loads(file_data)
+
+        # Normalizar claves del JSON a minúsculas
+        unique_products = normalize_keys(unique_products)
+        print(f"Archivo leído y normalizado. Total de registros: {len(unique_products)}")
+
+        # Eliminar registros actuales
+        print("Eliminando registros existentes...")
+        Uniqueproducts.objects.all().delete()
+        print("Registros eliminados correctamente.")
+
+        # Procesar e insertar registros en lotes
+        restored_products = []
+        missing_products = []  # Almacenar los IDs de productos faltantes
+        BATCH_SIZE = 5000  # Tamaño del lote para inserción
+
+        print("Iniciando la restauración de registros...")
+        for record in tqdm(unique_products, desc="Restaurando registros", unit="registro"):
+            product_id = record.get("product_id")
+            superid = record.get("superid")
+            correlative = record.get("correlative")
+            printlabel = record.get("printlabel")
+            state = record.get("state")
+            cost = record.get("cost")
+            soldvalue = record.get("solvalue")
+            datelastinventory = record.get("datelastinventory")
+            observation = record.get("observation")
+            location = record.get("location")
+            typedocincome = record.get("typedocincome")
+            ndocincome = record.get("ndocincome")
+            typedocout = record.get("typedocout")
+            ndocout = record.get("ndocout")
+            dateadd = record.get("dateadd")
+            iddocumentincome = record.get("iddocumentincome")
+            ncompany = record.get("ncompany")
+
+            # Convertir dateLastInventory si existe y manejar valores no válidos
+            if datelastinventory:
+                try:
+                    datelastinventory = int(datelastinventory)  # Asegurarse de que sea un número
+                    datelastinventory = datetime.fromtimestamp(datelastinventory / 1000)
+                except (ValueError, TypeError):
+                    datelastinventory = None  # Si no es válido, asignar None
+
+            try:
+                # Buscar producto relacionado
+                product = Products.objects.get(id=product_id)
+                restored_products.append(
+                    Uniqueproducts(
+                        product=product,
+                        superid=superid,
+                        correlative=correlative,
+                        printlabel=printlabel,
+                        state=state,
+                        cost=cost,
+                        soldvalue=soldvalue,
+                        datelastinventory=datelastinventory,
+                        observation=observation,
+                        location=location,
+                        typedocincome=typedocincome,
+                        ndocincome=ndocincome,
+                        typedocout=typedocout,
+                        ndocout=ndocout,
+                        dateadd=dateadd,
+                        iddocumentincome=iddocumentincome,
+                        ncompany=ncompany,
+                    )
+                )
+            except Products.DoesNotExist:
+                missing_products.append({"product_id": product_id, "reason": "Producto no existe"})
+
+            # Insertar en lotes
+            if len(restored_products) >= BATCH_SIZE:
+                Uniqueproducts.objects.bulk_create(restored_products)
+                restored_products = []
+                print(f"Lote de {BATCH_SIZE} registros insertado...")
+
+        # Insertar registros restantes
+        if restored_products:
+            Uniqueproducts.objects.bulk_create(restored_products)
+            print(f"Último lote de {len(restored_products)} registros insertado.")
+
+        print("Restauración completada.")
+
+        # Resumen final
+        return JsonResponse({
+            "status": "success",
+            "message": f"Se han restaurado {len(unique_products) - len(missing_products)} registros.",
+            "missing_products": missing_products
+        })
+
+    except Exception as e:
+        print(f"Error durante la restauración: {e}")
+        return JsonResponse({"status": "error", "message": str(e)})
+    
 
 #Revisar carga masiva base de datos
 import pandas as pd
@@ -3727,3 +3922,93 @@ def generar_pdf_errores(errores, pdf_filename):
         print(f"Archivo PDF generado: {pdf_path}")
     except Exception as e:
         print(f"Error al generar el PDF: {str(e)}")
+
+
+@csrf_exempt
+def bulk_upload_products(request):
+    try:
+        if request.method != 'POST':
+            return JsonResponse({"status": "error", "message": "Método no permitido."})
+
+        # Leer archivo JSON
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
+
+        file_data = uploaded_file.read().decode('utf-8')
+        products_data = json.loads(file_data)
+
+        # Normalizar claves
+        products_data = normalize_keys(products_data)
+        print(f"Archivo leído y normalizado. Total de registros: {len(products_data)}")
+
+        # Extraer SKUs existentes
+        existing_skus = set(Products.objects.values_list('sku', flat=True))
+        print(f"SKUs existentes en la base de datos: {len(existing_skus)}")
+
+        # Procesar e insertar productos
+        new_products = []
+        duplicate_skus = []
+        for record in tqdm(products_data, desc="Cargando productos", unit="producto"):
+            sku = record.get("aux")  # En tu JSON, AUX representa el SKU
+
+            # Verificar si el SKU ya existe
+            if sku in existing_skus:
+                duplicate_skus.append(sku)
+                continue  # Saltar al siguiente registro
+
+            # Convertir fecha si es necesario
+            createdate = record.get("createdate")
+            if createdate and createdate != 0:
+                try:
+                    createdate = datetime.fromtimestamp(int(createdate) / 1000)
+                except (ValueError, TypeError):
+                    createdate = None
+            else:
+                createdate = None
+
+            # Crear objeto de producto
+            new_products.append(
+                Products(
+                    sku=sku,
+                    nameproduct=record.get("nameproduct"),
+                    prefixed=record.get("prefixed"),
+                    brands=record.get("brand"),
+                    codebar=record.get("codebar"),
+                    codebar2=record.get("codebar2"),
+                    codebar3=record.get("codebar3"),
+                    iderp=record.get("iderp"),
+                    codsupplier=record.get("codsupplier"),
+                    description=record.get("description"),
+                    lastcost=record.get("lastcost"),
+                    latestreplenishment=None,  # Manejo adicional si se necesita
+                    lastprice=record.get("lastprice"),
+                    currentstock=record.get("currentstock"),
+                    createdate=createdate,
+                    imgthumbs=record.get("imgthumbs"),
+                    idmelimain=record.get("idmelimain"),
+                    idproduct=record.get("idproduct"),
+                    meliprice_s1=record.get("meliprice_s1"),
+                    uniquecodebar=record.get("uniquecodebar", False),
+                    profundidad=record.get("profundidad"),
+                    largo=record.get("largo"),
+                    alto=record.get("alto"),
+                    peso=record.get("peso"),
+                )
+            )
+
+        # Insertar en la base de datos
+        if new_products:
+            Products.objects.bulk_create(new_products)
+            print(f"Se han insertado {len(new_products)} nuevos productos.")
+
+        # Respuesta con resumen
+        return JsonResponse({
+            "status": "success",
+            "message": f"Se insertaron {len(new_products)} productos nuevos.",
+            "duplicates": duplicate_skus
+        })
+
+    except Exception as e:
+        print(f"Error durante la carga: {e}")
+        return JsonResponse({"status": "error", "message": str(e)})

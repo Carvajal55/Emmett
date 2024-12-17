@@ -981,11 +981,11 @@
                 const nuevoProducto = {
                     sku: this.nuevoProducto.sku,            // SKU generado o ingresado
                     nombre: this.nuevoProducto.nombre,  
-                    alias: this.nuevoProducto.alias,      // Nombre del producto    // Nombre del producto
+                    alias: this.nuevoProducto.alias,        // Alias del producto
                     marca: this.nuevoProducto.marca,        // Marca del producto
                     precio: this.nuevoProducto.precio,      // Precio del producto
                     proveedor: this.nuevoProducto.proveedor, // ID del proveedor seleccionado
-                    categoria: this.nuevoProducto.categoria, // Categoría seleccionada (para generar el SKU)
+                    categoria: this.nuevoProducto.categoria, // Categoría seleccionada
                     codigoBarra: this.nuevoProducto.codigoBarra, // Código de barras
                     alto: this.nuevoProducto.alto,          // Dimensiones del producto
                     largo: this.nuevoProducto.largo,
@@ -1004,47 +1004,54 @@
                 });
 
                 // Enviamos la solicitud POST al backend para crear el producto
-                fetch("/api/create-product/", { // Asegúrate de usar la ruta completa si necesario
+                fetch("/api/create-product/", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify(nuevoProducto)  // Convertimos el objeto a JSON
                 })
-                    .then(response => response.json())  // Parseamos la respuesta a JSON
-                    .then(data => {
-                        Swal.close(); // Cerrar el mensaje de carga
+                .then(response => response.json())  // Parseamos la respuesta a JSON
+                .then(data => {
+                    Swal.close(); // Cerrar el mensaje de carga
 
-                        if (data.message) {
-                            // Mostrar notificación de éxito
-                            Swal.fire({
-                                icon: "success",
-                                title: "¡Producto creado!",
-                                text: data.message
-                            });
-
-                            // Aquí puedes agregar lógica adicional, como actualizar la lista de productos o limpiar el formulario
-                            this.nuevoProducto = {}; // Limpiar el formulario
-                        } else {
-                            // Mostrar error retornado por el backend
-                            Swal.fire({
-                                icon: "error",
-                                title: "Error al crear el producto",
-                                text: data.error || "Hubo un problema inesperado."
-                            });
+                    if (data.message && data.product) {
+                        // Mostrar notificación de éxito con el SKU retornado
+                        Swal.fire({
+                        icon: "success",
+                        title: "¡Producto creado!",
+                        html: `
+                            <p style="margin-bottom: 10px;">
+                                El producto con SKU <span id="skuText" style="font-weight: bold; user-select: text;">${data.product}</span> se creó con éxito.
+                            </p>
+                        `,
+                        customClass: {
+                            popup: 'swal-selectable' // Personalización opcional
                         }
-                    })
-                    .catch(error => {
-                        Swal.close(); // Cerrar el mensaje de carga en caso de error
-                        console.error("Error al crear el producto:", error);
+                    });
 
-                        // Mostrar mensaje de error
+                        // Aquí puedes agregar lógica adicional, como actualizar la lista de productos o limpiar el formulario
+                        this.nuevoProducto = {}; // Limpiar el formulario
+                    } else {
+                        // Mostrar error retornado por el backend
                         Swal.fire({
                             icon: "error",
                             title: "Error al crear el producto",
-                            text: "Ocurrió un problema al conectar con el servidor. Por favor, inténtalo de nuevo."
+                            text: data.error || "Hubo un problema inesperado."
                         });
+                    }
+                })
+                .catch(error => {
+                    Swal.close(); // Cerrar el mensaje de carga en caso de error
+                    console.error("Error al crear el producto:", error);
+
+                    // Mostrar mensaje de error
+                    Swal.fire({
+                        icon: "error",
+                        title: "Error al crear el producto",
+                        text: "Ocurrió un problema al conectar con el servidor. Por favor, inténtalo de nuevo."
                     });
+                });
             },
             enviarDatos() {
                 const jsonData = {
