@@ -3745,14 +3745,13 @@ def restore_unique_products_view(request):
         if not uploaded_file:
             return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
 
-        # Leer el contenido del archivo y cargarlo como JSON
         print("Leyendo el archivo de respaldo...")
-        file_data = uploaded_file.read().decode('utf-8')
-        unique_products = json.loads(file_data)
-
-        # Normalizar claves del JSON a minúsculas
-        unique_products = normalize_keys(unique_products)
-        print(f"Archivo leído y normalizado. Total de registros: {len(unique_products)}")
+        
+        # Leer archivo línea por línea para reducir el uso de memoria
+        with uploaded_file.open('r') as f:
+            records = (json.loads(line.strip()) for line in f)
+        
+        print("Archivo leído correctamente. Procesando lotes...")
 
         # Eliminar registros actuales
         print("Eliminando registros existentes...")
@@ -3761,12 +3760,11 @@ def restore_unique_products_view(request):
 
         # Procesar e insertar registros en lotes
         restored_products = []
-        missing_products = []  # Almacenar los SKUs de productos faltantes
-        BATCH_SIZE = 5000  # Tamaño del lote para inserción
+        missing_products = []
+        BATCH_SIZE = 5000
 
-        print("Iniciando la restauración de registros...")
-        for record in tqdm(unique_products, desc="Restaurando registros", unit="registro"):
-            sku = record.get("product_id")  # Ahora 'product_id' contiene el SKU del producto
+        for record in records:
+            sku = record.get("product_id")
             superid = record.get("superid")
             correlative = record.get("correlative")
             printlabel = record.get("printlabel")
@@ -3784,26 +3782,20 @@ def restore_unique_products_view(request):
             iddocumentincome = record.get("iddocumentincome")
             ncompany = record.get("ncompany")
 
-            # Convertir dateLastInventory si existe y manejar valores no válidos
+            # Convertir dateLastInventory si existe
             if datelastinventory:
                 try:
-                    datelastinventory = int(datelastinventory)  # Asegurarse de que sea un número
-                    datelastinventory = datetime.fromtimestamp(datelastinventory / 1000)
+                    datelastinventory = datetime.fromtimestamp(int(datelastinventory) / 1000)
                 except (ValueError, TypeError):
-                    datelastinventory = None  # Si no es válido, asignar None
+                    datelastinventory = None
 
             try:
-               # Buscar producto relacionado por SKU
-                products = Products.objects.filter(sku=sku)
-                if products.count() > 1:
-                    # Si hay duplicados, omitir y registrar el problema
-                    missing_products.append({"sku": sku, "reason": "Duplicado en la base de datos"})
-                    continue
-                elif products.exists():
-                    product = products.first()
-                else:
+                # Buscar producto relacionado por SKU
+                product = Products.objects.filter(sku=sku).first()
+                if not product:
                     missing_products.append({"sku": sku, "reason": "Producto no existe"})
                     continue
+
                 restored_products.append(
                     Uniqueproducts(
                         product=product,
@@ -3825,14 +3817,15 @@ def restore_unique_products_view(request):
                         ncompany=ncompany,
                     )
                 )
-            except Products.DoesNotExist:
-                missing_products.append({"sku": sku, "reason": "Producto no existe"})
 
-            # Insertar en lotes
-            if len(restored_products) >= BATCH_SIZE:
-                Uniqueproducts.objects.bulk_create(restored_products)
-                restored_products = []
-                print(f"Lote de {BATCH_SIZE} registros insertado...")
+                # Insertar registros en lotes
+                if len(restored_products) >= BATCH_SIZE:
+                    Uniqueproducts.objects.bulk_create(restored_products)
+                    print(f"Lote de {BATCH_SIZE} registros insertado...")
+                    restored_products = []
+
+            except Exception as e:
+                missing_products.append({"sku": sku, "reason": f"Error inesperado: {e}"})
 
         # Insertar registros restantes
         if restored_products:
@@ -3841,7 +3834,6 @@ def restore_unique_products_view(request):
 
         print("Restauración completada.")
 
-        # Resumen final
         return JsonResponse({
             "status": "success",
             "message": f"Se han restaurado {len(unique_products) - len(missing_products)} registros.",
