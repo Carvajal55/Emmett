@@ -3761,12 +3761,12 @@ def restore_unique_products_view(request):
 
         # Procesar e insertar registros en lotes
         restored_products = []
-        missing_products = []  # Almacenar los IDs de productos faltantes
+        missing_products = []  # Almacenar los SKUs de productos faltantes
         BATCH_SIZE = 5000  # Tamaño del lote para inserción
 
         print("Iniciando la restauración de registros...")
         for record in tqdm(unique_products, desc="Restaurando registros", unit="registro"):
-            product_id = record.get("product_id")
+            sku = record.get("product_id")  # Ahora 'product_id' contiene el SKU del producto
             superid = record.get("superid")
             correlative = record.get("correlative")
             printlabel = record.get("printlabel")
@@ -3793,8 +3793,17 @@ def restore_unique_products_view(request):
                     datelastinventory = None  # Si no es válido, asignar None
 
             try:
-                # Buscar producto relacionado
-                product = Products.objects.get(id=product_id)
+               # Buscar producto relacionado por SKU
+                products = Products.objects.filter(sku=sku)
+                if products.count() > 1:
+                    # Si hay duplicados, omitir y registrar el problema
+                    missing_products.append({"sku": sku, "reason": "Duplicado en la base de datos"})
+                    continue
+                elif products.exists():
+                    product = products.first()
+                else:
+                    missing_products.append({"sku": sku, "reason": "Producto no existe"})
+                    continue
                 restored_products.append(
                     Uniqueproducts(
                         product=product,
@@ -3817,7 +3826,7 @@ def restore_unique_products_view(request):
                     )
                 )
             except Products.DoesNotExist:
-                missing_products.append({"product_id": product_id, "reason": "Producto no existe"})
+                missing_products.append({"sku": sku, "reason": "Producto no existe"})
 
             # Insertar en lotes
             if len(restored_products) >= BATCH_SIZE:
