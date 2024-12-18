@@ -152,7 +152,7 @@ EMAIL_HOST_USER = 'erp@emmett.cl'  # Tu correo en cPanel
 EMAIL_HOST_PASSWORD = 'holahola4090'  # La contraseña de la cuenta de correo
 DEFAULT_FROM_EMAIL = 'erp@emmett.cl'  # Dirección de correo que se usará como remitente
 
-
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600 
 AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
 
 
