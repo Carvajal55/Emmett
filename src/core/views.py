@@ -3746,12 +3746,16 @@ def restore_unique_products_view(request):
             return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
 
         print("Leyendo el archivo de respaldo...")
-        
-        # Leer archivo línea por línea para reducir el uso de memoria
-        with uploaded_file.open('r') as f:
-            records = (json.loads(line.strip()) for line in f)
-        
-        print("Archivo leído correctamente. Procesando lotes...")
+
+        # Leer el contenido completo del archivo y almacenarlo en memoria
+        file_content = uploaded_file.read().decode('utf-8')
+
+        # Convertir el contenido en un generador de JSON
+        unique_products = json.loads(file_content)
+
+        # Normalizar claves del JSON a minúsculas
+        unique_products = normalize_keys(unique_products)
+        print(f"Archivo leído y normalizado. Total de registros: {len(unique_products)}")
 
         # Eliminar registros actuales
         print("Eliminando registros existentes...")
@@ -3760,11 +3764,12 @@ def restore_unique_products_view(request):
 
         # Procesar e insertar registros en lotes
         restored_products = []
-        missing_products = []
-        BATCH_SIZE = 5000
+        missing_products = []  # Almacenar los SKUs de productos faltantes
+        BATCH_SIZE = 5000  # Tamaño del lote para inserción
 
-        for record in records:
-            sku = record.get("product_id")
+        print("Iniciando la restauración de registros...")
+        for record in tqdm(unique_products, desc="Restaurando registros", unit="registro"):
+            sku = record.get("product_id")  # Ahora 'product_id' contiene el SKU del producto
             superid = record.get("superid")
             correlative = record.get("correlative")
             printlabel = record.get("printlabel")
@@ -3821,8 +3826,8 @@ def restore_unique_products_view(request):
                 # Insertar registros en lotes
                 if len(restored_products) >= BATCH_SIZE:
                     Uniqueproducts.objects.bulk_create(restored_products)
-                    print(f"Lote de {BATCH_SIZE} registros insertado...")
                     restored_products = []
+                    print(f"Lote de {BATCH_SIZE} registros insertado...")
 
             except Exception as e:
                 missing_products.append({"sku": sku, "reason": f"Error inesperado: {e}"})
