@@ -3765,7 +3765,7 @@ def restore_unique_products_view(request):
         # Procesar e insertar registros en lotes
         restored_products = []
         missing_products = []  # Almacenar los SKUs de productos faltantes
-        BATCH_SIZE = 5000  # Tamaño del lote para inserción
+        BATCH_SIZE = 100  # Tamaño del lote para inserción
 
         print("Iniciando la restauración de registros...")
         for record in tqdm(unique_products, desc="Restaurando registros", unit="registro"):
