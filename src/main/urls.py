@@ -130,7 +130,13 @@ urlpatterns = [
    path('api/bulk-upload/<str:model_type>/', core_views.bulk_upload, name='bulk_upload'),
    path('api/imprimir-etiqueta-sector-simple/', core_views.imprimir_etiqueta_sector_simple, name='imprimir_etiqueta_sector_simple'),
 
+<<<<<<< HEAD
 
+=======
+    path('api/backup-unique-products/', core_views.backup_unique_products_view, name='backup_unique_products'),
+    path('api/restore-unique-products/', core_views.restore_unique_products_view, name='restore_unique_products'),
+    path('api/bulk-upload-products/', core_views.bulk_upload_products, name='bulk_upload_products'),
+>>>>>>> 57f45786f1ed34e3ec65f43ec94cb35f56c46b68
 
 
 

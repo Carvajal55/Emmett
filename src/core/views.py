@@ -45,6 +45,10 @@ import qrcode
 import io
 from dotenv import load_dotenv
 import datetime
+<<<<<<< HEAD
+=======
+from datetime import timedelta
+>>>>>>> 57f45786f1ed34e3ec65f43ec94cb35f56c46b68
 
 
 
@@ -2600,6 +2604,7 @@ def validate_superid_simplified(request):
 """Imprimir Etiquetas"""
 from reportlab.lib.utils import ImageReader
 from datetime import date
+<<<<<<< HEAD
 
 @csrf_exempt
 def imprimir_etiqueta_qr(request):
@@ -2649,6 +2654,199 @@ def imprimir_etiqueta_qr(request):
             x_bar = x_offset, 25 * mm
 
             qr_width, qr_height = 22 * mm, 22 * mm
+
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=5,
+                border=0,  # Sin borde blanco
+            )
+            qr.add_data(super_id)
+            qr.make(fit=True)
+
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            buffer = BytesIO()
+            qr_img.save(buffer, format="PNG")
+            buffer.seek(0)
+
+            qr_image = ImageReader(buffer)
+            pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
+
+            # SKU
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{sku}")
+
+            # Etiqueta contador
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
+
+            # Fecha
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
+
+            # Nombre del producto
+            y_product_text = y_qr - 15
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.drawString(x_qr, y_product_text, f"{producto.nameproduct}")
+            # Código de barras
+            x_barcode = x_qr - 6 * mm  # Mover a la derecha o ajustar como desees
+            y_barcode = y_qr - 50 # Ajustar a la misma altura del QR
+            barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
+            barcode_sku.drawOn(pdf, x_barcode, y_barcode)
+           
+
+            # SuperID y número de documento
+            y_super_id = y_barcode + 30
+            pdf.setFont("Helvetica-Bold",10)
+            pdf.drawString(x_qr, y_super_id - 3, f"{super_id}")
+            pdf.drawString(x_qr + 25 * mm, y_super_id -3 , f"{number}")
+
+            # Guardar el nuevo UniqueProduct
+            Uniqueproducts.objects.create(
+                product=producto,
+                superid=super_id,
+                correlative=current_correlative,
+                state=0,
+                cost=producto.lastcost,
+                locationname="Almacen",
+                observation="Etiqueta generada automáticamente",
+                printlabel=os.path.join(settings.MEDIA_URL, relative_file_path),  # Guardar URL en printlabel
+                iddocumentincome=number,
+                dateadd=date.today()
+            )
+
+            # Incrementar el correlativo
+            current_correlative += 1
+
+            if not is_left and i < qty - 1:
+                pdf.showPage()
+
+        pdf.save()
+
+        # Actualizar el stock en Bsale
+        office_id = 1  # ID de la oficina en Bsale, cámbialo según sea necesario
+        variant_id = producto.iderp  # Supongamos que el ID del producto es el mismo que la variante en Bsale
+        cost = producto.lastcost
+        print(variant_id, office_id, qty,cost,"DATOS PARA BSALE")
+        bsale_response = actualizar_stock_bsale(variant_id, office_id, qty,cost)
+
+        if not bsale_response:
+            return JsonResponse({'error': 'Etiqueta creada, pero no se pudo actualizar stock en Bsale.'}, status=500)
+
+
+        try:
+            with open(url_json, 'r+') as json_file:
+                data = json.load(json_file)
+                for detail in data.get('details', []):
+                    if detail.get('sku') == sku:
+                        detail['printed'] = True
+                json_file.seek(0)
+                json.dump(data, json_file, indent=4)
+                json_file.truncate()
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            return JsonResponse({'error': f'Error al procesar el archivo JSON: {str(e)}'}, status=400)
+
+        try:
+            factura = Purchase.objects.get(urljson=url_json)
+            if all(detail.get('printed') for detail in data.get('details', [])):
+                factura.status = 3
+                factura.save()
+        except Purchase.DoesNotExist:
+            pass
+
+        pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
+        return JsonResponse({
+            'urlPdf': pdf_url,
+            'superids': super_ids,
+            'sku': sku
+        })
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+
+
+
+
+=======
+>>>>>>> 57f45786f1ed34e3ec65f43ec94cb35f56c46b68
+
+@csrf_exempt
+def imprimir_etiqueta_qr(request):
+    if request.method == 'POST':
+        # Obtener los datos enviados desde el front-end
+        sku = request.POST.get('sku')
+        number = request.POST.get('number')
+        model = request.POST.get('model')
+        qty = int(request.POST.get('qty', 1))
+        codebar = request.POST.get('codebar', '')
+        url_json = request.POST.get('urlJson')  # Ruta del archivo JSON
+
+<<<<<<< HEAD
+        # Validaciones iniciales
+        if not sku or qty <= 0 or not url_json:
+            return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
+        
+        # Obtener el producto correspondiente del modelo Products
+=======
+        if not sku or qty <= 0 or not url_json:
+            return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
+
+>>>>>>> 57f45786f1ed34e3ec65f43ec94cb35f56c46b68
+        try:
+            producto = Products.objects.get(sku=sku)
+        except Products.DoesNotExist:
+            return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
+
+        pdf_filename = f'etiqueta_{sku}.pdf'
+        relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
+        absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
+        os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+
+        last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
+        current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
+        base_numeric_sku = ''.join(filter(str.isdigit, sku))  # Extraer números del SKU
+        if not base_numeric_sku:
+            return JsonResponse({'error': 'El SKU no contiene números válidos.'}, status=400)
+
+        base_superid = f"{base_numeric_sku}e"
+
+        page_width, page_height = 102 * mm, 50 * mm
+        pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
+
+        super_ids = []
+        for i in range(qty):
+<<<<<<< HEAD
+            # Generar SuperID
+            super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
+            super_ids.append(super_id)
+
+            # Parte izquierda de la etiqueta (SKU y código de barras horizontal)
+            x_sku_left, y_sku_left = 5 * mm, 35 * mm
+            barcode_sku_left = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
+            barcode_sku_left.drawOn(pdf, x_sku_left, y_sku_left)
+            pdf.setFont("Helvetica", 6)
+            pdf.drawString(x_sku_left + 20, y_sku_left - 10, f"SKU: {sku}")
+
+            # SuperID en vertical (rotado)
+            pdf.saveState()
+            pdf.rotate(90)
+            x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -2 * mm
+            barcode_superid_left = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
+            barcode_superid_left.drawOn(pdf, y_superid_rotated_left, -x_superid_rotated_left)
+            pdf.setFont("Helvetica", 6)
+            pdf.drawString(y_superid_rotated_left + 15, -x_superid_rotated_left - 15, f"SuperID: {super_id}")
+            pdf.restoreState()
+=======
+            super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
+            super_ids.append(super_id)
+
+            is_left = i % 2 == 0
+            x_offset = 3 * mm if is_left else 56 * mm
+
+            # QR Code
+            x_qr, y_qr = x_offset, 25 * mm
+            x_bar = x_offset, 25 * mm
+
+            qr_width, qr_height = 22 * mm, 22 * mm
+>>>>>>> 57f45786f1ed34e3ec65f43ec94cb35f56c46b68
 
             qr = qrcode.QRCode(
                 version=1,
@@ -3648,6 +3846,146 @@ def imprimir_etiquetas_masivas(request):
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
+<<<<<<< HEAD
+=======
+from django.core.serializers.json import DjangoJSONEncoder
+
+def backup_unique_products_view(request):
+    try:
+        backup_file = "uniqueproducts_backup.json"
+        
+        # Extraer todos los registros de Uniqueproducts
+        unique_products = list(Uniqueproducts.objects.all().values())
+        
+        # Guardar los datos en un archivo JSON con un encoder que maneje datetime
+        with open(backup_file, 'w') as f:
+            json.dump(unique_products, f, indent=4, cls=DjangoJSONEncoder)
+        
+        return JsonResponse({"status": "success", "message": f"Respaldo creado en {backup_file}"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)})
+
+def normalize_keys(data):
+    """Convierte las claves de un diccionario o lista de diccionarios a minúsculas."""
+    if isinstance(data, list):
+        return [normalize_keys(item) for item in data]
+    elif isinstance(data, dict):
+        return {key.lower(): normalize_keys(value) for key, value in data.items()}
+    else:
+        return data
+
+@csrf_exempt
+def restore_unique_products_view(request):
+    try:
+        if request.method != 'POST':
+            return JsonResponse({"status": "error", "message": "Método no permitido."})
+
+        # Obtener el archivo cargado desde el request
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
+
+        # Leer el contenido del archivo y cargarlo como JSON
+        print("Leyendo el archivo de respaldo...")
+        file_data = uploaded_file.read().decode('utf-8')
+        unique_products = json.loads(file_data)
+
+        # Normalizar claves del JSON a minúsculas
+        unique_products = normalize_keys(unique_products)
+        print(f"Archivo leído y normalizado. Total de registros: {len(unique_products)}")
+
+        # Eliminar registros actuales
+        print("Eliminando registros existentes...")
+        Uniqueproducts.objects.all().delete()
+        print("Registros eliminados correctamente.")
+
+        # Procesar e insertar registros en lotes
+        restored_products = []
+        missing_products = []  # Almacenar los SKUs de productos faltantes
+        BATCH_SIZE = 5000  # Tamaño del lote para inserción
+
+        print("Iniciando la restauración de registros...")
+        for record in tqdm(unique_products, desc="Restaurando registros", unit="registro"):
+            sku = record.get("sku")  # Usar SKU en lugar de product_id
+            superid = record.get("superid")
+            correlative = record.get("correlative")
+            printlabel = record.get("printlabel")
+            state = record.get("state")
+            cost = record.get("cost")
+            soldvalue = record.get("solvalue")
+            datelastinventory = record.get("datelastinventory")
+            observation = record.get("observation")
+            location = record.get("location")
+            typedocincome = record.get("typedocincome")
+            ndocincome = record.get("ndocincome")
+            typedocout = record.get("typedocout")
+            ndocout = record.get("ndocout")
+            dateadd = record.get("dateadd")
+            iddocumentincome = record.get("iddocumentincome")
+            ncompany = record.get("ncompany")
+
+            # Convertir dateLastInventory si existe y manejar valores no válidos
+            if datelastinventory:
+                try:
+                    datelastinventory = int(datelastinventory)  # Asegurarse de que sea un número
+                    datelastinventory = datetime.fromtimestamp(datelastinventory / 1000)
+                except (ValueError, TypeError):
+                    datelastinventory = None  # Si no es válido, asignar None
+
+            try:
+                # Buscar producto relacionado por SKU
+                product = Products.objects.get(sku=sku)
+                restored_products.append(
+                    Uniqueproducts(
+                        product=product,
+                        superid=superid,
+                        correlative=correlative,
+                        printlabel=printlabel,
+                        state=state,
+                        cost=cost,
+                        soldvalue=soldvalue,
+                        datelastinventory=datelastinventory,
+                        observation=observation,
+                        location=location,
+                        typedocincome=typedocincome,
+                        ndocincome=ndocincome,
+                        typedocout=typedocout,
+                        ndocout=ndocout,
+                        dateadd=dateadd,
+                        iddocumentincome=iddocumentincome,
+                        ncompany=ncompany,
+                    )
+                )
+            except Products.DoesNotExist:
+                missing_products.append({"sku": sku, "reason": "Producto no existe"})
+            except ValueError as ve:
+                missing_products.append({"reason": str(ve)})
+
+            # Insertar en lotes
+            if len(restored_products) >= BATCH_SIZE:
+                Uniqueproducts.objects.bulk_create(restored_products)
+                restored_products = []
+                print(f"Lote de {BATCH_SIZE} registros insertado...")
+
+        # Insertar registros restantes
+        if restored_products:
+            Uniqueproducts.objects.bulk_create(restored_products)
+            print(f"Último lote de {len(restored_products)} registros insertado.")
+
+        print("Restauración completada.")
+
+        # Resumen final
+        return JsonResponse({
+            "status": "success",
+            "message": f"Se han restaurado {len(unique_products) - len(missing_products)} registros.",
+            "missing_products": missing_products
+        })
+
+    except Exception as e:
+        print(f"Error durante la restauración: {e}")
+        return JsonResponse({"status": "error", "message": str(e)})
+    
+>>>>>>> 57f45786f1ed34e3ec65f43ec94cb35f56c46b68
 
 #Revisar carga masiva base de datos
 import pandas as pd
@@ -3726,4 +4064,98 @@ def generar_pdf_errores(errores, pdf_filename):
         pdf.save()
         print(f"Archivo PDF generado: {pdf_path}")
     except Exception as e:
+<<<<<<< HEAD
         print(f"Error al generar el PDF: {str(e)}")
+=======
+        print(f"Error al generar el PDF: {str(e)}")
+
+
+@csrf_exempt
+def bulk_upload_products(request):
+    try:
+        if request.method != 'POST':
+            return JsonResponse({"status": "error", "message": "Método no permitido."})
+
+        # Leer archivo JSON
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
+
+        file_data = uploaded_file.read().decode('utf-8')
+        products_data = json.loads(file_data)
+
+        # Normalizar claves
+        products_data = normalize_keys(products_data)
+        print(f"Archivo leído y normalizado. Total de registros: {len(products_data)}")
+
+        # Extraer SKUs existentes
+        existing_skus = set(Products.objects.values_list('sku', flat=True))
+        print(f"SKUs existentes en la base de datos: {len(existing_skus)}")
+
+        # Procesar e insertar productos
+        new_products = []
+        duplicate_skus = []
+        for record in tqdm(products_data, desc="Cargando productos", unit="producto"):
+            sku = record.get("aux")  # En tu JSON, AUX representa el SKU
+
+            # Verificar si el SKU ya existe
+            if sku in existing_skus:
+                duplicate_skus.append(sku)
+                continue  # Saltar al siguiente registro
+
+            # Convertir fecha si es necesario
+            createdate = record.get("createdate")
+            if createdate and createdate != 0:
+                try:
+                    createdate = datetime.fromtimestamp(int(createdate) / 1000)
+                except (ValueError, TypeError):
+                    createdate = None
+            else:
+                createdate = None
+
+            # Crear objeto de producto
+            new_products.append(
+                Products(
+                    sku=sku,
+                    nameproduct=record.get("nameproduct"),
+                    prefixed=record.get("prefixed"),
+                    brands=record.get("brand"),
+                    codebar=record.get("codebar"),
+                    codebar2=record.get("codebar2"),
+                    codebar3=record.get("codebar3"),
+                    iderp=record.get("iderp"),
+                    codsupplier=record.get("codsupplier"),
+                    description=record.get("description"),
+                    lastcost=record.get("lastcost"),
+                    latestreplenishment=None,  # Manejo adicional si se necesita
+                    lastprice=record.get("lastprice"),
+                    currentstock=record.get("currentstock"),
+                    createdate=createdate,
+                    imgthumbs=record.get("imgthumbs"),
+                    idmelimain=record.get("idmelimain"),
+                    idproduct=record.get("idproduct"),
+                    meliprice_s1=record.get("meliprice_s1"),
+                    uniquecodebar=record.get("uniquecodebar", False),
+                    profundidad=record.get("profundidad"),
+                    largo=record.get("largo"),
+                    alto=record.get("alto"),
+                    peso=record.get("peso"),
+                )
+            )
+
+        # Insertar en la base de datos
+        if new_products:
+            Products.objects.bulk_create(new_products)
+            print(f"Se han insertado {len(new_products)} nuevos productos.")
+
+        # Respuesta con resumen
+        return JsonResponse({
+            "status": "success",
+            "message": f"Se insertaron {len(new_products)} productos nuevos.",
+            "duplicates": duplicate_skus
+        })
+
+    except Exception as e:
+        print(f"Error durante la carga: {e}")
+        return JsonResponse({"status": "error", "message": str(e)})
+>>>>>>> 57f45786f1ed34e3ec65f43ec94cb35f56c46b68
