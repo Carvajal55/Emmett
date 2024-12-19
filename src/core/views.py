@@ -389,15 +389,15 @@ def producto_detalles(request, product_id):
         for unique_product in unique_products:
             sector = sector_mapping.get(unique_product.location)
             if sector and isinstance(sector, Sectoroffice):
-                bodega_name = bodega_mapping.get(sector.idoffice, 'Bodega desconocida')
-                if sector.idoffice in bodegas_stock:
-                    bodegas_stock[sector.idoffice] += 1
-                unique_products_data.append({
-                    'superid': unique_product.superid,
-                    'locationname': sector.namesector,
-                    'bodega': bodega_name,
-                })
-            
+                bodega_name = bodega_mapping.get(sector.idoffice)
+                if bodega_name:  # Excluir si la bodega es desconocida
+                    if sector.idoffice in bodegas_stock:
+                        bodegas_stock[sector.idoffice] += 1
+                    unique_products_data.append({
+                        'superid': unique_product.superid,
+                        'locationname': sector.namesector,
+                        'bodega': bodega_name,
+                    })
 
         response_data = {
             'id': producto.id,
