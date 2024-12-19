@@ -81,24 +81,32 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="internalDispatchModalLabel">Despacho Interno</h5>
-                        
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="modalTypeDocument" class="form-label">Tipo de Documento</label>
+                            <select id="modalTypeDocument" v-model="typeDocument" class="form-select">
+                                <option value="39">Boleta</option>
+                                <option value="33">Factura</option>
+                                <option value="52">Guía</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="modalNDocument" class="form-label">Número de Documento</label>
+                            <input id="modalNDocument" type="number" v-model="nDocument" class="form-control" placeholder="Ingrese el número del documento">
+                        </div>
                         <div v-show="alertasuccess" class="alert alert-success">
-                            <strong>Success!</strong> 
+                            <strong>¡Éxito!</strong> Producto despachado correctamente.
                         </div>
                         <div v-show="alertaerror" class="alert alert-danger">
-                            <strong>Danger!</strong> 
-                          </div>
+                            <strong>Error:</strong> No se pudo despachar el producto.
+                        </div>
                         <div class="input-group mb-3">
-                            <input type="text" v-model="sid" class="form-control" @keyup.enter="validateAndLinkSuperid(true)" placeholder="Ingrese SuperID">
+                            <input type="text" v-model="sid" class="form-control" placeholder="Ingrese SuperID" @keyup.enter="validateAndLinkSuperid(true)">
                             <button type="button" class="btn btn-primary" @click="validateAndLinkSuperid(true)">Agregar</button>
                         </div>
-                        
-                        
-
-                        <table class="table">
+                        <table class="d-none table">
                             <thead>
                                 <tr>
                                     <th>SuperID</th>
@@ -121,7 +129,6 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="">Despachar Internamente</button>
                     </div>
                 </div>
             </div>
@@ -266,6 +273,12 @@
             validateAndLinkSuperid(isInternal = false) {
                 const superidToValidate = this.sid;
 
+                // Validar que el tipo y número de documento estén completos
+                if (!this.typeDocument || !this.nDocument) {
+                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de agregar un producto.', 'error');
+                    return;
+                }
+
                 axios.post('/api/validate-superid/', { sid: superidToValidate })
                     .then(response => {
                         if (response.data.icon === 'success') {
@@ -275,7 +288,7 @@
                                 description: response.data.description
                             };
 
-                            // Llamar a dispatchConsumption directamente
+                            // Llamar a dispatchConsumption con el producto validado
                             this.dispatchConsumption(product);
 
                             this.sid = ''; // Limpiar el campo de entrada
@@ -290,27 +303,34 @@
                         console.error(error);
                     });
             },
+
             dispatchConsumption(product) {
-                this.alerta = false;
+                // Verificar que el número de documento y el tipo de documento estén completos
+                if (!this.nDocument || !this.typeDocument) {
+                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de despachar.', 'error');
+                    return;
+                }
+
                 axios.post('/api/dispatch-consumption/', {
-                    nDocument: this.nDocument,
-                    typeDocument: this.typeDocument,
-                    company: this.company,
-                    products: [product] // Enviamos el producto como un array con un solo elemento
+                    nDocument: this.nDocument,         // Número de documento
+                    typeDocument: this.typeDocument,   // Tipo de documento
+                    company: this.company,             // Compañía seleccionada
+                    products: [product]                // Producto a despachar
                 })
                 .then(response => {
                     if (response.data.icon === 'success') {
-                        this.alertasuccess = true;
-
+                        this.alertasuccess = true;      // Mostrar mensaje de éxito
                         this.playSound('successSound'); // Reproducir sonido de éxito
+
+                        // Opcional: Aquí puedes limpiar los datos o actualizar la lista de productos
                     } else {
                         Swal.fire('Error', response.data.title, response.data.icon);
                         this.playSound('errorSound'); // Reproducir sonido de error
                     }
                 })
                 .catch(error => {
-                    this.alertaerror = true;
-                    this.playSound('errorSound'); // Reproducir sonido de error
+                    this.alertaerror = true;           // Mostrar mensaje de error
+                    this.playSound('errorSound');      // Reproducir sonido de error
                     console.error(error);
                 });
             },

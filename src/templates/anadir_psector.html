@@ -8,6 +8,11 @@
 
     <h3>Gestión de Productos por Sector</h3>
 
+    <!-- Mensajes de alerta temporales -->
+    <div v-if="alertMessage" :class="['alert', alertType]" role="alert" v-show="showAlert">
+        [[ alertMessage ]]
+    </div>
+
     <!-- Input único para ingresar sector o agregar productos por Super ID -->
     <div class="form-group">
         <input type="text" id="sectorOrProductInput" class="form-control" 
@@ -73,7 +78,10 @@
             sectorSeleccionado: '',  // Sector actualmente seleccionado
             productos: [],  // Lista de productos en el sector
             currentPage: 1,  // Página actual
-            itemsPerPage: 10  // Productos por página
+            itemsPerPage: 10,  // Productos por página
+            alertMessage: '',  // Mensaje de alerta
+            alertType: '',  // Tipo de alerta (success o danger)
+            showAlert: false  // Estado de visibilidad de la alerta
         },
         computed: {
             paginatedProducts() {
@@ -96,10 +104,12 @@
                 if (valor.startsWith('B-')) {
                     if (this.sectorSeleccionado === valor) {
                         this.limpiarSeleccion();
-                        alert("Sector cerrado. Ahora puedes seleccionar uno nuevo.");
+                        this.playSound('success');
+                        this.mostrarAlerta('Sector cerrado. Ahora puedes seleccionar uno nuevo.', 'alert-success');
                     } else {
                         if (this.sectorSeleccionado) {
-                            alert("Ya hay un sector abierto. Cierra el sector actual antes de abrir uno nuevo.");
+                            this.playSound('error');
+                            this.mostrarAlerta('Ya hay un sector abierto. Cierra el sector actual antes de abrir uno nuevo.', 'alert-danger');
                             return;
                         }
                         this.sectorSeleccionado = valor;
@@ -122,11 +132,6 @@
                     }
                 });
             },
-            setFocus() {
-                this.$nextTick(() => {
-                    document.getElementById("sectorOrProductInput").focus();
-                });
-            },
             buscarProductos() {
                 axios.post('/api/buscar-productos-sector/', {
                     searchTerm: this.sectorSeleccionado
@@ -136,22 +141,25 @@
                         this.productos = [...response.data.productos];
                         this.currentPage = 1;
                         this.playSound('success');
+                        this.mostrarAlerta('Productos cargados con éxito.', 'alert-success');
                     } else {
                         console.error(response.data.msg);
                         this.productos = [];
                         this.playSound('error');
+                        this.mostrarAlerta('Error al cargar productos.', 'alert-danger');
                     }
                     this.setFocus();
                 })
                 .catch(error => {
                     console.error('Error al buscar productos:', error);
                     this.playSound('error');
+                    this.mostrarAlerta('Error al buscar productos.', 'alert-danger');
                     this.setFocus();
                 });
             },
             agregarProductoPorSuperID(superid) {
                 if (!this.sectorSeleccionado) {
-                    alert('Selecciona un sector antes de agregar productos.');
+                    this.mostrarAlerta('Selecciona un sector antes de agregar productos.', 'alert-danger');
                     this.playSound('error');
                     return;
                 }
@@ -164,15 +172,18 @@
                     if (response.data.resp === 1) {
                         this.buscarProductos();
                         this.playSound('success');
+                        this.mostrarAlerta('Producto añadido con éxito.', 'alert-success');
                     } else {
                         console.error(response.data.msg);
                         this.playSound('error');
+                        this.mostrarAlerta('Error al añadir producto.', 'alert-danger');
                     }
                     this.setFocus();
                 })
                 .catch(error => {
                     console.error('Error al agregar producto:', error);
                     this.playSound('error');
+                    this.mostrarAlerta('Error al agregar producto.', 'alert-danger');
                     this.setFocus();
                 });
             },
@@ -186,13 +197,20 @@
                 this.sectorSeleccionado = '';
                 this.productos = [];
                 this.currentPage = 1;
-                console.log("Selección limpiada, puedes ingresar un nuevo sector.");
                 this.setFocus();
             },
             playSound(type) {
                 const audioElement = type === 'success' ? document.getElementById('successSound') : document.getElementById('errorSound');
                 audioElement.currentTime = 0;
                 audioElement.play();
+            },
+            mostrarAlerta(mensaje, tipo) {
+                this.alertMessage = mensaje;
+                this.alertType = tipo;
+                this.showAlert = true;
+                setTimeout(() => {
+                    this.showAlert = false;
+                }, 3000); // Oculta la alerta después de 3 segundos
             }
         }
     });

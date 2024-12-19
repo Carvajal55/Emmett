@@ -305,13 +305,15 @@ def buscar_productosAPI(request):
         'unique_products'
     )
 
+    # Obtener las bodegas válidas
+    bodega_ids_included = [1, 2, 4, 6, 9, 10]
+    bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included)
+    bodega_mapping = {bodega.idoffice: bodega.name for bodega in bodegas}
+
     # Obtener los sectores válidos directamente
-    valid_sectores = Sectoroffice.objects.filter(
-        idoffice__in=[10, 9, 7, 6, 5, 4, 2, 1]
-    ).exclude(
-        namesector__in=['XT99-99', 'NRN1-1']
-    )
-    valid_sector_map = {sector.idsectoroffice: sector.namesector for sector in valid_sectores}
+    excluded_sectors = Sectoroffice.objects.filter(namesector="XT99-99") | Sectoroffice.objects.filter(zone="NARN") | Sectoroffice.objects.filter(zone="NRN")
+    sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sectors.values_list('idsectoroffice', flat=True))
+    sector_mapping = {sector.idsectoroffice: sector for sector in sectores}
 
     # Paginación
     paginator = Paginator(productos, 10)
@@ -323,18 +325,21 @@ def buscar_productosAPI(request):
     # Serializar productos
     productos_data = []
     for producto in productos_page:
-        unique_products = producto.unique_products.filter(state=0)
+        unique_products = producto.unique_products.exclude(location__in=excluded_sectors.values_list('idsectoroffice', flat=True))
 
         # Procesar stock y ubicaciones válidas
-        stock_total = 0
+        bodegas_stock = {bodega.idoffice: 0 for bodega in bodegas}
         unique_products_data = []
         for up in unique_products:
-            sector_name = valid_sector_map.get(up.location)
-            if sector_name:
-                stock_total += 1
+            sector = sector_mapping.get(up.location)
+            if sector and isinstance(sector, Sectoroffice):
+                bodega_name = bodega_mapping.get(sector.idoffice, 'Bodega desconocida')
+                if sector.idoffice in bodegas_stock:
+                    bodegas_stock[sector.idoffice] += 1
                 unique_products_data.append({
                     'superid': up.superid,
-                    'locationname': sector_name,
+                    'locationname': sector.namesector,
+                    'bodega': bodega_name,
                 })
 
         # Serializar producto principal
@@ -343,7 +348,7 @@ def buscar_productosAPI(request):
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice or 0,
-            'stock_total': stock_total,
+            'stock_total': sum(bodegas_stock.values()),
             'unique_products': unique_products_data,
             'prefixed': producto.prefixed or '',
             'brands': producto.brands or '',
@@ -1708,6 +1713,7 @@ def add_product_to_sector(request):
                 if sector:
                     productos_no_encontrados = []
                     productos_actualizados = 0
+                    productos_stock_actualizado = 0
 
                     for producto_data in productos:
                         superid = producto_data.get('superid', '')
@@ -1715,6 +1721,17 @@ def add_product_to_sector(request):
                             producto = Uniqueproducts.objects.filter(superid=superid).first()
 
                             if producto:
+                                # Si el producto proviene de la bodega "despachados" (id 0)
+                                if producto.location == 0:
+                                    # Buscar el SKU asociado y actualizar el stock
+                                    sku = producto.product.sku
+                                    product = Products.objects.filter(sku=sku).first()
+                                    if product:
+                                        product.currentstock += 1
+                                        product.save()
+                                        productos_stock_actualizado += 1
+
+                                # Actualizar la ubicación del producto al sector correspondiente
                                 producto.location = sector.idsectoroffice
                                 producto.save()
                                 productos_actualizados += 1
@@ -1728,6 +1745,7 @@ def add_product_to_sector(request):
                             'resp': 2,
                             'msg': f'Algunos productos no fueron encontrados: {", ".join(productos_no_encontrados)}',
                             'productos_actualizados': productos_actualizados,
+                            'productos_stock_actualizado': productos_stock_actualizado,
                             'sector': sector.namesector
                         })
                     else:
@@ -1735,6 +1753,7 @@ def add_product_to_sector(request):
                             'resp': 1,
                             'msg': 'Todos los productos fueron añadidos con éxito.',
                             'productos_actualizados': productos_actualizados,
+                            'productos_stock_actualizado': productos_stock_actualizado,
                             'sector': sector.namesector
                         })
                 else:

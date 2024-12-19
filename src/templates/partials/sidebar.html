@@ -24,7 +24,7 @@
     <nav class="sidebar-nav scroll-sidebar" data-simplebar>
       <ul id="sidebarnav">
         
-        {% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
+        {% if request.user.usuario.rol == 'ADMIN' %}
         <!-- Ingresar Documento -->
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'ingresar_documentos' %}">
@@ -32,6 +32,9 @@
             <span class="hide-menu">Ingresar Documento</span>
           </a>
         </li>
+        {% endif %}
+
+        {% if request.user.usuario.rol == 'ADMIN'%}
 
         <!-- Autorizar Documento -->
         <li class="sidebar-item">
@@ -40,7 +43,18 @@
             <span class="hide-menu">Autorizar Documento</span>
           </a>
         </li>
-
+        {% endif %}
+        <!-- Buscar Productos - Permitido para ADMIN, VENTAS y BODEGA -->
+        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'VENTAS' or request.user.usuario.rol == 'BODEGA' %}
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'buscar_productos' %}">
+            <span><i class="ti ti-search"></i></span>
+            <span class="hide-menu">Buscar Productos</span>
+          </a>
+        </li>
+        {% endif %}
+        {% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
+        
         <!-- Imprimir Etiquetas -->
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'recepciones_aceptadas' %}">
@@ -48,7 +62,10 @@
             <span class="hide-menu">Imprimir Etiquetas</span>
           </a>
         </li>
+        {% endif %}
 
+        
+        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'VENTAS' or request.user.usuario.rol == 'BODEGA' %}
         
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'anadir_psector' %}">
@@ -56,6 +73,8 @@
             <span class="hide-menu">Agregar Productos a Sector</span>
           </a>
         </li>
+        {% endif %}
+        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
 
         <li class="sidebar-item">
           <a class="sidebar-link" href="{% url 'editar_productos' %}">
@@ -66,6 +85,7 @@
             <span class="hide-menu">Editar Productos</span>
           </a>
         </li>
+        {% endif %}
 
         {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'BODEGA' or request.user.usuario.rol == 'VENTAS' %}
         <!-- Cuadrar Sector -->
@@ -78,6 +98,7 @@
           </a>
         </li>
         {% endif %}
+        {% if request.user.usuario.rol in 'ADMIN'  %}
 
          <!-- Cuadrar Sector -->
          <li class="sidebar-item">
@@ -95,15 +116,7 @@
 
        
 
-        <!-- Buscar Productos - Permitido para ADMIN, VENTAS y BODEGA -->
-        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'VENTAS' or request.user.usuario.rol == 'BODEGA' %}
-        <li class="sidebar-item">
-          <a class="sidebar-link" href="{% url 'buscar_productos' %}">
-            <span><i class="ti ti-search"></i></span>
-            <span class="hide-menu">Buscar Productos</span>
-          </a>
-        </li>
-        {% endif %}
+        
 
         <!-- Despachar Productos - Permitido para ADMIN, VENTAS y BODEGA -->
         {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'VENTAS' or request.user.usuario.rol == 'BODEGA' %}
@@ -124,6 +137,13 @@
           </a>
         </li>
         {% endif %}
+
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'login_view' %}">
+            <span><i class="ti ti-user-plus"></i></span>
+            <span class="hide-menu">Cerrar Sesión</span>
+          </a>
+        </li>
       </ul>
     </nav>
     <!-- End Sidebar navigation -->
