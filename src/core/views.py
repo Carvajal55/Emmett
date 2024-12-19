@@ -2758,6 +2758,106 @@ def imprimir_etiqueta_qr(request):
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 
+@csrf_exempt
+def reimprimir_etiqueta_qr(request):
+    if request.method == 'POST':
+        # Obtener los datos enviados desde el front-end
+        sku = request.POST.get('sku')
+        number = request.POST.get('number')
+        model = request.POST.get('model')
+        qty = int(request.POST.get('qty', 1))
+        codebar = request.POST.get('codebar', '')
+
+        if not sku or qty <= 0:
+            return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
+
+        try:
+            producto = Products.objects.get(sku=sku)
+        except Products.DoesNotExist:
+            return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
+
+        pdf_filename = f'etiqueta_reimpresion_{sku}.pdf'
+        relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
+        absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
+        os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+
+        base_numeric_sku = ''.join(filter(str.isdigit, sku))  # Extraer números del SKU
+        if not base_numeric_sku:
+            return JsonResponse({'error': 'El SKU no contiene números válidos.'}, status=400)
+
+        base_superid = f"{base_numeric_sku}e"
+
+        page_width, page_height = 102 * mm, 50 * mm
+        pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
+
+        for i in range(qty):
+            super_id = f"{base_superid}{str(i + 1).zfill(2)}"
+
+            is_left = i % 2 == 0
+            x_offset = 3 * mm if is_left else 56 * mm
+
+            # QR Code
+            x_qr, y_qr = x_offset, 25 * mm
+            qr_width, qr_height = 22 * mm, 22 * mm
+
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=5,
+                border=0,  # Sin borde blanco
+            )
+            qr.add_data(super_id)
+            qr.make(fit=True)
+
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            buffer = BytesIO()
+            qr_img.save(buffer, format="PNG")
+            buffer.seek(0)
+
+            qr_image = ImageReader(buffer)
+            pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
+
+            # SKU
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{sku}")
+
+            # Etiqueta contador
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
+
+            # Fecha
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
+
+            # Nombre del producto
+            y_product_text = y_qr - 15
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.drawString(x_qr, y_product_text, f"{producto.nameproduct}")
+
+            # Código de barras
+            x_barcode = x_qr - 6 * mm  # Mover a la derecha o ajustar como desees
+            y_barcode = y_qr - 50  # Ajustar a la misma altura del QR
+            barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
+            barcode_sku.drawOn(pdf, x_barcode, y_barcode)
+
+            # SuperID y número de documento
+            y_super_id = y_barcode + 30
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.drawString(x_qr, y_super_id - 3, f"{super_id}")
+            pdf.drawString(x_qr + 25 * mm, y_super_id - 3, f"{number}")
+
+            if not is_left and i < qty - 1:
+                pdf.showPage()
+
+        pdf.save()
+
+        pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
+        return JsonResponse({
+            'urlPdf': pdf_url,
+            'superids': [f"{base_superid}{str(i + 1).zfill(2)}" for i in range(qty)],
+            'sku': sku
+        })
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
 
 
 
@@ -3195,7 +3295,7 @@ def actualizar_iderp(request):
 
 
 #Clave Dinamica
-
+from datetime import timedelta
 # Genera una clave dinámica para el usuario ADMIN
 @csrf_exempt
 @login_required(login_url='login_view')
@@ -3205,7 +3305,7 @@ def generate_dynamic_key(request):
         key = ''.join(random.choices(string.digits, k=6))
 
         # Guardar la clave en la base de datos con una validez de 5 minutos
-        expiration_time = timezone.now() + datetime.timedelta(minutes=5)
+        expiration_time = timezone.now() + timedelta(minutes=5)  # Usando timedelta correctamente
         DynamicKey.objects.create(key=key, expiration_time=expiration_time)
 
         return JsonResponse({'key': key, 'expiration_time': expiration_time}, status=201)

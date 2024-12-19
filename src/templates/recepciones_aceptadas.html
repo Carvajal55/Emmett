@@ -52,7 +52,7 @@
                             </td>
                             <td>[[ factura.dateAdd ]]</td>
                             <td>
-                                <button v-if="factura.status == 1" @click="printLabelUnique(factura.urlJson)" class="btn btn-primary btn-sm">Ver Detalles</button>
+                                <button v-if="factura.status == 1 || factura.status == 3" @click="printLabelUnique(factura.urlJson)" class="btn btn-primary btn-sm">Ver Detalles</button>
                             </td>
                         </tr>
                     </tbody>
@@ -94,16 +94,15 @@
                       </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="detalle in detallesFactura.filter(item => !item.printed)" :key="detalle.sku">
+                        <tr v-for="detalle in detallesFactura" :key="detalle.sku">
                             <td>[[ detalle.sku ]]</td>
                             <td>[[ detalle.model ]]</td>
                             <td>[[ detalle.qty ]]</td>
-                            <td class="d-none">
-                                <button @click="imprimirDetalle(detalle,factura)" class="btn btn-success btn-sm">Imprimir Etiqueta</button>
-                            </td>
                             <td>
-                                <button @click="imprimirDetalleQR(detalle)" class="btn btn-success btn-sm">Imprimir Etiqueta QR</button>
+                                <button v-if="!detalle.printed" @click="imprimirDetalleQR(detalle)" class="btn btn-success btn-sm">Imprimir Etiqueta</button>
+                                <button v-else @click="reimprimirDetalle(detalle)" class="btn btn-warning btn-sm">Reimprimir Etiqueta</button>
                             </td>
+                            
                         </tr>
                     </tbody>
                   </table>
@@ -178,6 +177,60 @@
                     })
                     .catch(error => {
                         console.error('Error al obtener los detalles de la factura:', error);
+                    });
+            },
+            reimprimirDetalle(detalle) {
+                console.log("Reimprimiendo detalle:", detalle);
+
+                // Crear el formulario con los datos necesarios para la reimpresión
+                let formData = new FormData();
+                formData.append('sku', detalle.sku);
+                formData.append('model', detalle.model);
+                formData.append('qty', detalle.qty);
+                formData.append('codebar', detalle.codebar || '');
+                formData.append('urlJson', detalle.urlJson);
+                formData.append('number', detalle.number);
+
+
+                console.log("Datos enviados a la API para reimpresión:", {
+                    sku: detalle.sku,
+                    model: detalle.model,
+                    qty: detalle.qty,
+                    codebar: detalle.codebar || '',
+                    urlJson: detalle.urlJson,
+                    number: detalle.number
+                });
+
+                // Enviar la solicitud al backend para generar la etiqueta de reimpresión
+                axios.post('/api/reimprimir-etiquetaqr/', formData)
+                    .then(response => {
+                        console.log("Respuesta del servidor:", response.data);
+                        if (response.data.urlPdf) {
+                            // Abrir el archivo PDF generado en una nueva pestaña del navegador
+                            window.open(response.data.urlPdf, '_blank');
+                            Swal.fire({
+                                title: 'Etiqueta Reimpresa',
+                                text: 'La etiqueta se ha reimpreso correctamente.',
+                                icon: 'success',
+                                confirmButtonText: 'OK'
+                            });
+                        } else {
+                            Swal.fire({
+                                title: 'Error',
+                                text: 'No se pudo generar la etiqueta.',
+                                icon: 'error',
+                                confirmButtonText: 'OK'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error al generar la reimpresión:', error);
+                        Swal.fire({
+                            title: 'Error',
+                            text: 'Hubo un problema al generar la reimpresión.',
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        });
                     });
             },
             // Imprimir un detalle de la factura

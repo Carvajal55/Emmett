@@ -62,6 +62,7 @@ urlpatterns = [
     #Imprimir etiquetas
     path('api/imprimir-etiqueta/', core_views.imprimir_etiqueta, name='imprimir_etiqueta'),
     path('api/imprimir-etiquetaqr/', core_views.imprimir_etiqueta_qr, name='imprimir_etiqueta_qr'),
+    path('api/reimprimir-etiquetaqr/', core_views.reimprimir_etiqueta_qr, name='reimprimir_etiqueta_qr'),
 
     #Ingresar Documentos
     path('api/create-category/', core_views.create_category, name='create_category'),
