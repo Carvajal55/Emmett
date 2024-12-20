@@ -177,6 +177,8 @@
             internalProducts: [], // Lista de productos para despacho interno
             alertasuccess:false,
             alertaerror:false,
+            processingQueue: [],     // Cola de SuperIDs en espera
+            isProcessing: false,     // Bandera para evitar procesos simultáneos
         },
         watch: {
             typeDocument() {
@@ -254,7 +256,7 @@
                         totalAmount: product.totalAmount,
                         quantity: product.quantity,
                         count: 0,
-                        name : product.name,
+                        name: product.name,
                         superid: null
                     }));
                 }).catch(error => {
@@ -271,25 +273,27 @@
                 }
             },
             async validateAndLinkSuperid(isInternal = false) {
-                if (!this.sid || this.isProcessing) return; // Evita procesar si ya está en proceso o el input está vacío
-                
-                const superidToValidate = this.sid.trim(); 
-                this.processingQueue.push(superidToValidate); // Agrega el SuperID a la cola
-                this.sid = ''; // Limpia el input para permitir nuevas entradas
-                this.$nextTick(() => document.getElementById('sidProduct').focus()); // Enfoca nuevamente el input
+                // Prevenir duplicados o procesar si está vacío
+                if (!this.sid || this.isProcessing) return;
 
+                const superidToValidate = this.sid.trim();
+                this.processingQueue.push(superidToValidate); // Agregar a la cola
+                this.sid = ''; // Limpiar el input inmediatamente
+                this.$nextTick(() => document.getElementById('sidProduct').focus()); // Enfocar nuevamente
+
+                // Si no hay un proceso activo, iniciar el procesamiento de la cola
                 if (!this.isProcessing) {
-                    this.processQueue(isInternal); // Procesa la cola si no está en ejecución
+                    this.processQueue(isInternal);
                 }
             },
             async processQueue(isInternal) {
                 if (this.processingQueue.length === 0) {
                     this.isProcessing = false;
-                    return; // No hay SuperIDs en la cola
+                    return; // Nada que procesar
                 }
 
-                this.isProcessing = true; // Marca como en proceso
-                const superidToProcess = this.processingQueue.shift(); // Toma el siguiente SuperID de la cola
+                this.isProcessing = true; // Marcar como en proceso
+                const superidToProcess = this.processingQueue.shift(); // Extraer el primer SuperID de la cola
 
                 try {
                     const response = await axios.post('/api/validate-superid/', { sid: superidToProcess });
@@ -301,19 +305,19 @@
                             description: response.data.description
                         };
 
-                        // Enviar el producto a despacho
+                        // Llamar a la función de despacho
                         await this.dispatchConsumption(product, isInternal);
-                        this.playSound('successSound'); // Éxito
+                        this.playSound('successSound'); // Sonido de éxito
                     } else {
                         Swal.fire('Error', response.data.title, response.data.icon);
-                        this.playSound('errorSound'); // Error
+                        this.playSound('errorSound'); // Sonido de error
                     }
                 } catch (error) {
                     Swal.fire('Error', 'Error al validar el SuperID.', 'error');
                     this.playSound('errorSound');
                     console.error(error);
                 } finally {
-                    this.processQueue(isInternal); // Procesa el siguiente SuperID en la cola
+                    this.processQueue(isInternal); // Procesar el siguiente SuperID en la cola
                 }
             },
 
