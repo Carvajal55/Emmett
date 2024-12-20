@@ -2343,15 +2343,14 @@ def dispatch_consumption(request):
             company = data.get('company')
             products = data.get('products', [])
 
-            # Validaciones iniciales
-            if not n_document or not type_document or not products:
+            if not products:
                 return JsonResponse({
-                    'title': 'Datos incompletos',
+                    'title': 'Sin productos',
                     'icon': 'error',
-                    'message': 'Asegúrate de enviar nDocument, typeDocument y productos'
+                    'message': 'No se enviaron productos para despachar.'
                 }, status=400)
 
-            # Obtener o crear el sector "Despachados" (cacheado para evitar múltiples consultas)
+            # Obtener o crear el sector "Despachados"
             sector_despachados, _ = Sectoroffice.objects.get_or_create(
                 zone="DESP",
                 defaults={
@@ -2363,12 +2362,9 @@ def dispatch_consumption(request):
                     'state': 1
                 }
             )
-
             sector_despachados_id = sector_despachados.idsectoroffice
 
-            # Usar una transacción para manejar las operaciones locales
             with transaction.atomic():
-                # Obtener los superIDs y buscar los productos en un solo query
                 superids = [product.get('superid') for product in products]
                 unique_products = Uniqueproducts.objects.filter(
                     superid__in=superids, state=0
@@ -2377,69 +2373,33 @@ def dispatch_consumption(request):
                 if not unique_products.exists():
                     return JsonResponse({
                         'title': 'SuperIDs no encontrados',
-                        'icon': 'error',
-                        'message': 'Ninguno de los SuperIDs proporcionados está disponible para despacho'
+                        'icon': 'error'
                     }, status=404)
 
-                # Agrupar por producto para sumar cantidades
-                products_by_variant = {}
                 for product in products:
-                    unique_product = unique_products.filter(superid=product.get('superid')).first()
+                    superid = product.get('superid')
+                    unique_product = unique_products.filter(superid=superid).first()
+
                     if not unique_product:
-                        return JsonResponse({
-                            'title': f'SuperID {product.get("superid")} no encontrado',
-                            'icon': 'error'
-                        })
+                        continue  # Saltar SuperIDs inválidos
 
-                    variant_id = unique_product.product.iderp
-                    quantity = int(product.get('quantity', 1))
-
-                    if variant_id not in products_by_variant:
-                        products_by_variant[variant_id] = 0
-                    products_by_variant[variant_id] += quantity
-
-                    # Validar stock disponible localmente
-                    stock_disponible = Uniqueproducts.objects.filter(
-                        product=unique_product.product, state=0
-                    ).count()
-
-                    if stock_disponible < quantity:
-                        return JsonResponse({
-                            'title': f'Stock insuficiente para {unique_product.product.sku}',
-                            'icon': 'error',
-                            'message': f'Stock disponible: {stock_disponible}'
-                        })
-
-                    # Marcar el producto como "despachado" localmente
                     unique_product.location = sector_despachados_id
-                    unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
-                    unique_product.typedocout = type_document
-                    unique_product.ndocout = n_document
-                    unique_product.datelastinventory = timezone.now()
                     unique_product.state = 1
-                    unique_product.ncompany = company
+                    unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
                     unique_product.save()
 
-                # Preparar datos para la API de Bsale
                 data_bsale = {
                     "note": f"Despacho desde empresa {company}",
-                    "officeId": 1,  # Ajusta según la configuración de tu sistema
+                    "officeId": 1,
                     "details": [
-                        {"quantity": qty, "variantId": variant_id}
-                        for variant_id, qty in products_by_variant.items()
+                        {"quantity": 1, "variantId": up.product.iderp}
+                        for up in unique_products
                     ]
                 }
 
-                headers = {
-                    "access_token": BSALE_API_TOKEN,
-                    "Content-Type": "application/json"
-                }
-
-                # Hacer la llamada a la API de Bsale
+                headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
                 response = requests.post(
-                    "https://api.bsale.io/v1/stocks/consumptions.json",
-                    headers=headers,
-                    json=data_bsale
+                    "https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale
                 )
 
                 if response.status_code not in [200, 201]:

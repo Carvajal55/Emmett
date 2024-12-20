@@ -99,47 +99,51 @@
                                 <option value="52">Guía</option>
                             </select>
                         </div>
+        
                         <div class="mb-3">
                             <label for="modalNDocument" class="form-label">Número de Documento</label>
                             <input id="modalNDocument" type="number" v-model="nDocument" class="form-control" placeholder="Ingrese el número del documento">
                         </div>
-                        <div v-show="alertasuccess" class="alert alert-success">
-                            <strong>¡Éxito!</strong> Producto despachado correctamente.
-                        </div>
-                        <div v-show="alertaerror" class="alert alert-danger">
-                            <strong>Error:</strong> No se pudo despachar el producto.
-                        </div>
+        
                         <div class="input-group mb-3">
-                            <input type="text" v-model="sid" class="form-control" placeholder="Ingrese SuperID" @keyup.enter="validateAndLinkSuperid(true)">
-                            <button type="button" class="btn btn-primary" @click="validateAndLinkSuperid(true)">Agregar</button>
+                            <input 
+                                id="sidProduct" 
+                                type="text" 
+                                v-model="sid" 
+                                @keyup.enter="validateAndLinkSuperid(true)" 
+                                class="form-control" 
+                                placeholder="Escanea el código único"
+                            />
                         </div>
-                        <table class="d-none table">
+        
+                        <h5>SuperIDs Despachados</h5>
+                        <table class="table table-bordered">
                             <thead>
                                 <tr>
+                                    <th>#</th>
                                     <th>SuperID</th>
                                     <th>SKU</th>
                                     <th>Descripción</th>
-                                    <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="(product, index) in internalProducts" :key="index">
+                                    <td>[[ index + 1 ]]</td>
                                     <td>[[ product.superid ]]</td>
                                     <td>[[ product.code ]]</td>
                                     <td>[[ product.description ]]</td>
-                                    <td>
-                                        <button type="button" class="btn btn-danger btn-sm" @click="removeInternalProduct(index)">Eliminar</button>
-                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
+        
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                     </div>
                 </div>
             </div>
         </div>
+        
             
         <table class="table mt-3">
             <thead>
@@ -240,7 +244,7 @@
                     .then(response => {
                         if (response.data.icon === 'success') {
                             Swal.fire('Éxito', 'Productos despachados internamente con éxito.', 'success');
-                            this.internalProducts = []; // Limpiar la lista después del despacho
+                            this.internalProducts = []; // Limpiar la lista tras el despacho
                         } else {
                             Swal.fire('Error', response.data.title, response.data.icon);
                         }
@@ -270,6 +274,10 @@
                     console.error(error);
                 });
             },
+            removeInternalProduct(index) {
+            this.internalProducts.splice(index, 1); // Eliminar producto de la lista
+        },
+
             playSound(soundId) {
                 const audioElement = document.getElementById(soundId);
                 if (audioElement) {
@@ -294,59 +302,52 @@
                             description: response.data.description
                         };
 
-                        // Enviar a despacho
+                        // Agregar el producto a la lista visual
+                        this.internalProducts.push(product);
+
+                        // Descontar automáticamente en el sistema
                         await this.dispatchConsumption(product, isInternal);
-                        this.playSound('successSound'); // Éxito
+
+                        this.playSound('successSound'); // Reproducir sonido de éxito
                     } else {
                         Swal.fire('Error', response.data.title, response.data.icon);
-                        this.playSound('errorSound'); // Error
+                        this.playSound('errorSound'); // Reproducir sonido de error
                     }
                 } catch (error) {
                     Swal.fire('Error', 'Error al validar el SuperID.', 'error');
                     this.playSound('errorSound'); // Reproducir sonido de error
                     console.error(error);
                 } finally {
-                    this.sid = ''; // Limpiar el input
+                    this.sid = ''; // Limpiar el input tras procesar
                     this.isProcessing = false; // Liberar la bandera
-                    this.$nextTick(() => document.getElementById('sidProduct').focus()); // Volver a enfocar
+                    this.$nextTick(() => document.getElementById('sidProduct').focus()); // Enfocar nuevamente
                 }
             },
 
-            dispatchConsumption(product, isInternal = false) {
-                // Si no es interno, verificar que el tipo y número de documento estén completos
-                if (!isInternal && (!this.nDocument || !this.typeDocument)) {
-                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de despachar.', 'error');
-                    return;
-                }
-
+            async dispatchConsumption(product, isInternal = false) {
                 const payload = {
                     company: this.company,
                     products: [product]
                 };
 
-                // Agregar campos de documento solo si no es despacho interno
+                // Agregar campos de documento si no es despacho interno
                 if (!isInternal) {
                     payload.nDocument = this.nDocument;
                     payload.typeDocument = this.typeDocument;
                 }
 
-                axios.post('/api/dispatch-consumption/', payload)
-                    .then(response => {
-                        if (response.data.icon === 'success') {
-                            this.alertasuccess = true;      // Mostrar mensaje de éxito
-                            this.playSound('successSound'); // Reproducir sonido de éxito
+                try {
+                    const response = await axios.post('/api/dispatch-consumption/', payload);
 
-                            // Opcional: Aquí puedes limpiar los datos o actualizar la lista de productos
-                        } else {
-                            Swal.fire('Error', response.data.title, response.data.icon);
-                            this.playSound('errorSound'); // Reproducir sonido de error
-                        }
-                    })
-                    .catch(error => {
-                        this.alertaerror = true;           // Mostrar mensaje de error
-                        this.playSound('errorSound');      // Reproducir sonido de error
-                        console.error(error);
-                    });
+                    if (response.data.icon !== 'success') {
+                        Swal.fire('Error', response.data.title, response.data.icon);
+                        this.playSound('errorSound'); // Reproducir sonido de error
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Error al despachar el producto.', 'error');
+                    this.playSound('errorSound'); // Reproducir sonido de error
+                    console.error(error);
+                }
             },
             openInternalDispatchModal() {
                 new bootstrap.Modal(document.getElementById('internalDispatchModal')).show();
