@@ -38,15 +38,8 @@
             </div>   
             <div>
                 <label for="sidProduct">ID Producto</label>
-                <input 
-                    id="sidProduct" 
-                    type="text" 
-                    v-model="sid" 
-                    @keyup.enter="validateAndLinkSuperid(true)" 
-                    class="form-control" 
-                    :disabled="isProcessing" 
-                    placeholder="Escanea el código único" />
-            </div>            
+                <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid(false)" class="form-control">
+            </div>             
             
             <button @click="dispatchConsumption" class="mt-3 btn btn-success">Despachar</button>
             {% if request.user.usuario.rol == 'VENTAS' %}
@@ -99,51 +92,47 @@
                                 <option value="52">Guía</option>
                             </select>
                         </div>
-        
                         <div class="mb-3">
                             <label for="modalNDocument" class="form-label">Número de Documento</label>
                             <input id="modalNDocument" type="number" v-model="nDocument" class="form-control" placeholder="Ingrese el número del documento">
                         </div>
-        
-                        <div class="input-group mb-3">
-                            <input 
-                                id="sidProduct" 
-                                type="text" 
-                                v-model="sid" 
-                                @keyup.enter="validateAndLinkSuperid(true)" 
-                                class="form-control" 
-                                placeholder="Escanea el código único"
-                            />
+                        <div v-show="alertasuccess" class="alert alert-success">
+                            <strong>¡Éxito!</strong> Producto despachado correctamente.
                         </div>
-        
-                        <h5>SuperIDs Despachados</h5>
-                        <table class="table table-bordered">
+                        <div v-show="alertaerror" class="alert alert-danger">
+                            <strong>Error:</strong> No se pudo despachar el producto.
+                        </div>
+                        <div class="input-group mb-3">
+                            <input type="text" v-model="sid" class="form-control" placeholder="Ingrese SuperID" @keyup.enter="validateAndLinkSuperid(true)">
+                            <button type="button" class="btn btn-primary" @click="validateAndLinkSuperid(true)">Agregar</button>
+                        </div>
+                        <table class="d-none table">
                             <thead>
                                 <tr>
-                                    <th>#</th>
                                     <th>SuperID</th>
                                     <th>SKU</th>
                                     <th>Descripción</th>
+                                    <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="(product, index) in internalProducts" :key="index">
-                                    <td>[[ index + 1 ]]</td>
                                     <td>[[ product.superid ]]</td>
                                     <td>[[ product.code ]]</td>
                                     <td>[[ product.description ]]</td>
+                                    <td>
+                                        <button type="button" class="btn btn-danger btn-sm" @click="removeInternalProduct(index)">Eliminar</button>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-        
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                     </div>
                 </div>
             </div>
         </div>
-        
             
         <table class="table mt-3">
             <thead>
@@ -188,7 +177,6 @@
             internalProducts: [], // Lista de productos para despacho interno
             alertasuccess:false,
             alertaerror:false,
-            isProcessing: false,
         },
         watch: {
             typeDocument() {
@@ -244,7 +232,7 @@
                     .then(response => {
                         if (response.data.icon === 'success') {
                             Swal.fire('Éxito', 'Productos despachados internamente con éxito.', 'success');
-                            this.internalProducts = []; // Limpiar la lista tras el despacho
+                            this.internalProducts = []; // Limpiar la lista después del despacho
                         } else {
                             Swal.fire('Error', response.data.title, response.data.icon);
                         }
@@ -274,10 +262,6 @@
                     console.error(error);
                 });
             },
-            removeInternalProduct(index) {
-            this.internalProducts.splice(index, 1); // Eliminar producto de la lista
-        },
-
             playSound(soundId) {
                 const audioElement = document.getElementById(soundId);
                 if (audioElement) {
@@ -286,64 +270,74 @@
                     console.error(`El sonido con ID ${soundId} no se encontró.`);
                 }
             },
-            async validateAndLinkSuperid(isInternal = false) {
-                if (this.isProcessing || !this.sid) return;
+            validateAndLinkSuperid(isInternal = false) {
+                const superidToValidate = this.sid;
 
-                this.isProcessing = true;
-                const superidToValidate = this.sid.trim().toUpperCase(); // Convertir a mayúsculas y quitar espacios
-
-                try {
-                    const response = await axios.post('/api/validate-superid/', { sid: superidToValidate });
-
-                    if (response.data.icon === 'success') {
-                        const product = {
-                            superid: superidToValidate,
-                            code: response.data.sku,
-                            description: response.data.description
-                        };
-
-                        this.internalProducts.push(product);
-                        await this.dispatchConsumption(product, isInternal);
-                        this.playSound('successSound');
-                    } else {
-                        Swal.fire('Error', response.data.title, response.data.icon);
-                        this.playSound('errorSound');
-                    }
-                } catch (error) {
-                    Swal.fire('Error', 'Error al validar el SuperID.', 'error');
-                    this.playSound('errorSound');
-                    console.error(error);
-                } finally {
-                    this.sid = '';
-                    this.isProcessing = false;
-                    this.$nextTick(() => document.getElementById('sidProduct').focus());
+                if (!isInternal && (!this.typeDocument || !this.nDocument)) {
+                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de agregar un producto.', 'error');
+                    return;
                 }
+
+                axios.post('/api/validate-superid/', { sid: superidToValidate })
+                    .then(response => {
+                        if (response.data.icon === 'success') {
+                            const product = {
+                                superid: superidToValidate,
+                                code: response.data.sku,
+                                description: response.data.description
+                            };
+
+                            // Llamar a dispatchConsumption con el producto validado
+                            this.dispatchConsumption(product, isInternal);
+
+                            this.sid = ''; // Limpiar el campo de entrada
+                        } else {
+                            Swal.fire('Error', response.data.title, response.data.icon);
+                            this.playSound('errorSound'); // Reproducir sonido de error
+                        }
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'Error al validar el SuperID.', 'error');
+                        this.playSound('errorSound'); // Reproducir sonido de error
+                        console.error(error);
+                    });
             },
 
-            async dispatchConsumption(product, isInternal = false) {
+            dispatchConsumption(product, isInternal = false) {
+                // Si no es interno, verificar que el tipo y número de documento estén completos
+                if (!isInternal && (!this.nDocument || !this.typeDocument)) {
+                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de despachar.', 'error');
+                    return;
+                }
+
                 const payload = {
                     company: this.company,
                     products: [product]
                 };
 
-                // Agregar campos de documento si no es despacho interno
+                // Agregar campos de documento solo si no es despacho interno
                 if (!isInternal) {
                     payload.nDocument = this.nDocument;
                     payload.typeDocument = this.typeDocument;
                 }
 
-                try {
-                    const response = await axios.post('/api/dispatch-consumption/', payload);
+                axios.post('/api/dispatch-consumption/', payload)
+                    .then(response => {
+                        if (response.data.icon === 'success') {
+                            this.alertasuccess = true;      // Mostrar mensaje de éxito
+                            this.playSound('successSound'); // Reproducir sonido de éxito
 
-                    if (response.data.icon !== 'success') {
-                        Swal.fire('Error', response.data.title, response.data.icon);
-                        this.playSound('errorSound'); // Reproducir sonido de error
-                    }
-                } catch (error) {
-                    Swal.fire('Error', 'Error al despachar el producto.', 'error');
-                    this.playSound('errorSound'); // Reproducir sonido de error
-                    console.error(error);
-                }
+                            // Opcional: Aquí puedes limpiar los datos o actualizar la lista de productos
+                        } else {
+                            Swal.fire('Error', response.data.title, response.data.icon);
+                            this.playSound('errorSound'); // Reproducir sonido de error
+                        }
+                    })
+                    .catch(error => {
+                        this.alertaerror = true;           // Mostrar mensaje de error
+                        this.playSound('errorSound');      // Reproducir sonido de error
+                        console.error(error);
+                    });
             },
             openInternalDispatchModal() {
                 new bootstrap.Modal(document.getElementById('internalDispatchModal')).show();

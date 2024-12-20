@@ -2338,20 +2338,13 @@ def dispatch_consumption(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            n_document = data.get('nDocument')
+            n_document = data.get('nDocument', 0)
             type_document = data.get('typeDocument')
             company = data.get('company')
             products = data.get('products', [])
 
-            if not products:
-                return JsonResponse({
-                    'title': 'Sin productos',
-                    'icon': 'error',
-                    'message': 'No se enviaron productos para despachar.'
-                }, status=400)
-
-            # Obtener o crear el sector "Despachados"
-            sector_despachados, _ = Sectoroffice.objects.get_or_create(
+            # Obtener o crear el sector "Despachados" (cacheado para evitar múltiples consultas)
+            sector_despachados = Sectoroffice.objects.get_or_create(
                 zone="DESP",
                 defaults={
                     'idoffice': 0,
@@ -2361,58 +2354,75 @@ def dispatch_consumption(request):
                     'namesector': "Despachados",
                     'state': 1
                 }
-            )
+            )[0]
+
             sector_despachados_id = sector_despachados.idsectoroffice
 
+            # Usar una transacción para manejar las operaciones
             with transaction.atomic():
+                # Obtener todos los superIDs en un solo query
                 superids = [product.get('superid') for product in products]
-                unique_products = Uniqueproducts.objects.filter(
-                    superid__in=superids, state=0
-                ).select_related('product')
-
-                if not unique_products.exists():
-                    return JsonResponse({
-                        'title': 'SuperIDs no encontrados',
-                        'icon': 'error'
-                    }, status=404)
-
-                for product in products:
-                    superid = product.get('superid')
-                    unique_product = unique_products.filter(superid=superid).first()
-
-                    if not unique_product:
-                        continue  # Saltar SuperIDs inválidos
-
-                    unique_product.location = sector_despachados_id
-                    unique_product.state = 1
-                    unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
-                    unique_product.save()
-
-                data_bsale = {
-                    "note": f"Despacho desde empresa {company}",
-                    "officeId": 1,
-                    "details": [
-                        {"quantity": 1, "variantId": up.product.iderp}
-                        for up in unique_products
-                    ]
+                unique_products = {
+                    up.superid: up for up in Uniqueproducts.objects.filter(
+                        superid__in=superids, state=0
+                    ).select_related('product')
                 }
 
-                headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-                response = requests.post(
-                    "https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale
-                )
+                # Procesar productos en un solo lote
+                for product in products:
+                    superid = product.get('superid')
+                    cantidad = int(product.get('quantity', 1))
 
-                if response.status_code not in [200, 201]:
-                    raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
+                    unique_product = unique_products.get(superid)
+                    if not unique_product:
+                        return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'})
+
+                    if unique_product.location is None:
+                        unique_product.location = sector_despachados_id
+                        unique_product.save()
+
+                    # Validar stock disponible
+                    stock_disponible = Uniqueproducts.objects.filter(
+                        product=unique_product.product, state=0
+                    ).count()
+
+                    if stock_disponible < cantidad:
+                        return JsonResponse({
+                            'title': f'Stock insuficiente para {unique_product.product.sku}',
+                            'icon': 'error',
+                            'message': f'Stock disponible: {stock_disponible}'
+                        })
+
+                    # Preparar datos para Bsale
+                    data_bsale = {
+                        "note": f"Despacho desde empresa {company}",
+                        "officeId": 1,
+                        "details": [{"quantity": cantidad, "variantId": unique_product.product.iderp}]
+                    }
+                    headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+
+                    # Hacer llamada a Bsale
+                    response = requests.post(
+                        "https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale
+                    )
+
+                    if response.status_code not in [200, 201]:
+                        raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
+
+                    # Actualizar producto despachado
+                    unique_product.location = sector_despachados_id
+                    unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
+                    unique_product.typedocout = type_document
+                    unique_product.ndocout = n_document
+                    unique_product.datelastinventory = timezone.now()
+                    unique_product.state = 1
+                    unique_product.ncompany = company
+                    unique_product.save()
 
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
         except Exception as e:
-            return JsonResponse({
-                'title': 'Error en el despacho',
-                'icon': 'error',
-                'message': str(e)
-            }, status=500)
+            return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
 #BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
