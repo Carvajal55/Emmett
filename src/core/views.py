@@ -2537,7 +2537,7 @@ def validate_superid(request):
 
 
 @csrf_exempt
-def validate_superid_optimized(request):
+def validate_superid_simplified(request):
     if request.method == "POST":
         try:
             # Parsear la solicitud JSON
