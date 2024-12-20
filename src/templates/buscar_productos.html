@@ -175,18 +175,21 @@
         methods: {
             // Buscar productos con paginación
             async fetchProducts(page = 1) {
+                // Restablecer el producto seleccionado cuando se realiza una nueva búsqueda
+                this.selectedProduct = null;
+
                 if (!this.searchQuery) {
                     this.products = [];
                     return;
                 }
-    
+
                 // Cancelar solicitudes anteriores si existen
                 if (this.cancelTokenSource) {
                     this.cancelTokenSource.cancel("Cancelando solicitud anterior");
                 }
-    
+
                 this.cancelTokenSource = axios.CancelToken.source();
-    
+
                 try {
                     const response = await axios.get(`/api/buscar-productos/`, {
                         params: { page, q: this.searchQuery },
@@ -203,6 +206,7 @@
                     }
                 }
             },
+
     
             // Ver detalles de un producto
             async verDetallesProducto(productId) {

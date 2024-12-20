@@ -301,19 +301,18 @@ def buscar_productosAPI(request):
     # Filtrar productos por SKU, nombre o prefijo
     productos = Products.objects.filter(
         Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
-    ).prefetch_related(
-        'unique_products'
-    )
+    ).prefetch_related('unique_products')  # Eliminamos 'brands' de select_related
 
-    # Obtener las bodegas válidas
+    # Filtrar y mapear las bodegas y sectores válidos
     bodega_ids_included = [1, 2, 4, 6, 9, 10]
-    bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included)
-    bodega_mapping = {bodega.idoffice: bodega.name for bodega in bodegas}
+    bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included).values('idoffice', 'name')
+    bodega_mapping = {b['idoffice']: b['name'] for b in bodegas}
 
-    # Obtener los sectores válidos directamente
-    excluded_sectors = Sectoroffice.objects.filter(namesector="XT99-99") | Sectoroffice.objects.filter(zone="NARN") | Sectoroffice.objects.filter(zone="NRN")
-    sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sectors.values_list('idsectoroffice', flat=True))
-    sector_mapping = {sector.idsectoroffice: sector for sector in sectores}
+    excluded_sector_ids = Sectoroffice.objects.filter(
+        Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
+    ).values_list('idsectoroffice', flat=True)
+    sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sector_ids).values('idsectoroffice', 'namesector', 'idoffice')
+    sector_mapping = {sector['idsectoroffice']: sector for sector in sectores}
 
     # Paginación
     paginator = Paginator(productos, 10)
@@ -325,20 +324,19 @@ def buscar_productosAPI(request):
     # Serializar productos
     productos_data = []
     for producto in productos_page:
-        unique_products = producto.unique_products.exclude(location__in=excluded_sectors.values_list('idsectoroffice', flat=True))
+        unique_products = producto.unique_products.exclude(location__in=excluded_sector_ids).values('superid', 'location')
 
         # Procesar stock y ubicaciones válidas
-        bodegas_stock = {bodega.idoffice: 0 for bodega in bodegas}
+        bodegas_stock = {bodega_id: 0 for bodega_id in bodega_mapping}
         unique_products_data = []
         for up in unique_products:
-            sector = sector_mapping.get(up.location)
-            if sector and isinstance(sector, Sectoroffice):
-                bodega_name = bodega_mapping.get(sector.idoffice, 'Bodega desconocida')
-                if sector.idoffice in bodegas_stock:
-                    bodegas_stock[sector.idoffice] += 1
+            sector = sector_mapping.get(up['location'])
+            if sector:
+                bodega_name = bodega_mapping.get(sector['idoffice'], 'Bodega desconocida')
+                bodegas_stock[sector['idoffice']] += 1
                 unique_products_data.append({
-                    'superid': up.superid,
-                    'locationname': sector.namesector,
+                    'superid': up['superid'],
+                    'locationname': sector['namesector'],
                     'bodega': bodega_name,
                 })
 
@@ -351,7 +349,7 @@ def buscar_productosAPI(request):
             'stock_total': sum(bodegas_stock.values()),
             'unique_products': unique_products_data,
             'prefixed': producto.prefixed or '',
-            'brands': producto.brands or '',
+            'brands': producto.brands or '',  # Acceder directamente al campo brands
             'iderp': producto.iderp or '',
             'alto': producto.alto or 0,
             'largo': producto.largo or 0,
@@ -365,6 +363,7 @@ def buscar_productosAPI(request):
         'total_pages': paginator.num_pages,
         'current_page': productos_page.number,
     }, safe=False)
+
 
 
 
