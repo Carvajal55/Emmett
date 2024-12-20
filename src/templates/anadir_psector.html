@@ -141,7 +141,7 @@
                         this.productos = [...response.data.productos];
                         this.currentPage = 1;
                         this.playSound('success');
-                        this.mostrarAlerta('Productos cargados con éxito.', 'alert-success');
+
                     } else {
                         console.error(response.data.msg);
                         this.productos = [];
@@ -170,7 +170,9 @@
                 })
                 .then(response => {
                     if (response.data.resp === 1) {
+                        // Llamar a buscarProductos() pero sin manejar sonidos/alertas ahí
                         this.buscarProductos();
+                        // Manejar éxito aquí
                         this.playSound('success');
                         this.mostrarAlerta('Producto añadido con éxito.', 'alert-success');
                     } else {
@@ -178,13 +180,14 @@
                         this.playSound('error');
                         this.mostrarAlerta('Error al añadir producto.', 'alert-danger');
                     }
-                    this.setFocus();
                 })
                 .catch(error => {
                     console.error('Error al agregar producto:', error);
                     this.playSound('error');
                     this.mostrarAlerta('Error al agregar producto.', 'alert-danger');
-                    this.setFocus();
+                })
+                .finally(() => {
+                    this.setFocus(); // Asegura que el input reciba el foco independientemente del resultado
                 });
             },
             changePage(page) {

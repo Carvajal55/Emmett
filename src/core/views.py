@@ -1194,9 +1194,25 @@ def obtener_correlativo(categoria):
 def generar_json(request):
     if request.method == 'POST':
         try:
-            data = json.loads(request.body)
+            # Verificar si se envió un archivo
+            file = request.FILES.get('img_url')  # Obtener el archivo del input file
+            if file:
+                # Guardar la imagen en la carpeta especificada dentro de media
+                relative_file_path = os.path.join('imagenes', file.name)
+                absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
 
-            # Obtener los datos necesarios del encabezado
+                # Crear la carpeta si no existe
+                os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+
+                # Guardar el archivo
+                with open(absolute_file_path, 'wb') as dest:
+                    for chunk in file.chunks():
+                        dest.write(chunk)
+            else:
+                relative_file_path = ''  # Si no se envía imagen, dejar vacío
+
+            # Procesar el resto de los datos JSON
+            data = json.loads(request.POST.get('jsonData'))  # Obtener el JSON enviado como parte de la solicitud
             headers = data.get('headers', {})
             supplier = headers.get('supplier', '')
             supplier_name = headers.get('supplierName', '')
@@ -1204,57 +1220,41 @@ def generar_json(request):
             number_document = headers.get('nDocument', None)
             observation = headers.get('observation', '')
             date_purchase = headers.get('datePurchase', None)
-            url_img = headers.get('urlImg', '')
             global_discount = float(headers.get('dcto', 0) or 0)  # Descuento global
 
             # Crear el nombre del archivo basado en los datos del encabezado
-            file_name = f"s_{supplier}t_{type_document}f_{number_document}.json"
+            json_file_name = f"s_{supplier}t_{type_document}f_{number_document}.json"
 
-            # Construir la ruta relativa de guardado
-            relative_file_path = os.path.join('models', 'invoices', 'json', file_name)
-            absolute_file_path = os.path.join(settings.BASE_DIR, relative_file_path)
+            # Guardar el JSON
+            relative_json_path = os.path.join('models', 'invoices', 'json', json_file_name)
+            absolute_json_path = os.path.join(settings.BASE_DIR, relative_json_path)
+            os.makedirs(os.path.dirname(absolute_json_path), exist_ok=True)
 
-            # Crear las carpetas si no existen
-            os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
-
-            # Variables para calcular los totales
+            # Calcular totales y procesar detalles
             subtotal_without_discount = 0
             subtotal_with_discount = 0
-
-            # Procesar los detalles de la factura
             for detalle in data.get('details', []):
-                cost = float(detalle.get('cost', 0))  # Convertir costo a número
-                product_discount = float(detalle.get('dctoItem', global_discount) or 0)  # Convertir descuento a número
-
-                # Calcular el costo con descuento
+                cost = float(detalle.get('cost', 0))
+                product_discount = float(detalle.get('dctoItem', global_discount) or 0)
                 cost_with_discount = cost - (cost * (product_discount / 100))
+                subtotal_without_discount += cost * detalle.get('qty', 1)
+                subtotal_with_discount += cost_with_discount * detalle.get('qty', 1)
+                detalle['cost_with_discount'] = cost_with_discount
 
-                # Actualizar subtotales
-                subtotal_without_discount += cost * detalle.get('qty', 1)  # Considerar la cantidad
-                subtotal_with_discount += cost_with_discount * detalle.get('qty', 1)  # Considerar la cantidad
-
-                # Agregar estos campos al detalle
-                detalle['cost_with_discount'] = cost_with_discount  # Costo con descuento
-
-            # Calcular IVA y subtotales finales
-            iva_rate = 0.19  # Tasa de IVA (19%)
+            iva_rate = 0.19
             iva_amount = subtotal_with_discount * iva_rate
             subtotal_bruto = subtotal_with_discount + iva_amount
 
-            # Añadir los subtotales y el IVA al encabezado
             headers['subtotalWithoutDiscount'] = subtotal_without_discount
             headers['subtotalWithDiscount'] = subtotal_with_discount
             headers['iva'] = iva_amount
             headers['subtotalBruto'] = subtotal_bruto
-
-            # Actualizar el JSON con los nuevos encabezados
             data['headers'] = headers
 
-            # Guardar el JSON en el archivo especificado
-            with open(absolute_file_path, 'w', encoding='utf-8') as json_file:
+            with open(absolute_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(data, json_file, ensure_ascii=False, indent=4)
 
-            # Buscar si la factura ya existe
+            # Guardar en la base de datos
             purchase, created = Purchase.objects.update_or_create(
                 typedoc=type_document,
                 number=number_document,
@@ -1264,23 +1264,22 @@ def generar_json(request):
                     'observation': observation,
                     'dateadd': timezone.now(),
                     'dateproccess': date_purchase,
-                    'subtotal': subtotal_with_discount,  # Subtotal con descuento
-                    'urljson': relative_file_path,  # Guardar solo la ruta relativa en la base de datos
-                    'urlimg': url_img,
-                    'status': 0,  # Estado predeterminado
+                    'subtotal': subtotal_with_discount,
+                    'urljson': relative_json_path,
+                    'urlimg': relative_file_path,  # Guardar la ruta relativa del archivo
+                    'status': 0,
                 }
             )
 
-            # Devolver la ruta del archivo creada y un mensaje de éxito
             return JsonResponse({
                 'message': 'Archivo JSON procesado correctamente',
-                'urlJson': relative_file_path,
+                'urlJson': relative_json_path,
                 'subtotalWithoutDiscount': subtotal_without_discount,
                 'subtotalWithDiscount': subtotal_with_discount,
                 'iva': iva_amount,
                 'subtotalBruto': subtotal_bruto,
                 'purchaseId': purchase.id,
-                'action': 'created' if created else 'updated'  # Indicar si se creó o actualizó
+                'action': 'created' if created else 'updated'
             }, status=201)
 
         except Exception as e:
@@ -1563,73 +1562,62 @@ def buscar_productos_por_sector(request):
 
 @csrf_exempt
 def search_products_by_sector(request):
-    if request.method == 'POST':
-        # Parsear el cuerpo JSON
-        try:
-            body = json.loads(request.body)
-            term = body.get('searchTerm', '').strip()
-        except json.JSONDecodeError:
-            return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON'})
+    if request.method != 'POST':
+        return JsonResponse({'resp': 3, 'msg': 'Método no permitido'})
 
-        print(f"Término de búsqueda recibido: '{term}'")
+    try:
+        body = json.loads(request.body)
+        term = body.get('searchTerm', '').strip()
+    except json.JSONDecodeError:
+        return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON'})
 
-        # Reemplazar ' por - en el término de búsqueda
-        term = term.replace("'", "-")
-        print(f"Término de búsqueda modificado: '{term}'")
+    # Reemplazar ' por - en el término de búsqueda
+    term = term.replace("'", "-")
 
-        # Verificar si el término tiene el formato correcto, comenzando con 'B-'
-        if term.startswith('B-'):
-            parts = term.split('-')
-            if len(parts) == 4:
-                # Extraer id_office y name_sector a partir del término
-                id_office = parts[1]
-                name_sector = parts[2] + '-' + parts[3]
-                
-                print(f"Office ID: {id_office}, Sector Name: {name_sector}")
+    # Verificar si el término tiene el formato correcto
+    if not term.startswith('B-'):
+        return JsonResponse({'resp': 3, 'msg': 'El término de búsqueda no contiene el formato esperado.'})
 
-                # Buscar el sector en la base de datos
-                sector = Sectoroffice.objects.filter(namesector=name_sector, idoffice=id_office).first()
+    parts = term.split('-')
+    if len(parts) != 4:
+        return JsonResponse({'resp': 3, 'msg': 'Formato de término de búsqueda incorrecto.'})
 
-                if sector:
-                    print(f"Sector encontrado: {sector.namesector} con id {sector.idsectoroffice}")
+    # Extraer id_office y name_sector
+    id_office = parts[1]
+    name_sector = f"{parts[2]}-{parts[3]}"
 
-                    # Buscar productos en Uniqueproducts asociados al sector encontrado, ordenados por ID inverso
-                    productos = Uniqueproducts.objects.filter(location=sector.idsectoroffice).order_by('-id')  # Orden descendente
-                    productos_data = []
+    try:
+        # Buscar el sector
+        sector = Sectoroffice.objects.get(namesector=name_sector, idoffice=id_office)
+    except Sectoroffice.DoesNotExist:
+        return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado en oficina "{id_office}"'})
 
-                    for producto in productos:
-                        # Acceder al producto relacionado, manejar errores si no existe
-                        producto_data = {
-                            'superid': producto.superid,
-                            'sku': producto.product.sku if producto.product else "N/A",
-                            'name': producto.product.nameproduct if producto.product else "N/A"
-                        }
-                        productos_data.append(producto_data)
+    # Buscar productos asociados al sector, ordenados por ID inverso
+    productos = Uniqueproducts.objects.filter(
+        location=sector.idsectoroffice
+    ).select_related('product').order_by('-id')
 
-                    # Generar la respuesta
-                    response_data = {
-                        'resp': 1,
-                        'msg': 'Sector seleccionado',
-                        'idSector': sector.idsectoroffice,
-                        'cantProd': len(productos_data),
-                        'terminoScaneado': term,
-                        'nameSector': sector.namesector,
-                        'productos': productos_data
-                    }
-                    return JsonResponse(response_data)
-                else:
-                    # Sector no encontrado
-                    print(f"Sector '{name_sector}' no encontrado en oficina '{id_office}'")
-                    return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado en oficina "{id_office}"'})
-            else:
-                print(f"Formato de término incorrecto, partes encontradas: {parts}")
-                return JsonResponse({'resp': 3, 'msg': 'Formato de término de búsqueda incorrecto.'})
-        else:
-            print(f"El término no contiene 'B-': {term}")
-            return JsonResponse({'resp': 3, 'msg': 'El término de búsqueda no contiene el formato esperado.'})
+    # Construir datos de los productos
+    productos_data = [
+        {
+            'superid': producto.superid,
+            'sku': producto.product.sku if producto.product else "N/A",
+            'name': producto.product.nameproduct if producto.product else "N/A"
+        }
+        for producto in productos
+    ]
 
-    # Responder si el método no es POST
-    return JsonResponse({'resp': 3, 'msg': 'Método no permitido'})
+    # Generar la respuesta
+    response_data = {
+        'resp': 1,
+        'msg': 'Sector seleccionado',
+        'idSector': sector.idsectoroffice,
+        'cantProd': len(productos_data),
+        'terminoScaneado': term,
+        'nameSector': sector.namesector,
+        'productos': productos_data
+    }
+    return JsonResponse(response_data)
 
 # @csrf_exempt
 # def add_product_to_sector(request):
@@ -2350,15 +2338,14 @@ def format_table(details):
 def dispatch_consumption(request):
     if request.method == "POST":
         try:
-            # Obtener los datos del request
             data = json.loads(request.body)
             n_document = data.get('nDocument', 0)
             type_document = data.get('typeDocument')
             company = data.get('company')
             products = data.get('products', [])
 
-            # Verificar o crear el sector "Despachados"
-            sector_despachados, created = Sectoroffice.objects.get_or_create(
+            # Obtener o crear el sector "Despachados" (cacheado para evitar múltiples consultas)
+            sector_despachados = Sectoroffice.objects.get_or_create(
                 zone="DESP",
                 defaults={
                     'idoffice': 0,
@@ -2368,65 +2355,63 @@ def dispatch_consumption(request):
                     'namesector': "Despachados",
                     'state': 1
                 }
-            )
-            print(f"Sector 'Despachados' idsectoroffice: {sector_despachados.idsectoroffice}")
+            )[0]
 
-            # Iniciar una transacción atómica
+            sector_despachados_id = sector_despachados.idsectoroffice
+
+            # Usar una transacción para manejar las operaciones
             with transaction.atomic():
+                # Obtener todos los superIDs en un solo query
+                superids = [product.get('superid') for product in products]
+                unique_products = {
+                    up.superid: up for up in Uniqueproducts.objects.filter(
+                        superid__in=superids, state=0
+                    ).select_related('product')
+                }
+
+                # Procesar productos en un solo lote
                 for product in products:
                     superid = product.get('superid')
                     cantidad = int(product.get('quantity', 1))
 
-                    # Verificar si el superid existe en Uniqueproducts con estado 0
-                    unique_product = Uniqueproducts.objects.select_related('product').filter(superid=superid, state=0).first()
-
+                    unique_product = unique_products.get(superid)
                     if not unique_product:
-                        print(f"SuperID {superid} no encontrado o ya despachado.")
-                        return JsonResponse({'title': 'SuperID no encontrado o ya despachado', 'icon': 'error'})
+                        return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'})
 
-                    # Si el location es None, asignarlo al sector "Despachados"
                     if unique_product.location is None:
-                        unique_product.location = sector_despachados.idsectoroffice
+                        unique_product.location = sector_despachados_id
                         unique_product.save()
-                        print(f"Producto con SuperID {superid} asignado a 'Despachados' (Location ID: {sector_despachados.idsectoroffice})")
 
-                    # Obtener el Sectoroffice relacionado usando el location de unique_product
-                    sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
-                    if not sector:
-                        print(f"Sector no encontrado para el Location ID {unique_product.location}")
-                        return JsonResponse({'title': 'Sector no encontrado para el producto', 'icon': 'error'})
-
-                    product_instance = unique_product.product
-                    stock_disponible = Uniqueproducts.objects.filter(product=product_instance, state=0).count()
+                    # Validar stock disponible
+                    stock_disponible = Uniqueproducts.objects.filter(
+                        product=unique_product.product, state=0
+                    ).count()
 
                     if stock_disponible < cantidad:
-                        print(f"Error: Producto {product_instance.sku} no tiene suficiente stock. Stock actual: {stock_disponible}")
                         return JsonResponse({
-                            'title': 'Stock insuficiente',
+                            'title': f'Stock insuficiente para {unique_product.product.sku}',
                             'icon': 'error',
-                            'message': f'El producto {product_instance.sku} no tiene suficiente stock disponible.'
+                            'message': f'Stock disponible: {stock_disponible}'
                         })
 
-                    # Preparar los datos para enviar a Bsale
+                    # Preparar datos para Bsale
                     data_bsale = {
                         "note": f"Despacho desde empresa {company}",
                         "officeId": 1,
-                        "details": [{"quantity": cantidad, "variantId": product_instance.iderp}]
+                        "details": [{"quantity": cantidad, "variantId": unique_product.product.iderp}]
                     }
-                    print(f"Datos enviados a Bsale: {json.dumps(data_bsale, indent=2)}")
+                    headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-                    headers = {
-                        "access_token": BSALE_API_TOKEN,
-                        "Content-Type": "application/json"
-                    }
-
-                    response = requests.post("https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale)
+                    # Hacer llamada a Bsale
+                    response = requests.post(
+                        "https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale
+                    )
 
                     if response.status_code not in [200, 201]:
                         raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
 
-                    # Mover el producto al sector "Despachados" y actualizar su estado
-                    unique_product.location = sector_despachados.idsectoroffice
+                    # Actualizar producto despachado
+                    unique_product.location = sector_despachados_id
                     unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
                     unique_product.typedocout = type_document
                     unique_product.ndocout = n_document
@@ -2435,12 +2420,9 @@ def dispatch_consumption(request):
                     unique_product.ncompany = company
                     unique_product.save()
 
-                    print(f"Producto {unique_product.superid} despachado y movido al sector 'Despachados'.")
-
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
         except Exception as e:
-            print(f"Error inesperado: {str(e)}")
             return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
@@ -2623,130 +2605,117 @@ from datetime import date
 
 @csrf_exempt
 def imprimir_etiqueta_qr(request):
-    if request.method == 'POST':
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    try:
         # Obtener los datos enviados desde el front-end
         sku = request.POST.get('sku')
         number = request.POST.get('number')
         model = request.POST.get('model')
         qty = int(request.POST.get('qty', 1))
         codebar = request.POST.get('codebar', '')
-        url_json = request.POST.get('urlJson')  # Ruta del archivo JSON
+        url_json = request.POST.get('urlJson')
 
         if not sku or qty <= 0 or not url_json:
             return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
 
-        try:
-            producto = Products.objects.get(sku=sku)
-        except Products.DoesNotExist:
+        producto = Products.objects.filter(sku=sku).first()
+        if not producto:
             return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
 
+        # Preparar rutas para guardar el PDF
         pdf_filename = f'etiqueta_{sku}.pdf'
         relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
         absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
         os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
+        # Obtener el correlativo actual
         last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
-        base_numeric_sku = ''.join(filter(str.isdigit, sku))  # Extraer números del SKU
+        base_numeric_sku = ''.join(filter(str.isdigit, sku))
         if not base_numeric_sku:
             return JsonResponse({'error': 'El SKU no contiene números válidos.'}, status=400)
 
         base_superid = f"{base_numeric_sku}e"
 
-        page_width, page_height = 102 * mm, 50 * mm
-        pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
-
+        # Crear el PDF
+        pdf = canvas.Canvas(absolute_file_path, pagesize=(102 * mm, 50 * mm))
         super_ids = []
-        for i in range(qty):
-            super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
-            super_ids.append(super_id)
 
-            is_left = i % 2 == 0
-            x_offset = 3 * mm if is_left else 56 * mm
+        with transaction.atomic():
+            for i in range(qty):
+                super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
+                super_ids.append(super_id)
 
-            # QR Code
-            x_qr, y_qr = x_offset, 25 * mm
-            x_bar = x_offset, 25 * mm
+                # Posiciones dinámicas
+                is_left = i % 2 == 0
+                x_offset = 3 * mm if is_left else 56 * mm
+                x_qr, y_qr = x_offset, 25 * mm
+                qr_width, qr_height = 22 * mm, 22 * mm
 
-            qr_width, qr_height = 22 * mm, 22 * mm
+                # Generar QR Code
+                qr = qrcode.QRCode(
+                    version=1,
+                    error_correction=qrcode.constants.ERROR_CORRECT_L,
+                    box_size=5,
+                    border=0,
+                )
+                qr.add_data(super_id)
+                qr.make(fit=True)
 
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=5,
-                border=0,  # Sin borde blanco
-            )
-            qr.add_data(super_id)
-            qr.make(fit=True)
+                qr_img = qr.make_image(fill_color="black", back_color="white")
+                buffer = BytesIO()
+                qr_img.save(buffer, format="PNG")
+                buffer.seek(0)
+                qr_image = ImageReader(buffer)
 
-            qr_img = qr.make_image(fill_color="black", back_color="white")
-            buffer = BytesIO()
-            qr_img.save(buffer, format="PNG")
-            buffer.seek(0)
+                pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
-            qr_image = ImageReader(buffer)
-            pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
+                # Detalles de la etiqueta
+                pdf.setFont("Helvetica-Bold", 10)
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{sku}")
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
 
-            # SKU
-            pdf.setFont("Helvetica-Bold", 10)
-            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{sku}")
+                # Nombre del producto
+                pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
 
-            # Etiqueta contador
-            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
+                # Código de barras
+                barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
+                barcode_sku.drawOn(pdf, x_qr - 6 * mm, y_qr - 50)
 
-            # Fecha
-            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
+                # SuperID y número de documento
+                pdf.drawString(x_qr, y_qr - 60, f"{super_id}")
+                pdf.drawString(x_qr + 25 * mm, y_qr - 60, f"{number}")
 
-            # Nombre del producto
-            y_product_text = y_qr - 15
-            pdf.setFont("Helvetica-Bold", 10)
-            pdf.drawString(x_qr, y_product_text, f"{producto.nameproduct}")
-            # Código de barras
-            x_barcode = x_qr - 6 * mm  # Mover a la derecha o ajustar como desees
-            y_barcode = y_qr - 50 # Ajustar a la misma altura del QR
-            barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
-            barcode_sku.drawOn(pdf, x_barcode, y_barcode)
-           
+                # Crear el UniqueProduct
+                Uniqueproducts.objects.create(
+                    product=producto,
+                    superid=super_id,
+                    correlative=current_correlative,
+                    state=0,
+                    cost=producto.lastcost,
+                    locationname="Almacen",
+                    observation="Etiqueta generada automáticamente",
+                    printlabel=os.path.join(settings.MEDIA_URL, relative_file_path),
+                    iddocumentincome=number,
+                    dateadd=date.today()
+                )
 
-            # SuperID y número de documento
-            y_super_id = y_barcode + 30
-            pdf.setFont("Helvetica-Bold",10)
-            pdf.drawString(x_qr, y_super_id - 3, f"{super_id}")
-            pdf.drawString(x_qr + 25 * mm, y_super_id -3 , f"{number}")
+                current_correlative += 1
 
-            # Guardar el nuevo UniqueProduct
-            Uniqueproducts.objects.create(
-                product=producto,
-                superid=super_id,
-                correlative=current_correlative,
-                state=0,
-                cost=producto.lastcost,
-                locationname="Almacen",
-                observation="Etiqueta generada automáticamente",
-                printlabel=os.path.join(settings.MEDIA_URL, relative_file_path),  # Guardar URL en printlabel
-                iddocumentincome=number,
-                dateadd=date.today()
-            )
-
-            # Incrementar el correlativo
-            current_correlative += 1
-
-            if not is_left and i < qty - 1:
-                pdf.showPage()
+                if not is_left and i < qty - 1:
+                    pdf.showPage()
 
         pdf.save()
 
-        # Actualizar el stock en Bsale
-        office_id = 1  # ID de la oficina en Bsale, cámbialo según sea necesario
-        variant_id = producto.iderp  # Supongamos que el ID del producto es el mismo que la variante en Bsale
-        cost = producto.lastcost
-        print(variant_id, office_id, qty,cost,"DATOS PARA BSALE")
-        bsale_response = actualizar_stock_bsale(variant_id, office_id, qty,cost)
-
+        # Actualizar stock en Bsale
+        bsale_response = actualizar_stock_bsale(producto.iderp, 1, qty, producto.lastcost)
         if not bsale_response:
             return JsonResponse({'error': 'Etiqueta creada, pero no se pudo actualizar stock en Bsale.'}, status=500)
 
-
+        # Marcar detalles como impresos en el archivo JSON
         try:
             with open(url_json, 'r+') as json_file:
                 data = json.load(json_file)
@@ -2759,6 +2728,7 @@ def imprimir_etiqueta_qr(request):
         except (FileNotFoundError, json.JSONDecodeError) as e:
             return JsonResponse({'error': f'Error al procesar el archivo JSON: {str(e)}'}, status=400)
 
+        # Actualizar estado de la factura
         try:
             factura = Purchase.objects.get(urljson=url_json)
             if all(detail.get('printed') for detail in data.get('details', [])):
@@ -2774,7 +2744,8 @@ def imprimir_etiqueta_qr(request):
             'sku': sku
         })
 
-    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @csrf_exempt

@@ -384,6 +384,15 @@
             <label for="observation" class="form-label">Observación</label>
             <input class="form-control form-control-lg" v-model="form.observaciones">
         </div>
+        <div class="my-3">
+            <label for="imagenFactura" class="form-label">Subir Imagen de la Factura</label>
+            <input
+                type="file"
+                class="form-control"
+                @change="procesarImagen"
+                accept="image/*"
+            />
+        </div>
 
         <!-- Botones de acción omitidos por brevedad... -->
         <button 
@@ -538,7 +547,9 @@
                 cantidadCheque: 0,
                 subtotal: 0,
                 observaciones: '',
+                img_url:''
             },
+            imagenFactura: null, // Para almacenar la imagen seleccionada
             
             pagination: {
                 current_page: 1,
@@ -629,7 +640,6 @@
         },
         computed: {
             
-           
             formularioValido() {
                 // Verifica que las fechas, número de documento y al menos un producto estén presentes
                 const { fechaEmision, fechaVencimiento, numeroDocumento } = this.form;
@@ -1053,61 +1063,79 @@
                     });
                 });
             },
-            enviarDatos() {
-                const jsonData = {
-                    facturaId: this.facturaId, // Incluye el ID de la factura cargada
-                    headers: {
-                        supplier: this.form.rutProveedor,
-                        supplierName: this.form.razonSocial,
-                        typeDocument: this.form.tipoDocumento,
-                        nDocument: this.form.numeroDocumento,
-                        dcto: this.form.descuentoGeneral,
-                        datePurchase: this.form.fechaEmision,
-                        dateExpired: this.form.fechaVencimiento,
-                        observation: this.form.observaciones,
-                        typePay: this.form.tipoPago,
-                        nCheque: this.form.numeroCheque,
-                        qtyCheque: this.form.cantidadCheque,
-                        subtotal: this.totalSubtotales,
-                        urlPDF: "",
-                        urlJson: "",
-                        dateReception: this.currentDate,
-                        userProcess: "Nombre Usuario",
-                        urlImg: ""
-                    },
-                    details: this.productosDocumento.map(producto => ({
-                        qty: producto.cantidad,
-                        received_quantity: producto.received_quantity,
-                        completo: producto.completo,
-                        cost: producto.costo,
-                        dctoItem: producto.descuento,
-                        subtotalItem: producto.subtotal,
-                        sku: producto.sku,
-                        model: producto.model,
-                    })),
-                };
-
-                axios.post('/api/generar-json/', jsonData)
-                    .then(response => {
-                        Swal.fire({
-                            title: 'Éxito',
-                            text: 'La factura se ha guardado correctamente.',
-                            icon: 'success',
-                            confirmButtonText: 'OK'
-                        }).then(() => {
-                            window.location.href = "{% url 'recepciones_pendientes' %}";
-                        });
-                    })
-                    .catch(error => {
-                        console.error("Error al enviar los datos:", error);
-                        Swal.fire({
-                            title: 'Error',
-                            text: 'Hubo un problema al guardar la factura.',
-                            icon: 'error',
-                            confirmButtonText: 'OK'
-                        });
-                    });
+            procesarImagen(event) {
+                const archivo = event.target.files[0]; // Obtén el archivo seleccionado
+                if (archivo) {
+                    this.form.img_url = archivo; // Guarda el archivo en form.img_url para enviarlo al backend
+                    console.log('Imagen seleccionada:', archivo);
+                } else {
+                    this.form.img_url = null; // Limpia el campo si no hay archivo seleccionado
+                }
             },
+            enviarDatos() {
+    const formData = new FormData();
+
+    // Adjuntar imagen si existe
+    if (this.form.img_url) {
+        formData.append("img_url", this.form.img_url);
+    }
+
+    // Adjuntar el JSON como string
+    formData.append("jsonData", JSON.stringify({
+        facturaId: this.facturaId,
+        headers: {
+            supplier: this.form.rutProveedor,
+            supplierName: this.form.razonSocial,
+            typeDocument: this.form.tipoDocumento,
+            nDocument: this.form.numeroDocumento,
+            dcto: this.form.descuentoGeneral,
+            datePurchase: this.form.fechaEmision,
+            dateExpired: this.form.fechaVencimiento,
+            observation: this.form.observaciones,
+            typePay: this.form.tipoPago,
+            nCheque: this.form.numeroCheque,
+            qtyCheque: this.form.cantidadCheque,
+            subtotal: this.totalSubtotales,
+            urlPDF: "",
+            urlJson: "",
+            dateReception: this.currentDate,
+            userProcess: "Nombre Usuario"
+        },
+        details: this.productosDocumento.map(producto => ({
+            qty: producto.cantidad,
+            received_quantity: producto.received_quantity,
+            completo: producto.completo,
+            cost: producto.costo,
+            dctoItem: producto.descuento,
+            subtotalItem: producto.subtotal,
+            sku: producto.sku,
+            model: producto.model,
+        }))
+    }));
+
+    axios.post('/api/generar-json/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    .then(response => {
+        Swal.fire({
+            title: 'Éxito',
+            text: 'La factura se ha guardado correctamente.',
+            icon: 'success',
+            confirmButtonText: 'OK'
+        }).then(() => {
+            window.location.href = "{% url 'recepciones_pendientes' %}";
+        });
+    })
+    .catch(error => {
+        console.error("Error al enviar los datos:", error);
+        Swal.fire({
+            title: 'Error',
+            text: 'Hubo un problema al guardar la factura.',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+    });
+},
 
             mostrarTodosLosProveedores() {
                 // Obtener la lista completa de proveedores

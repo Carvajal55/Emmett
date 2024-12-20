@@ -273,8 +273,7 @@
             validateAndLinkSuperid(isInternal = false) {
                 const superidToValidate = this.sid;
 
-                // Validar que el tipo y número de documento estén completos
-                if (!this.typeDocument || !this.nDocument) {
+                if (!isInternal && (!this.typeDocument || !this.nDocument)) {
                     Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de agregar un producto.', 'error');
                     return;
                 }
@@ -289,7 +288,7 @@
                             };
 
                             // Llamar a dispatchConsumption con el producto validado
-                            this.dispatchConsumption(product);
+                            this.dispatchConsumption(product, isInternal);
 
                             this.sid = ''; // Limpiar el campo de entrada
                         } else {
@@ -304,35 +303,41 @@
                     });
             },
 
-            dispatchConsumption(product) {
-                // Verificar que el número de documento y el tipo de documento estén completos
-                if (!this.nDocument || !this.typeDocument) {
+            dispatchConsumption(product, isInternal = false) {
+                // Si no es interno, verificar que el tipo y número de documento estén completos
+                if (!isInternal && (!this.nDocument || !this.typeDocument)) {
                     Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de despachar.', 'error');
                     return;
                 }
 
-                axios.post('/api/dispatch-consumption/', {
-                    nDocument: this.nDocument,         // Número de documento
-                    typeDocument: this.typeDocument,   // Tipo de documento
-                    company: this.company,             // Compañía seleccionada
-                    products: [product]                // Producto a despachar
-                })
-                .then(response => {
-                    if (response.data.icon === 'success') {
-                        this.alertasuccess = true;      // Mostrar mensaje de éxito
-                        this.playSound('successSound'); // Reproducir sonido de éxito
+                const payload = {
+                    company: this.company,
+                    products: [product]
+                };
 
-                        // Opcional: Aquí puedes limpiar los datos o actualizar la lista de productos
-                    } else {
-                        Swal.fire('Error', response.data.title, response.data.icon);
-                        this.playSound('errorSound'); // Reproducir sonido de error
-                    }
-                })
-                .catch(error => {
-                    this.alertaerror = true;           // Mostrar mensaje de error
-                    this.playSound('errorSound');      // Reproducir sonido de error
-                    console.error(error);
-                });
+                // Agregar campos de documento solo si no es despacho interno
+                if (!isInternal) {
+                    payload.nDocument = this.nDocument;
+                    payload.typeDocument = this.typeDocument;
+                }
+
+                axios.post('/api/dispatch-consumption/', payload)
+                    .then(response => {
+                        if (response.data.icon === 'success') {
+                            this.alertasuccess = true;      // Mostrar mensaje de éxito
+                            this.playSound('successSound'); // Reproducir sonido de éxito
+
+                            // Opcional: Aquí puedes limpiar los datos o actualizar la lista de productos
+                        } else {
+                            Swal.fire('Error', response.data.title, response.data.icon);
+                            this.playSound('errorSound'); // Reproducir sonido de error
+                        }
+                    })
+                    .catch(error => {
+                        this.alertaerror = true;           // Mostrar mensaje de error
+                        this.playSound('errorSound');      // Reproducir sonido de error
+                        console.error(error);
+                    });
             },
             openInternalDispatchModal() {
                 new bootstrap.Modal(document.getElementById('internalDispatchModal')).show();

@@ -322,90 +322,87 @@
                         });
                 },
                 imprimirDetalleQR(detalle) {
-                    console.log("Imprimiendo detalle:", detalle);
+    console.log("Imprimiendo detalle:", detalle);
 
-                    // Crear el formulario con los datos necesarios para la impresión
-                    let formData = new FormData();
-                    formData.append('sku', detalle.sku);
-                    formData.append('model', detalle.model);
-                    formData.append('qty', detalle.qty);
-                    formData.append('codebar', detalle.codebar || '');
-                    formData.append('urlJson', detalle.urlJson);
-                    formData.append('number', detalle.number);
+    // Crear el formulario con los datos necesarios para la impresión
+    let formData = new FormData();
+    formData.append('sku', detalle.sku);
+    formData.append('model', detalle.model);
+    formData.append('qty', detalle.qty);
+    formData.append('codebar', detalle.codebar || '');
+    formData.append('urlJson', detalle.urlJson);
+    formData.append('number', detalle.number);
 
-                    console.log("Datos enviados a la API:", {
-                        sku: detalle.sku,
-                        model: detalle.model,
-                        qty: detalle.qty,
-                        codebar: detalle.codebar || '',
-                        urlJson: detalle.urlJson,
-                        number: detalle.number
-                    });
+    console.log("Datos enviados a la API:", {
+        sku: detalle.sku,
+        model: detalle.model,
+        qty: detalle.qty,
+        codebar: detalle.codebar || '',
+        urlJson: detalle.urlJson,
+        number: detalle.number
+    });
 
-                    // Enviar la solicitud al backend para generar la etiqueta
-                    axios.post('/api/imprimir-etiquetaqr/', formData)
+    // Enviar la solicitud al backend para generar la etiqueta
+    axios.post('/api/imprimir-etiquetaqr/', formData)
+        .then(response => {
+            console.log("Respuesta del servidor:", response.data);
+            if (response.data.urlPdf) {
+                // Abrir el archivo PDF generado en una nueva pestaña del navegador
+                window.open(response.data.urlPdf, '_blank');
+                Swal.fire({
+                    title: 'Etiqueta Generada',
+                    text: 'La etiqueta se ha generado correctamente.',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
+
+                // Marcar el detalle como impreso
+                detalle.printed = true;
+
+                // Verificar si todos los detalles están impresos
+                const allPrinted = this.detallesFactura.every(item => item.printed);
+
+                if (allPrinted) {
+                    Swal.fire('Completado', 'Todas las etiquetas han sido impresas.', 'success');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('detallesModal'));
+                    if (modal) modal.hide();
+
+                    // Actualizar la tabla de facturas
+                    this.fetchFacturas(this.currentPage);
+                } else {
+                    // Intentar actualizar la lista de detallesFactura
+                    axios.post('/api/resumen-facturas/', { urlJson: detalle.urlJson })
                         .then(response => {
-                            console.log("Respuesta del servidor:", response.data);
-                            if (response.data.urlPdf) {
-                                // Abrir el archivo PDF generado en una nueva pestaña del navegador
-                                window.open(response.data.urlPdf, '_blank');
-                                Swal.fire({
-                                    title: 'Etiqueta Generada',
-                                    text: 'La etiqueta se ha generado correctamente.',
-                                    icon: 'success',
-                                    confirmButtonText: 'OK'
-                                }).then(() => {
-                                    // Llamar a `fetchFacturas` para actualizar la lista
-                                    this.fetchFacturas(this.currentPage);
-
-                                    // Filtrar los detalles restantes (no impresos)
-                                    let formData = new FormData();
-                                    formData.append('urlJson', detalle.urlJson);
-
-                                    axios.post('/api/resumen-facturas/', formData)
-                                        .then(response => {
-                                            console.log('Detalles de la factura actualizados:', response.data);
-
-                                            // Guardar la data actualizada
-                                            this.facturaCompleta = response.data;
-
-                                            // Filtrar los detalles restantes (no impresos)
-                                            this.detallesFactura = this.facturaCompleta.details.filter(item => !item.printed);
-
-                                            // Si no quedan detalles por imprimir, cerrar el modal y actualizar la tabla
-                                            if (this.detallesFactura.length === 0) {
-                                                Swal.fire('Completado', 'Todas las etiquetas han sido impresas.', 'success');
-                                                const modal = bootstrap.Modal.getInstance(document.getElementById('detallesModal'));
-                                                if (modal) modal.hide();
-
-                                                // Actualizar la tabla de facturas
-                                                this.fetchFacturas(this.currentPage);
-                                            }
-                                        })
-                                        .catch(error => {
-                                            console.error('Error al actualizar los detalles de la factura:', error);
-                                            Swal.fire('Error', 'Hubo un problema al actualizar los detalles de la factura.', 'error');
-                                        });
-                                });
-                            } else {
-                                Swal.fire({
-                                    title: 'Error',
-                                    text: 'No se pudo generar la etiqueta.',
-                                    icon: 'error',
-                                    confirmButtonText: 'OK'
-                                });
-                            }
+                            console.log('Detalles actualizados:', response.data);
+                            this.detallesFactura = this.detallesFactura.map(item => {
+                                const updatedItem = response.data.details.find(d => d.sku === item.sku);
+                                return updatedItem ? { ...item, printed: updatedItem.printed } : item;
+                            });
                         })
                         .catch(error => {
-                            console.error('Error al generar la etiqueta:', error);
-                            Swal.fire({
-                                title: 'Error',
-                                text: 'Hubo un problema al generar la etiqueta.',
-                                icon: 'error',
-                                confirmButtonText: 'OK'
-                            });
+                            console.warn('No se pudo actualizar la lista de detalles. Continuando con el flujo principal.', error);
+                            // Continuar sin interrumpir el flujo principal
                         });
-                },
+                }
+            } else {
+                Swal.fire({
+                    title: 'Error',
+                    text: 'No se pudo generar la etiqueta.',
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error al generar la etiqueta:', error);
+            Swal.fire({
+                title: 'Error',
+                text: 'Hubo un problema al generar la etiqueta.',
+                icon: 'error',
+                confirmButtonText: 'OK'
+            });
+        });
+},
 
 
         },

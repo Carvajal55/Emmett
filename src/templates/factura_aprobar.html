@@ -15,7 +15,8 @@
                 <p><strong>Fecha Pago Documento:</strong> [[ factura.headers.dateExpired || 'N/A' ]]</p>
                 <p><strong>Ingresado Por:</strong> [[ factura.headers.userProcess ]]</p>
                 <p><strong>Estado Resumen:</strong> OK</p>
-                <p><strong>PDF:</strong> <a :href="factura.headers.urlPDF" target="_blank">Ver PDF</a></p>
+                <p><strong>PDF:</strong> <a :href="`/media/${factura.headers.urlImg}`" target="_blank">Ver PDF</a></p>
+
             </div>
 
             <!-- Columna 2 -->
@@ -81,12 +82,12 @@
                 <th>#</th>
                 <th>SKU</th>
                 <th>PRODUCTO</th>
-                <th>CANTIDAD</th>
+                <th>QTY</th>
                 <th>DCTO</th>
                 <th>COSTO REAL</th>
                 <th>COSTO </th>
-                <th>ÚLTIMO COSTO</th>
-                <th>ÚLTIMO PRECIO</th>
+                <th>Ú.COSTO</th>
+                <th>Ú.PRECIO</th>
                 <th>PRECIO BSALE</th> <!-- Nueva columna -->
                 <th>TOTAL</th>
                 <th>PRECIO BASE</th>
@@ -111,7 +112,7 @@
                 <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td> <!-- lastPrice -->
                 <td>[[ formatCurrency(detalle.bsalePrice || 0) ]]</td> <!-- bsalePrice -->
                 <td>[[ formatCurrency(calcularTotal(detalle.cost_with_discount, detalle.qty)) ]]</td>
-                <td>
+                <td style="width: 300px;">
                     <input
                         type="number"
                         class="form-control"
