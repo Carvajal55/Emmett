@@ -222,20 +222,6 @@
                         console.error(error);
                     });
             },
-            generateDynamicKey() {
-                axios.post('/api/generate-dynamic-key/')
-                    .then(response => {
-                        this.generatedKey = response.data.key;
-                        // Forzar actualización
-                        this.$nextTick(() => {
-                            console.log("Generated Key:", this.generatedKey);
-                        });
-                    })
-                    .catch(error => {
-                        Swal.fire('Error', 'No se pudo generar la clave de acceso.', 'error');
-                        console.error(error);
-                    });
-            },
             dispatchInternalProducts() {
                 const payload = this.internalProducts.map(product => ({
                     superid: product.superid
@@ -244,14 +230,11 @@
                 axios.post('/api/dispatch-consumption/', { products: payload })
                     .then(response => {
                         if (response.data.icon === 'success') {
-                            Swal.fire('Éxito', 'Productos despachados internamente con éxito.', 'success');
                             this.internalProducts = []; // Limpiar la lista después del despacho
                         } else {
-                            Swal.fire('Error', response.data.title, response.data.icon);
                         }
                     })
                     .catch(error => {
-                        Swal.fire('Error', 'Error al despachar los productos internamente.', 'error');
                         console.error(error);
                     });
             },

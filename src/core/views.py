@@ -2537,40 +2537,30 @@ def validate_superid(request):
 
 
 @csrf_exempt
-def validate_superid_simplified(request):
+def validate_superid_optimized(request):
     if request.method == "POST":
         try:
-            # Obtener los datos desde la solicitud JSON
+            # Parsear la solicitud JSON
             body = json.loads(request.body)
             sid = body.get('sid')
-            document_products = body.get('document_products', [])
-
-            # Imprimir los datos recibidos para depuración
-            print(f"SuperID recibido: {sid}")
-            print(f"Productos recibidos del documento (SKUs): {document_products}")
+            document_products = set(body.get('document_products', []))  # Usar un conjunto para búsquedas rápidas
 
             # Verificar si el `superid` existe en `Uniqueproducts`
-            unique_product = Uniqueproducts.objects.select_related('product').filter(superid=sid).first()
+            unique_product = Uniqueproducts.objects.select_related('product').only(
+                'superid', 'product__sku'
+            ).filter(superid=sid).first()
 
             if not unique_product:
-                print("SuperID no encontrado en la base de datos.")
                 return JsonResponse({'error': 'SuperID no encontrado'}, status=404)
 
-            # Imprimir los datos completos del registro encontrado
-            print(f"Datos del Uniqueproduct encontrado: {unique_product.__dict__}")
-
-            # Verificar si el producto asociado existe y tiene un SKU
+            # Obtener el SKU asociado de manera directa
             associated_sku = unique_product.product.sku if unique_product.product else None
-            print(f"Producto asociado: {unique_product.product}")
-            print(f"SKU asociado encontrado: {associated_sku}")
 
             if not associated_sku:
-                print("Producto asociado no tiene un SKU válido.")
                 return JsonResponse({'error': 'Producto asociado no tiene un SKU válido'}, status=400)
 
-            # Si `document_products` está vacío, tratarlo como "Consumo Interno"
+            # Si no se proporcionan productos del documento, considerarlo "Consumo Interno"
             if not document_products:
-                print("No se proporcionaron productos del documento. Considerando como Consumo Interno.")
                 return JsonResponse({
                     'row': 1,
                     'title': 'SuperID validado para Consumo Interno',
@@ -2578,12 +2568,11 @@ def validate_superid_simplified(request):
                     'sku': associated_sku
                 })
 
-            # Validación para despacho normal: verificar si el SKU está en `document_products`
+            # Validar si el SKU está en los productos del documento
             if associated_sku not in document_products:
-                print("El SKU asociado no coincide con los productos del documento.")
                 return JsonResponse({'error': 'El SKU asociado no coincide con los productos del documento'}, status=400)
 
-            # Respuesta exitosa para despacho normal
+            # Respuesta exitosa
             return JsonResponse({
                 'row': 1,
                 'title': 'SuperID y SKU validados correctamente',
@@ -2592,8 +2581,7 @@ def validate_superid_simplified(request):
             })
 
         except Exception as e:
-            print(f"Error inesperado: {str(e)}")
-            return JsonResponse({'error': 'Error inesperado en la operación'}, status=500)
+            return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
 
