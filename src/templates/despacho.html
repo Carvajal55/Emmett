@@ -188,6 +188,17 @@
                 if (this.nDocument) this.fetchDetails();
             }
         },
+        mounted() {
+            // Inicializar el modal del despacho interno
+            const modalElement = document.getElementById('internalDispatchModal');
+            if (modalElement) {
+                this.modalInstance = new bootstrap.Modal(modalElement, {
+                    keyboard: false,    // Prevenir cierre con teclado
+                    backdrop: 'static'  // Prevenir cierre al hacer clic fuera
+                });
+            }
+        },
+
         methods: {
             requestDynamicKeyAccess() {
                 new bootstrap.Modal(document.getElementById('dynamicKeyModal')).show();
