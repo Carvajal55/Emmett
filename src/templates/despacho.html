@@ -38,8 +38,15 @@
             </div>   
             <div>
                 <label for="sidProduct">ID Producto</label>
-                <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid(false)" class="form-control">
-            </div>             
+                <input 
+                    id="sidProduct" 
+                    type="text" 
+                    v-model="sid" 
+                    @keyup.enter="validateAndLinkSuperid(true)" 
+                    class="form-control" 
+                    :disabled="isProcessing" 
+                    placeholder="Escanea el código único" />
+            </div>            
             
             <button @click="dispatchConsumption" class="mt-3 btn btn-success">Despachar</button>
             {% if request.user.usuario.rol == 'VENTAS' %}
@@ -177,6 +184,7 @@
             internalProducts: [], // Lista de productos para despacho interno
             alertasuccess:false,
             alertaerror:false,
+            isProcessing: false,
         },
         watch: {
             typeDocument() {
@@ -270,37 +278,38 @@
                     console.error(`El sonido con ID ${soundId} no se encontró.`);
                 }
             },
-            validateAndLinkSuperid(isInternal = false) {
-                const superidToValidate = this.sid;
+            async validateAndLinkSuperid(isInternal = false) {
+                if (this.isProcessing || !this.sid) return; // Prevenir múltiples envíos
 
-                if (!isInternal && (!this.typeDocument || !this.nDocument)) {
-                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de agregar un producto.', 'error');
-                    return;
+                this.isProcessing = true;
+                const superidToValidate = this.sid.trim();
+
+                try {
+                    const response = await axios.post('/api/validate-superid/', { sid: superidToValidate });
+
+                    if (response.data.icon === 'success') {
+                        const product = {
+                            superid: superidToValidate,
+                            code: response.data.sku,
+                            description: response.data.description
+                        };
+
+                        // Enviar a despacho
+                        await this.dispatchConsumption(product, isInternal);
+                        this.playSound('successSound'); // Éxito
+                    } else {
+                        Swal.fire('Error', response.data.title, response.data.icon);
+                        this.playSound('errorSound'); // Error
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Error al validar el SuperID.', 'error');
+                    this.playSound('errorSound'); // Reproducir sonido de error
+                    console.error(error);
+                } finally {
+                    this.sid = ''; // Limpiar el input
+                    this.isProcessing = false; // Liberar la bandera
+                    this.$nextTick(() => document.getElementById('sidProduct').focus()); // Volver a enfocar
                 }
-
-                axios.post('/api/validate-superid/', { sid: superidToValidate })
-                    .then(response => {
-                        if (response.data.icon === 'success') {
-                            const product = {
-                                superid: superidToValidate,
-                                code: response.data.sku,
-                                description: response.data.description
-                            };
-
-                            // Llamar a dispatchConsumption con el producto validado
-                            this.dispatchConsumption(product, isInternal);
-
-                            this.sid = ''; // Limpiar el campo de entrada
-                        } else {
-                            Swal.fire('Error', response.data.title, response.data.icon);
-                            this.playSound('errorSound'); // Reproducir sonido de error
-                        }
-                    })
-                    .catch(error => {
-                        Swal.fire('Error', 'Error al validar el SuperID.', 'error');
-                        this.playSound('errorSound'); // Reproducir sonido de error
-                        console.error(error);
-                    });
             },
 
             dispatchConsumption(product, isInternal = false) {
