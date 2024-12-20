@@ -270,72 +270,75 @@
                     console.error(`El sonido con ID ${soundId} no se encontró.`);
                 }
             },
-            validateAndLinkSuperid(isInternal = false) {
-                const superidToValidate = this.sid;
+            async validateAndLinkSuperid(isInternal = false) {
+                if (!this.sid || this.isProcessing) return; // Evita procesar si ya está en proceso o el input está vacío
+                
+                const superidToValidate = this.sid.trim(); 
+                this.processingQueue.push(superidToValidate); // Agrega el SuperID a la cola
+                this.sid = ''; // Limpia el input para permitir nuevas entradas
+                this.$nextTick(() => document.getElementById('sidProduct').focus()); // Enfoca nuevamente el input
 
-                if (!isInternal && (!this.typeDocument || !this.nDocument)) {
-                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de agregar un producto.', 'error');
-                    return;
+                if (!this.isProcessing) {
+                    this.processQueue(isInternal); // Procesa la cola si no está en ejecución
+                }
+            },
+            async processQueue(isInternal) {
+                if (this.processingQueue.length === 0) {
+                    this.isProcessing = false;
+                    return; // No hay SuperIDs en la cola
                 }
 
-                axios.post('/api/validate-superid/', { sid: superidToValidate })
-                    .then(response => {
-                        if (response.data.icon === 'success') {
-                            const product = {
-                                superid: superidToValidate,
-                                code: response.data.sku,
-                                description: response.data.description
-                            };
+                this.isProcessing = true; // Marca como en proceso
+                const superidToProcess = this.processingQueue.shift(); // Toma el siguiente SuperID de la cola
 
-                            // Llamar a dispatchConsumption con el producto validado
-                            this.dispatchConsumption(product, isInternal);
+                try {
+                    const response = await axios.post('/api/validate-superid/', { sid: superidToProcess });
 
-                            this.sid = ''; // Limpiar el campo de entrada
-                        } else {
-                            Swal.fire('Error', response.data.title, response.data.icon);
-                            this.playSound('errorSound'); // Reproducir sonido de error
-                        }
-                    })
-                    .catch(error => {
-                        Swal.fire('Error', 'Error al validar el SuperID.', 'error');
-                        this.playSound('errorSound'); // Reproducir sonido de error
-                        console.error(error);
-                    });
+                    if (response.data.icon === 'success') {
+                        const product = {
+                            superid: superidToProcess,
+                            code: response.data.sku,
+                            description: response.data.description
+                        };
+
+                        // Enviar el producto a despacho
+                        await this.dispatchConsumption(product, isInternal);
+                        this.playSound('successSound'); // Éxito
+                    } else {
+                        Swal.fire('Error', response.data.title, response.data.icon);
+                        this.playSound('errorSound'); // Error
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Error al validar el SuperID.', 'error');
+                    this.playSound('errorSound');
+                    console.error(error);
+                } finally {
+                    this.processQueue(isInternal); // Procesa el siguiente SuperID en la cola
+                }
             },
 
             dispatchConsumption(product, isInternal = false) {
-                // Si no es interno, verificar que el tipo y número de documento estén completos
-                if (!isInternal && (!this.nDocument || !this.typeDocument)) {
-                    Swal.fire('Error', 'Debe ingresar el tipo y número de documento antes de despachar.', 'error');
-                    return;
-                }
-
                 const payload = {
                     company: this.company,
                     products: [product]
                 };
 
-                // Agregar campos de documento solo si no es despacho interno
                 if (!isInternal) {
                     payload.nDocument = this.nDocument;
                     payload.typeDocument = this.typeDocument;
                 }
 
-                axios.post('/api/dispatch-consumption/', payload)
+                return axios.post('/api/dispatch-consumption/', payload)
                     .then(response => {
                         if (response.data.icon === 'success') {
                             this.alertasuccess = true;      // Mostrar mensaje de éxito
-                            this.playSound('successSound'); // Reproducir sonido de éxito
-
-                            // Opcional: Aquí puedes limpiar los datos o actualizar la lista de productos
                         } else {
                             Swal.fire('Error', response.data.title, response.data.icon);
-                            this.playSound('errorSound'); // Reproducir sonido de error
+                            this.alertaerror = true;           // Mostrar mensaje de error
                         }
                     })
                     .catch(error => {
-                        this.alertaerror = true;           // Mostrar mensaje de error
-                        this.playSound('errorSound');      // Reproducir sonido de error
+                        this.alertaerror = true;
                         console.error(error);
                     });
             },
