@@ -287,10 +287,10 @@
                 }
             },
             async validateAndLinkSuperid(isInternal = false) {
-                if (this.isProcessing || !this.sid) return; // Prevenir múltiples envíos
+                if (this.isProcessing || !this.sid) return;
 
                 this.isProcessing = true;
-                const superidToValidate = this.sid.trim();
+                const superidToValidate = this.sid.trim().toUpperCase(); // Convertir a mayúsculas y quitar espacios
 
                 try {
                     const response = await axios.post('/api/validate-superid/', { sid: superidToValidate });
@@ -302,25 +302,21 @@
                             description: response.data.description
                         };
 
-                        // Agregar el producto a la lista visual
                         this.internalProducts.push(product);
-
-                        // Descontar automáticamente en el sistema
                         await this.dispatchConsumption(product, isInternal);
-
-                        this.playSound('successSound'); // Reproducir sonido de éxito
+                        this.playSound('successSound');
                     } else {
                         Swal.fire('Error', response.data.title, response.data.icon);
-                        this.playSound('errorSound'); // Reproducir sonido de error
+                        this.playSound('errorSound');
                     }
                 } catch (error) {
                     Swal.fire('Error', 'Error al validar el SuperID.', 'error');
-                    this.playSound('errorSound'); // Reproducir sonido de error
+                    this.playSound('errorSound');
                     console.error(error);
                 } finally {
-                    this.sid = ''; // Limpiar el input tras procesar
-                    this.isProcessing = false; // Liberar la bandera
-                    this.$nextTick(() => document.getElementById('sidProduct').focus()); // Enfocar nuevamente
+                    this.sid = '';
+                    this.isProcessing = false;
+                    this.$nextTick(() => document.getElementById('sidProduct').focus());
                 }
             },
 
