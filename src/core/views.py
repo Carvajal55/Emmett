@@ -1728,7 +1728,7 @@ def add_product_to_sector(request):
 
                                 # Actualizar la ubicación del producto al sector correspondiente
                                 producto.location = sector.idsectoroffice
-                                producto.state = 1
+                                producto.state = 0
                                 producto.save()
                                 productos_actualizados += 1
                             else:

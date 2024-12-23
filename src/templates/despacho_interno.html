@@ -36,18 +36,16 @@
                 <label for="nDocument">Número de Documento (Opcional)</label>
                 <input id="nDocument" type="text" v-model="nDocument" class="form-control" placeholder="Ingrese el número del documento">
             </div>
-            <div class="col-md-4">
-                <label for="sidProduct">Escanear ID Producto (SuperID)</label>
-                <input 
-                    id="sidProduct" 
-                    type="text" 
-                    v-model="sid" 
-                    @keyup.enter="validateAndLinkSuperid" 
-                    class="form-control" 
-                    placeholder="Escanea el código único" 
-                    autocomplete="off"
-                >
-            </div>
+            <input 
+                id="sidProduct" 
+                type="text" 
+                v-model="sid" 
+                @keyup.enter="onEnterKey" 
+                class="form-control" 
+                placeholder="Escanea el código único" 
+                autocomplete="off" 
+                autofocus
+            >
         </div>
 
         <div class="row mt-4">
@@ -103,6 +101,7 @@
             alertClass: ''          // Clase de alerta
         },
         mounted() {
+            this.focusInput();
             // Determinar si mostrar el control de acceso según el rol
             const userRole = '{{ request.user.usuario.rol }}';
             if (userRole === 'BODEGA') {
@@ -110,6 +109,27 @@
             }
         },
         methods: {
+            onEnterKey() {
+                const superid = this.sid.trim();
+                
+                // Validar si el input no está vacío
+                if (!superid) return;
+
+                // Procesar el SuperID
+                this.validateAndLinkSuperid(superid);
+
+                // Limpiar el input inmediatamente
+                this.sid = '';
+                this.focusInput(); // Reenfocar después de limpiar
+            },
+            focusInput() {
+                this.$nextTick(() => {
+                    const input = document.getElementById('sidProduct');
+                    if (input) {
+                        input.focus();
+                    }
+                });
+            },
             validateAccessKey() {
                 axios.post('/api/validate-access-key/', { key: this.accessKey })
                     .then(response => {
@@ -125,23 +145,19 @@
                     });
             },
 
-            validateAndLinkSuperid() {
-                // Evitar acumulación mientras se procesa la entrada
+            validateAndLinkSuperid(superidToValidate) {
+                // Evitar procesar mientras hay un superid en cola
                 if (this.isProcessing) return;
 
-                const superidToValidate = this.sid.trim();
-                if (!superidToValidate) return;
-
-                // Agregar a la cola y limpiar el input inmediatamente
+                // Agregar a la cola de procesamiento
                 this.processingQueue.push(superidToValidate);
-                this.sid = ''; // Limpieza inmediata
-                this.$nextTick(() => document.getElementById('sidProduct').focus()); // Re-enfocar input
 
                 // Iniciar procesamiento si no está activo
                 if (!this.isProcessing) {
                     this.processQueue();
                 }
             },
+
 
 
             async processQueue() {
@@ -181,7 +197,6 @@
                     this.playSound('errorSound');
                 } finally {
                     // Continuar con el siguiente SuperID en la cola
-                    this.$nextTick(() => document.getElementById('sidProduct').focus()); // Asegurar foco
                     this.isProcessing = false;
                     this.processQueue();
                 }
