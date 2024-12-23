@@ -301,7 +301,7 @@ def buscar_productosAPI(request):
             'current_page': 1
         }, status=200)
 
-    # Cacheo de sectores y bodegas
+    # Cacheo de bodegas y sectores
     bodega_mapping = cache.get('bodega_mapping')
     if not bodega_mapping:
         bodegas = Bodega.objects.filter(
@@ -310,11 +310,12 @@ def buscar_productosAPI(request):
         bodega_mapping = {b['idoffice']: b['name'] for b in bodegas}
         cache.set('bodega_mapping', bodega_mapping, timeout=300)
 
+    excluded_sector_ids = Sectoroffice.objects.filter(
+        Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
+    ).values_list('idsectoroffice', flat=True)
+
     sector_mapping = cache.get('sector_mapping')
     if not sector_mapping:
-        excluded_sector_ids = Sectoroffice.objects.filter(
-            Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
-        ).values_list('idsectoroffice', flat=True)
         sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sector_ids).values(
             'idsectoroffice', 'namesector', 'idoffice'
         )
@@ -324,7 +325,7 @@ def buscar_productosAPI(request):
     # Filtrar productos
     productos = Products.objects.filter(
         Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
-    ).only('id', 'sku', 'nameproduct', 'lastprice', 'prefixed', 'brands', 'iderp', 'alto', 'largo', 'profundidad', 'peso')
+    ).prefetch_related('unique_products')
 
     # Paginación
     paginator = Paginator(productos, 10)
@@ -336,30 +337,21 @@ def buscar_productosAPI(request):
     productos_data = []
     for producto in productos_page:
         unique_products = producto.unique_products.filter(
-            ~Q(location__in=sector_mapping.keys())
-        ).values('superid', 'location')
+            state=0,  # Solo productos en estado 0
+            location__in=sector_mapping.keys()  # Sectores válidos
+        ).values('location')
 
-        bodegas_stock = {bodega_id: 0 for bodega_id in bodega_mapping}
-        unique_products_data = []
-
-        for up in unique_products:
-            sector = sector_mapping.get(up['location'])
-            if sector:
-                bodega_name = bodega_mapping.get(sector['idoffice'], 'Bodega desconocida')
-                bodegas_stock[sector['idoffice']] += 1
-                unique_products_data.append({
-                    'superid': up['superid'],
-                    'locationname': sector['namesector'],
-                    'bodega': bodega_name,
-                })
+        # Calcular stock total desde los productos únicos
+        stock_total = sum(
+            1 for up in unique_products if sector_mapping.get(up['location'])['idoffice'] in bodega_mapping
+        )
 
         productos_data.append({
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice or 0,
-            'stock_total': sum(bodegas_stock.values()),
-            'unique_products': unique_products_data,
+            'stock_total': stock_total,  # Stock total calculado para bodegas válidas
             'prefixed': producto.prefixed or '',
             'brands': producto.brands or '',
             'iderp': producto.iderp or '',
