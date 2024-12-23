@@ -100,17 +100,17 @@
             </tr>
         </thead>
         <tbody>
-            <tr v-for="(detalle, index) in detalles" :key="detalle.sku">
+            <tr v-for="(detalle, index) in detalles" :key="detalle.sku" style="font-size: 0.9rem;">
                 <td>[[ index + 1 ]]</td>
                 <td>[[ detalle.sku ]]</td>
                 <td>[[ detalle.model ]]</td>
                 <td>[[ detalle.qty ]]</td>
                 <td>[[ detalle.dctoItem ]] %</td>
-                <td>[[formatCurrency(detalle.cost_with_discount) ]]</td>
+                <td>[[ formatCurrency(detalle.cost_with_discount) ]]</td>
                 <td>[[ formatCurrency(detalle.cost) ]]</td>
-                <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td> <!-- lastCost -->
-                <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td> <!-- lastPrice -->
-                <td>[[ formatCurrency(detalle.bsalePrice || 0) ]]</td> <!-- bsalePrice -->
+                <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td>
+                <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td>
+                <td>[[ formatCurrency(detalle.bsalePrice || 0) ]]</td>
                 <td>[[ formatCurrency(calcularTotal(detalle.cost_with_discount, detalle.qty)) ]]</td>
                 <td style="width: 300px;">
                     <input
@@ -119,23 +119,26 @@
                         v-model="detalle.precioBase"
                         placeholder="Precio Base"
                         @input="calcularMargen(detalle)" 
+                        style="font-size: 0.9rem;" 
                     />
-                </td>
-                
-                   
                 </td>
                 <td>[[ detalle.margen ]]%</td>
                 <td>[[ detalle.totalStock ]]</td>
                 <td>
                     <button
                         class="btn btn-info"
+                        style="font-size: 0.9rem;" 
                         @click="abrirModal(detalle)"
                     >
                        Precios MarketPlace
                     </button>
                 </td>
                 <td>
-                    <button class="btn btn-primary" @click="actualizarPrecioBase(detalle)">
+                    <button
+                        class="btn btn-primary"
+                        style="font-size: 0.9rem;"
+                        @click="actualizarPrecioBase(detalle)"
+                    >
                         Precio Base
                     </button>
                 </td>
