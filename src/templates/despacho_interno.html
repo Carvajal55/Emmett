@@ -126,13 +126,13 @@
             },
 
             validateAndLinkSuperid() {
-                // Prevenir procesamientos simultáneos o si el input está vacío
-                if (!this.sid || this.isProcessing) return;
-
+                // Capturar el valor del input y limpiar inmediatamente
                 const superidToValidate = this.sid.trim();
+                if (!superidToValidate || this.isProcessing) return;
+
                 this.processingQueue.push(superidToValidate); // Agregar a la cola
-                this.sid = ''; // Limpiar el input
-                this.$nextTick(() => document.getElementById('sidProduct').focus()); // Volver a enfocar
+                this.sid = ''; // Limpiar el input inmediatamente
+                this.$nextTick(() => document.getElementById('sidProduct').focus()); // Re-enfocar el input
 
                 // Si no hay procesamiento activo, iniciar el procesamiento
                 if (!this.isProcessing) {
@@ -143,7 +143,7 @@
             async processQueue() {
                 if (this.processingQueue.length === 0) {
                     this.isProcessing = false;
-                    return; // No hay más SuperIDs en la cola
+                    return; // No hay más SuperID en la cola
                 }
 
                 this.isProcessing = true; // Marcar como en proceso
@@ -162,19 +162,19 @@
 
                         // Despachar el producto
                         await this.dispatchConsumption(product);
+                        this.alertasuccess = true; // Mostrar alerta de éxito
                         this.playSound('successSound'); // Reproducir sonido de éxito
-                        this.showAlert('Producto despachado correctamente.', 'alert-success');
                     } else {
-                        this.showAlert(response.data.title || 'Error al validar el producto.', 'alert-danger');
+                        this.alertaerror = true; // Mostrar alerta de error
                         this.playSound('errorSound'); // Reproducir sonido de error
                     }
                 } catch (error) {
-                    this.showAlert('Error al procesar SuperID.', 'alert-danger');
-                    this.playSound('errorSound');
                     console.error('Error al procesar SuperID:', error);
+                    this.alertaerror = true; // Mostrar alerta de error
+                    this.playSound('errorSound');
                 } finally {
-                    this.$nextTick(() => document.getElementById('sidProduct').focus()); // Asegurar el foco
-                    this.processQueue(); // Procesar el siguiente SuperID
+                    this.$nextTick(() => document.getElementById('sidProduct').focus()); // Re-enfocar el input
+                    this.processQueue(); // Procesar el siguiente SuperID en la cola
                 }
             },
 
