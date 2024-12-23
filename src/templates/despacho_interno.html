@@ -126,31 +126,36 @@
             },
 
             validateAndLinkSuperid() {
-                // Capturar el valor del input y limpiar inmediatamente
+                // Evitar acumulación mientras se procesa la entrada
+                if (this.isProcessing) return;
+
                 const superidToValidate = this.sid.trim();
-                if (!superidToValidate || this.isProcessing) return;
+                if (!superidToValidate) return;
 
-                this.processingQueue.push(superidToValidate); // Agregar a la cola
-                this.sid = ''; // Limpiar el input inmediatamente
-                this.$nextTick(() => document.getElementById('sidProduct').focus()); // Re-enfocar el input
+                // Agregar a la cola y limpiar el input inmediatamente
+                this.processingQueue.push(superidToValidate);
+                this.sid = ''; // Limpieza inmediata
+                this.$nextTick(() => document.getElementById('sidProduct').focus()); // Re-enfocar input
 
-                // Si no hay procesamiento activo, iniciar el procesamiento
+                // Iniciar procesamiento si no está activo
                 if (!this.isProcessing) {
                     this.processQueue();
                 }
             },
 
+
             async processQueue() {
+                // Verificar si hay algo en la cola
                 if (this.processingQueue.length === 0) {
                     this.isProcessing = false;
-                    return; // No hay más SuperID en la cola
+                    return; // No hay más SuperIDs por procesar
                 }
 
-                this.isProcessing = true; // Marcar como en proceso
-                const superidToProcess = this.processingQueue.shift(); // Extraer el primer SuperID de la cola
+                this.isProcessing = true; // Marcar procesamiento activo
+                const superidToProcess = this.processingQueue.shift(); // Extraer el siguiente SuperID
 
                 try {
-                    // Validar el SuperID con la API
+                    // Validar SuperID con la API
                     const response = await axios.post('/api/validate-superid/', { sid: superidToProcess });
 
                     if (response.data.icon === 'success') {
@@ -162,41 +167,44 @@
 
                         // Despachar el producto
                         await this.dispatchConsumption(product);
+                        this.internalProducts.push(product); // Agregar a la lista de productos despachados
                         this.alertasuccess = true; // Mostrar alerta de éxito
                         this.playSound('successSound'); // Reproducir sonido de éxito
                     } else {
+                        // Manejo de errores específicos
                         this.alertaerror = true; // Mostrar alerta de error
-                        this.playSound('errorSound'); // Reproducir sonido de error
+                        this.playSound('errorSound');
                     }
                 } catch (error) {
                     console.error('Error al procesar SuperID:', error);
                     this.alertaerror = true; // Mostrar alerta de error
                     this.playSound('errorSound');
                 } finally {
-                    this.$nextTick(() => document.getElementById('sidProduct').focus()); // Re-enfocar el input
-                    this.processQueue(); // Procesar el siguiente SuperID en la cola
+                    // Continuar con el siguiente SuperID en la cola
+                    this.$nextTick(() => document.getElementById('sidProduct').focus()); // Asegurar foco
+                    this.isProcessing = false;
+                    this.processQueue();
                 }
             },
 
             async dispatchConsumption(product) {
                 const payload = {
                     company: this.company,
-                    nDocument: this.nDocument || null, // Enviar número de documento si está disponible
                     products: [product]
                 };
 
                 try {
                     const response = await axios.post('/api/dispatch-consumption/', payload);
 
-                    if (response.data.icon === 'success') {
-                        // Agregar el producto despachado a la lista
-                        this.internalProducts.push(product);
-                    } else {
-                        this.showAlert(response.data.title || 'Error al despachar el producto.', 'alert-danger');
+                    if (response.data.icon !== 'success') {
+                        console.error('Error en la API de despacho:', response.data);
+                        this.alertaerror = true; // Mostrar alerta de error
+                        this.playSound('errorSound');
                     }
                 } catch (error) {
-                    console.error('Error al despachar el producto:', error);
-                    this.showAlert('Error al despachar el producto.', 'alert-danger');
+                    console.error('Error al realizar el despacho:', error);
+                    this.alertaerror = true; // Mostrar alerta de error
+                    this.playSound('errorSound');
                 }
             },
 
@@ -217,6 +225,7 @@
                     console.error(`El sonido con ID ${soundId} no se encontró.`);
                 }
             }
+
         }
     });
 </script>

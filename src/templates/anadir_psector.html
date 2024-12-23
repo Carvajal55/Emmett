@@ -82,7 +82,8 @@
             itemsPerPage: 10,  // Productos por página
             alertMessage: '',  // Mensaje de alerta
             alertType: '',  // Tipo de alerta (success o danger)
-            showAlert: false  // Estado de visibilidad de la alerta
+            showAlert: false,  // Estado de visibilidad de la alerta
+            totalProductosAgregados: 0  // Total de productos agregados al sector
         },
         computed: {
             paginatedProducts() {
@@ -144,7 +145,8 @@
                     if (this.sectorSeleccionado === valor) {
                         this.limpiarSeleccion();
                         this.playSound('success');
-                        this.mostrarAlerta('Sector cerrado. Ahora puedes seleccionar uno nuevo.', 'alert-success');
+                        this.mostrarAlerta(`Sector cerrado. Se agregaron ${this.totalProductosAgregados} productos.`, 'alert-success');
+                        this.totalProductosAgregados = 0; // Reiniciar el contador
                     } else {
                         if (this.sectorSeleccionado) {
                             this.playSound('error');
@@ -214,6 +216,7 @@
                         // Manejar éxito aquí
                         this.playSound('success');
                         this.mostrarAlerta('Producto añadido con éxito.', 'alert-success');
+                        this.totalProductosAgregados += 1; // Incrementar contador de productos agregados
                     } else {
                         console.error(response.data.msg);
                         this.playSound('error');
