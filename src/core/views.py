@@ -2616,23 +2616,24 @@ def validate_superid_simplified(request):
             # Parsear la solicitud JSON
             body = json.loads(request.body)
             sid = body.get('sid')
-            document_products = set(body.get('document_products', []))  # Usar un conjunto para búsquedas rápidas
+            document_products = set(body.get('document_products', []))  # Usar conjunto para búsquedas rápidas
 
-            # Verificar si el `superid` existe en `Uniqueproducts`
-            unique_product = Uniqueproducts.objects.select_related('product').only(
-                'superid', 'product__sku'
-            ).filter(superid=sid).first()
+            # Validar datos de entrada
+            if not sid:
+                return JsonResponse({'error': 'El SuperID es obligatorio'}, status=400)
+
+            # Optimizar la consulta de Uniqueproducts
+            unique_product = Uniqueproducts.objects.filter(superid=sid).select_related('product').only('product__sku').first()
 
             if not unique_product:
                 return JsonResponse({'error': 'SuperID no encontrado'}, status=404)
 
-            # Obtener el SKU asociado de manera directa
+            # Validar si el producto tiene un SKU asociado
             associated_sku = unique_product.product.sku if unique_product.product else None
-
             if not associated_sku:
                 return JsonResponse({'error': 'Producto asociado no tiene un SKU válido'}, status=400)
 
-            # Si no se proporcionan productos del documento, considerarlo "Consumo Interno"
+            # Si no se proporcionan productos del documento, considerar "Consumo Interno"
             if not document_products:
                 return JsonResponse({
                     'row': 1,
