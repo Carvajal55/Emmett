@@ -181,7 +181,6 @@
                     if (response.data.resp === 1) {
                         this.productos = [...response.data.productos];
                         this.currentPage = 1;
-                        this.playSound('success');
 
                     } else {
                         console.error(response.data.msg);

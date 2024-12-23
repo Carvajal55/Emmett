@@ -168,16 +168,16 @@
                         // Despachar el producto
                         await this.dispatchConsumption(product);
                         this.internalProducts.push(product); // Agregar a la lista de productos despachados
-                        this.alertasuccess = true; // Mostrar alerta de éxito
+                        this.showAlert(`SuperID ${superidToProcess} procesado correctamente.`, 'alert-success');
                         this.playSound('successSound'); // Reproducir sonido de éxito
                     } else {
-                        // Manejo de errores específicos
-                        this.alertaerror = true; // Mostrar alerta de error
+                        // Manejar casos de SuperID no encontrado u otros errores
+                        this.showAlert(`Error: ${response.data.title}`, 'alert-danger');
                         this.playSound('errorSound');
                     }
                 } catch (error) {
                     console.error('Error al procesar SuperID:', error);
-                    this.alertaerror = true; // Mostrar alerta de error
+                    this.showAlert(`Error al procesar SuperID: ${superidToProcess}`, 'alert-danger');
                     this.playSound('errorSound');
                 } finally {
                     // Continuar con el siguiente SuperID en la cola
@@ -198,13 +198,15 @@
 
                     if (response.data.icon !== 'success') {
                         console.error('Error en la API de despacho:', response.data);
-                        this.alertaerror = true; // Mostrar alerta de error
+                        this.showAlert(`Error al despachar SuperID: ${product.superid}`, 'alert-danger');
                         this.playSound('errorSound');
+                        throw new Error(`Error en el despacho: ${response.data.title}`);
                     }
                 } catch (error) {
                     console.error('Error al realizar el despacho:', error);
-                    this.alertaerror = true; // Mostrar alerta de error
+                    this.showAlert(`Error en el despacho de SuperID: ${product.superid}`, 'alert-danger');
                     this.playSound('errorSound');
+                    throw error;
                 }
             },
 
