@@ -36,16 +36,20 @@
                 <label for="nDocument">Número de Documento (Opcional)</label>
                 <input id="nDocument" type="text" v-model="nDocument" class="form-control" placeholder="Ingrese el número del documento">
             </div>
-            <input 
-                id="sidProduct" 
-                type="text" 
-                v-model="sid" 
-                @keyup.enter="onEnterKey" 
-                class="form-control" 
-                placeholder="Escanea el código único" 
-                autocomplete="off" 
-                autofocus
-            >
+            <div class="col-md-4">
+                <label for="nDocument">Ingresar Super ID</label>
+
+                <input 
+                    id="sidProduct" 
+                    type="text" 
+                    v-model="sid" 
+                    @keyup.enter="onEnterKey" 
+                    class="form-control" 
+                    placeholder="Escanea el código único" 
+                    autocomplete="off" 
+                    autofocus
+                >
+            </div>
         </div>
 
         <div class="row mt-4">
