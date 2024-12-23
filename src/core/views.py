@@ -117,6 +117,10 @@ def despacho(request):
 def editar_productos(request):
     return render(request, 'editar_productos.html')
 
+@login_required(login_url='login_view')
+def despacho_interno(request):
+    return render(request, 'despacho_interno.html')
+
 
 """ 
 APIS  """

@@ -127,6 +127,14 @@
           </a>
         </li>
         {% endif %}
+        {% if request.user.usuario.rol in 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="{% url 'despacho_interno' %}">
+            <span><i class="ti ti-truck"></i></span>
+            <span class="hide-menu">Despacho Interno</span>
+          </a>
+        </li>
+        {% endif %}
 
         <!-- Crear Usuarios - Solo para ADMIN -->
         {% if request.user.usuario.rol == 'ADMIN' %}

@@ -44,12 +44,12 @@
             <button @click="dispatchConsumption" class="mt-3 btn btn-success">Despachar</button>
             {% if request.user.usuario.rol == 'VENTAS' %}
     <!-- Botón que requiere clave, visible solo para el rol de VENTAS -->
-                <button @click="requestDynamicKeyAccess" class="mt-3 btn btn-primary">Despacho Interno</button>
+                <button @click="requestDynamicKeyAccess" class="d-none mt-3 btn btn-primary">Despacho Interno</button>
             {% endif %}
 
             {% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
                 <!-- Botón sin clave, visible solo para ADMIN y BODEGA -->
-                <button @click="openInternalDispatchModal" class="mt-3 btn btn-primary">Despacho Interno</button>
+                <button @click="openInternalDispatchModal" class="d-none mt-3 btn btn-primary">Despacho Interno</button>
             {% endif %}
             
 
@@ -309,7 +309,6 @@
                         this.playSound('errorSound'); // Sonido de error
                     }
                 } catch (error) {
-                    Swal.fire('Error', 'Error al validar el SuperID.', 'error');
                     this.playSound('errorSound');
                     console.error('Error al procesar SuperID:', error);
                 } finally {
@@ -336,7 +335,6 @@
                         this.alertasuccess = true;      // Mostrar mensaje de éxito
                         this.updateDispatchedProducts(product); // Actualizar la lista de productos despachados
                     } else {
-                        Swal.fire('Error', response.data.title, response.data.icon);
                         this.alertaerror = true;           // Mostrar mensaje de error
                     }
                 } catch (error) {
