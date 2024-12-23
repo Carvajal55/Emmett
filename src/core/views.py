@@ -287,6 +287,9 @@ def listar_bodegas(request):
     return JsonResponse({'bodegas': bodegas_data})
 
 
+from django.core.cache import cache
+from django.db.models import Count
+
 def buscar_productosAPI(request):
     query = request.GET.get('q', '').strip()
     page = int(request.GET.get('page', 1))
@@ -298,21 +301,30 @@ def buscar_productosAPI(request):
             'current_page': 1
         }, status=200)
 
-    # Filtrar productos por SKU, nombre o prefijo
+    # Cacheo de sectores y bodegas
+    bodega_mapping = cache.get('bodega_mapping')
+    if not bodega_mapping:
+        bodegas = Bodega.objects.filter(
+            idoffice__in=[1, 2, 4, 6, 9, 10]
+        ).values('idoffice', 'name')
+        bodega_mapping = {b['idoffice']: b['name'] for b in bodegas}
+        cache.set('bodega_mapping', bodega_mapping, timeout=300)
+
+    sector_mapping = cache.get('sector_mapping')
+    if not sector_mapping:
+        excluded_sector_ids = Sectoroffice.objects.filter(
+            Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
+        ).values_list('idsectoroffice', flat=True)
+        sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sector_ids).values(
+            'idsectoroffice', 'namesector', 'idoffice'
+        )
+        sector_mapping = {sector['idsectoroffice']: sector for sector in sectores}
+        cache.set('sector_mapping', sector_mapping, timeout=300)
+
+    # Filtrar productos
     productos = Products.objects.filter(
         Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
-    ).prefetch_related('unique_products')  # Eliminamos 'brands' de select_related
-
-    # Filtrar y mapear las bodegas y sectores válidos
-    bodega_ids_included = [1, 2, 4, 6, 9, 10]
-    bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included).values('idoffice', 'name')
-    bodega_mapping = {b['idoffice']: b['name'] for b in bodegas}
-
-    excluded_sector_ids = Sectoroffice.objects.filter(
-        Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
-    ).values_list('idsectoroffice', flat=True)
-    sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sector_ids).values('idsectoroffice', 'namesector', 'idoffice')
-    sector_mapping = {sector['idsectoroffice']: sector for sector in sectores}
+    ).only('id', 'sku', 'nameproduct', 'lastprice', 'prefixed', 'brands', 'iderp', 'alto', 'largo', 'profundidad', 'peso')
 
     # Paginación
     paginator = Paginator(productos, 10)
@@ -321,14 +333,15 @@ def buscar_productosAPI(request):
     except (EmptyPage, PageNotAnInteger):
         productos_page = paginator.page(1)
 
-    # Serializar productos
     productos_data = []
     for producto in productos_page:
-        unique_products = producto.unique_products.exclude(location__in=excluded_sector_ids).values('superid', 'location')
+        unique_products = producto.unique_products.filter(
+            ~Q(location__in=sector_mapping.keys())
+        ).values('superid', 'location')
 
-        # Procesar stock y ubicaciones válidas
         bodegas_stock = {bodega_id: 0 for bodega_id in bodega_mapping}
         unique_products_data = []
+
         for up in unique_products:
             sector = sector_mapping.get(up['location'])
             if sector:
@@ -340,7 +353,6 @@ def buscar_productosAPI(request):
                     'bodega': bodega_name,
                 })
 
-        # Serializar producto principal
         productos_data.append({
             'id': producto.id,
             'sku': producto.sku,
@@ -349,7 +361,7 @@ def buscar_productosAPI(request):
             'stock_total': sum(bodegas_stock.values()),
             'unique_products': unique_products_data,
             'prefixed': producto.prefixed or '',
-            'brands': producto.brands or '',  # Acceder directamente al campo brands
+            'brands': producto.brands or '',
             'iderp': producto.iderp or '',
             'alto': producto.alto or 0,
             'largo': producto.largo or 0,
@@ -2534,6 +2546,75 @@ def validate_superid(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Only POST method is allowed"}, status=405)
+
+@csrf_exempt
+def validate_superid_cached(request):
+    if request.method == "POST":
+        try:
+            # Parsear solicitud JSON
+            body = json.loads(request.body)
+            sid = body.get('sid')
+            document_products = set(body.get('document_products', []))
+
+            if not sid:
+                return JsonResponse({'error': 'SuperID no proporcionado'}, status=400)
+
+            # Verificar si el resultado está en caché
+            cache_key = f"validate_superid_{sid}"
+            cached_result = cache.get(cache_key)
+
+            if cached_result:
+                return JsonResponse(cached_result)
+
+            # Consultar Uniqueproducts
+            unique_product = Uniqueproducts.objects.select_related('product').only(
+                'superid', 'product__sku'
+            ).filter(superid=sid).first()
+
+            if not unique_product:
+                response = {'error': 'SuperID no encontrado'}
+                cache.set(cache_key, response, timeout=300)  # Cachear por 5 minutos
+                return JsonResponse(response, status=404)
+
+            associated_sku = unique_product.product.sku if unique_product.product else None
+
+            if not associated_sku:
+                response = {'error': 'Producto asociado no tiene un SKU válido'}
+                cache.set(cache_key, response, timeout=300)  # Cachear por 5 minutos
+                return JsonResponse(response, status=400)
+
+            # Validar si no se proporcionaron productos del documento
+            if not document_products:
+                response = {
+                    'row': 1,
+                    'title': 'SuperID validado para Consumo Interno',
+                    'icon': 'success',
+                    'sku': associated_sku
+                }
+                cache.set(cache_key, response, timeout=300)  # Cachear por 5 minutos
+                return JsonResponse(response)
+
+            # Validar si el SKU está en los productos del documento
+            if associated_sku not in document_products:
+                response = {'error': 'El SKU asociado no coincide con los productos del documento'}
+                cache.set(cache_key, response, timeout=300)  # Cachear por 5 minutos
+                return JsonResponse(response, status=400)
+
+            # Respuesta exitosa
+            response = {
+                'row': 1,
+                'title': 'SuperID y SKU validados correctamente',
+                'icon': 'success',
+                'sku': associated_sku
+            }
+            cache.set(cache_key, response, timeout=300)  # Cachear por 5 minutos
+            return JsonResponse(response)
+
+        except Exception as e:
+            return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
+
+    return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
+
 
 
 @csrf_exempt
