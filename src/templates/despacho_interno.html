@@ -115,17 +115,52 @@
         methods: {
             onEnterKey() {
                 const superid = this.sid.trim();
-                
-                // Validar si el input no está vacío
-                if (!superid) return;
+                if (!superid) return; // Validar si el input no está vacío
 
-                // Procesar el SuperID
-                this.validateAndLinkSuperid(superid);
-
-                // Limpiar el input inmediatamente
-                this.sid = '';
+                // Agregar el SuperID a la cola y limpiar el input
+                this.addToQueue(superid);
+                this.sid = ''; // Limpieza inmediata
                 this.focusInput(); // Reenfocar después de limpiar
             },
+            addToQueue(superid) {
+                // Verificar si el SuperID ya está en la cola
+                if (!this.processingQueue.includes(superid)) {
+                    this.processingQueue.push(superid);
+                    this.processSuperID(superid); // Procesar de inmediato
+                }
+            },
+            async processSuperID(superid) {
+                try {
+                    // Validar SuperID con la API
+                    const response = await axios.post('/api/validate-superid/', { sid: superid });
+
+                    if (response.data.icon === 'success') {
+                        const product = {
+                            superid: superid,
+                            code: response.data.sku,
+                            description: response.data.description
+                        };
+
+                        // Despachar el producto
+                        await this.dispatchConsumption(product);
+                        this.internalProducts.push(product); // Agregar a la lista de productos despachados
+                        this.showAlert(`SuperID ${superid} procesado correctamente.`, 'alert-success');
+                        this.playSound('successSound'); // Reproducir sonido de éxito
+                    } else {
+                        // Manejar casos de SuperID no encontrado u otros errores
+                        this.showAlert(`Error: ${response.data.title}`, 'alert-danger');
+                        this.playSound('errorSound');
+                    }
+                } catch (error) {
+                    console.error('Error al procesar SuperID:', error);
+                    this.showAlert(`Error al procesar SuperID: ${superid}`, 'alert-danger');
+                    this.playSound('errorSound');
+                } finally {
+                    // Eliminar el SuperID de la cola después de procesarlo
+                    this.processingQueue = this.processingQueue.filter(id => id !== superid);
+                }
+            },
+
             focusInput() {
                 this.$nextTick(() => {
                     const input = document.getElementById('sidProduct');
