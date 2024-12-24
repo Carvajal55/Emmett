@@ -2628,38 +2628,58 @@ def validate_superid_simplified(request):
                 return JsonResponse({'error': 'El SuperID es obligatorio'}, status=400)
 
             # Optimizar la consulta de Uniqueproducts
-            unique_product = Uniqueproducts.objects.filter(superid=sid).select_related('product').only('product__sku').first()
+            unique_product = (
+                Uniqueproducts.objects
+                .filter(superid=sid)
+                .select_related('product')
+                .only('superid', 'product__sku')
+                .first()
+            )
 
             if not unique_product:
-                return JsonResponse({'error': 'SuperID no encontrado'}, status=404)
+                return JsonResponse({
+                    'row': 0,
+                    'title': f'SuperID {sid} no encontrado',
+                    'icon': 'error'
+                }, status=404)
 
             # Validar si el producto tiene un SKU asociado
             associated_sku = unique_product.product.sku if unique_product.product else None
             if not associated_sku:
-                return JsonResponse({'error': 'Producto asociado no tiene un SKU válido'}, status=400)
+                return JsonResponse({
+                    'row': 0,
+                    'title': 'Producto asociado no tiene un SKU válido',
+                    'icon': 'error'
+                }, status=400)
 
-            # Si no se proporcionan productos del documento, considerar "Consumo Interno"
+            # Responder para "Consumo Interno" si no hay productos de documento
             if not document_products:
                 return JsonResponse({
                     'row': 1,
-                    'title': 'SuperID validado para Consumo Interno',
+                    'title': f'SuperID {sid} validado para Consumo Interno',
                     'icon': 'success',
                     'sku': associated_sku
                 })
 
             # Validar si el SKU está en los productos del documento
             if associated_sku not in document_products:
-                return JsonResponse({'error': 'El SKU asociado no coincide con los productos del documento'}, status=400)
+                return JsonResponse({
+                    'row': 0,
+                    'title': f'SKU {associated_sku} no coincide con productos del documento',
+                    'icon': 'error'
+                }, status=400)
 
             # Respuesta exitosa
             return JsonResponse({
                 'row': 1,
-                'title': 'SuperID y SKU validados correctamente',
+                'title': f'SuperID {sid} y SKU {associated_sku} validados correctamente',
                 'icon': 'success',
                 'sku': associated_sku
             })
 
         except Exception as e:
+            # Loggear el error para depuración
+            print(f"Error inesperado: {str(e)}")
             return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
