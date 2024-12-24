@@ -273,6 +273,8 @@ def update_user(request, user_id):
 
 
 """ BUSCAR PRODUCTOS """
+from django.db.models import Prefetch, Q
+
 
 def listar_bodegas(request):
     # Filtrar solo las bodegas con los IDs especificados
