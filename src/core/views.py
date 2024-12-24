@@ -46,6 +46,7 @@ import io
 from dotenv import load_dotenv
 import datetime
 from datetime import timedelta
+from django.db.models import Prefetch, Q
 
 
 
@@ -273,7 +274,6 @@ def update_user(request, user_id):
 
 
 """ BUSCAR PRODUCTOS """
-from django.db.models import Prefetch, Q
 
 
 def listar_bodegas(request):
@@ -393,39 +393,57 @@ def buscar_productosAPI(request):
 
 def producto_detalles(request, product_id):
     try:
-        producto = Products.objects.prefetch_related('unique_products').get(id=product_id)
+        # Cargar producto con productos únicos prefiltrados
+        excluded_sector_ids = Sectoroffice.objects.filter(
+            Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
+        ).values_list('idsectoroffice', flat=True)
 
+        producto = Products.objects.prefetch_related(
+            Prefetch(
+                'unique_products',
+                queryset=Uniqueproducts.objects.exclude(location__in=excluded_sector_ids).only('location', 'superid')
+            )
+        ).only('id', 'sku', 'nameproduct', 'lastprice').get(id=product_id)
+
+        # Cargar bodegas válidas
         bodega_ids_included = [1, 2, 4, 6, 9, 10]
-        bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included)
-        bodega_mapping = {bodega.idoffice: bodega.name for bodega in bodegas}
+        bodega_mapping = cache.get('bodega_mapping')
+        if not bodega_mapping:
+            bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included).only('idoffice', 'name')
+            bodega_mapping = {b.idoffice: b.name for b in bodegas}
+            cache.set('bodega_mapping', bodega_mapping, timeout=300)
 
-        sectores = Sectoroffice.objects.all()
-        sector_mapping = {sector.idsectoroffice: sector for sector in sectores}
+        # Cargar sectores válidos
+        sector_mapping = cache.get('sector_mapping')
+        if not sector_mapping:
+            sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sector_ids).only(
+                'idsectoroffice', 'namesector', 'idoffice'
+            )
+            sector_mapping = {s.idsectoroffice: s for s in sectores}
+            cache.set('sector_mapping', sector_mapping, timeout=300)
 
-        excluded_sectors = Sectoroffice.objects.filter(namesector="XT99-99") | Sectoroffice.objects.filter(zone="NARN") | Sectoroffice.objects.filter(zone="NRN") 
-        unique_products = producto.unique_products.exclude(location__in=excluded_sectors.values_list('idsectoroffice', flat=True))
-
-        bodegas_stock = {bodega.idoffice: 0 for bodega in bodegas}
-
+        # Calcular stock total y productos únicos
+        bodegas_stock = {bodega_id: 0 for bodega_id in bodega_ids_included}
         unique_products_data = []
-        for unique_product in unique_products:
+
+        for unique_product in producto.unique_products.all():
             sector = sector_mapping.get(unique_product.location)
-            if sector and isinstance(sector, Sectoroffice):
+            if sector:
                 bodega_name = bodega_mapping.get(sector.idoffice)
-                if bodega_name:  # Excluir si la bodega es desconocida
-                    if sector.idoffice in bodegas_stock:
-                        bodegas_stock[sector.idoffice] += 1
+                if bodega_name:  # Excluir bodegas desconocidas
+                    bodegas_stock[sector.idoffice] += 1
                     unique_products_data.append({
                         'superid': unique_product.superid,
                         'locationname': sector.namesector,
                         'bodega': bodega_name,
                     })
 
+        # Respuesta JSON optimizada
         response_data = {
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
-            'price': producto.lastprice,
+            'price': producto.lastprice or 0,
             'stock_total': sum(bodegas_stock.values()),
             'bodegas': {bodega_mapping[bodega_id]: stock for bodega_id, stock in bodegas_stock.items()},
             'unique_products': unique_products_data,
