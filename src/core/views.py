@@ -360,10 +360,10 @@ def buscar_productosAPI(request):
     productos_data = []
     for producto in productos_page:
         # Calcular stock total desde productos únicos
-        stock_total = sum(
-            1 for up in producto.unique_products.all()
+        stock_total = len([
+            up for up in producto.unique_products.all()
             if sector_mapping.get(up.location, {}).get('idoffice') in bodega_mapping
-        )
+        ])
 
         productos_data.append({
             'id': producto.id,
