@@ -1603,39 +1603,38 @@ def buscar_productos_por_sector(request):
 @csrf_exempt
 def search_products_by_sector(request):
     if request.method != 'POST':
-        return JsonResponse({'resp': 3, 'msg': 'Método no permitido'})
+        return JsonResponse({'resp': 3, 'msg': 'Método no permitido'}, status=405)
 
     try:
         body = json.loads(request.body)
         term = body.get('searchTerm', '').strip()
     except json.JSONDecodeError:
-        return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON'})
+        return JsonResponse({'resp': 3, 'msg': 'Error al decodificar JSON'}, status=400)
 
     # Reemplazar ' por - en el término de búsqueda
     term = term.replace("'", "-")
 
-    # Verificar si el término tiene el formato correcto
-    if not term.startswith('B-'):
-        return JsonResponse({'resp': 3, 'msg': 'El término de búsqueda no contiene el formato esperado.'})
+    # Validar formato del término con expresiones regulares
+    match = re.match(r'^B-(\d+)-([A-Z]+)-(\d+)$', term)
+    if not match:
+        return JsonResponse({'resp': 3, 'msg': 'Formato de término de búsqueda incorrecto.'}, status=400)
 
-    parts = term.split('-')
-    if len(parts) != 4:
-        return JsonResponse({'resp': 3, 'msg': 'Formato de término de búsqueda incorrecto.'})
-
-    # Extraer id_office y name_sector
-    id_office = parts[1]
-    name_sector = f"{parts[2]}-{parts[3]}"
+    # Extraer datos del término de búsqueda
+    id_office = match.group(1)
+    name_sector = f"{match.group(2)}-{match.group(3)}"
 
     try:
         # Buscar el sector
-        sector = Sectoroffice.objects.get(namesector=name_sector, idoffice=id_office)
+        sector = Sectoroffice.objects.only('idsectoroffice', 'namesector').get(namesector=name_sector, idoffice=id_office)
     except Sectoroffice.DoesNotExist:
-        return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado en oficina "{id_office}"'})
+        return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado en oficina "{id_office}"'}, status=404)
 
-    # Buscar productos asociados al sector, ordenados por ID inverso
+    # Buscar productos asociados al sector
     productos = Uniqueproducts.objects.filter(
         location=sector.idsectoroffice
-    ).select_related('product').order_by('-id')
+    ).select_related('product').only(
+        'superid', 'product__sku', 'product__nameproduct'
+    ).order_by('-id')
 
     # Construir datos de los productos
     productos_data = [
@@ -1657,7 +1656,7 @@ def search_products_by_sector(request):
         'nameSector': sector.namesector,
         'productos': productos_data
     }
-    return JsonResponse(response_data)
+    return JsonResponse(response_data, status=200)
 
 # @csrf_exempt
 # def add_product_to_sector(request):
