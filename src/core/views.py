@@ -1615,7 +1615,7 @@ def search_products_by_sector(request):
     term = term.replace("'", "-")
 
     # Validar formato del término con expresiones regulares
-    match = re.match(r'^B-(\d+)-([A-Z]+)-(\d+)$', term)
+    match = re.match(r'^B-(\d+)-([A-Z0-9]+)-(\d+)$', term)
     if not match:
         return JsonResponse({'resp': 3, 'msg': 'Formato de término de búsqueda incorrecto.'}, status=400)
 
