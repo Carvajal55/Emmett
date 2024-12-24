@@ -55,7 +55,7 @@ class Productconfig(models.Model):
 
 
 class Products(models.Model):
-    sku = models.CharField(max_length=45, blank=True, null=True)
+    sku = models.CharField(max_length=45, blank=True, null=True,db_index=True)
     nameproduct = models.CharField(max_length=250, blank=True, null=True)  # Field name made lowercase.
     prefixed = models.CharField(max_length=500, blank=True, null=True)
     brands = models.CharField(max_length=100, blank=True, null=True)
@@ -167,7 +167,7 @@ class Supplier(models.Model):
 
 class Uniqueproducts(models.Model):
     product = models.ForeignKey(Products, related_name='unique_products', on_delete=models.CASCADE, db_column='idProduct')  # Cambiado a ForeignKey
-    superid = models.CharField(db_column='superID', max_length=45, blank=True, null=True)
+    superid = models.CharField(db_column='superID', max_length=45, blank=True, null=True,db_index=True)
     locationname = models.CharField(db_column='locationName', max_length=45, blank=True, null=True)
     correlative = models.IntegerField(blank=True, null=True)
     printlabel = models.CharField(db_column='printLabel', blank=True, null=True,max_length=255)  # Field name made lowercase.
