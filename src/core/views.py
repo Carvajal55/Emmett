@@ -418,8 +418,8 @@ def producto_detalles(request, product_id):
         if not sector_mapping:
             sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sector_ids).only(
                 'idsectoroffice', 'namesector', 'idoffice'
-            )
-            sector_mapping = {s.idsectoroffice: s for s in sectores}
+            ).values('idsectoroffice', 'namesector', 'idoffice')
+            sector_mapping = {s['idsectoroffice']: s for s in sectores}
             cache.set('sector_mapping', sector_mapping, timeout=300)
 
         # Calcular stock total y productos únicos
@@ -428,13 +428,13 @@ def producto_detalles(request, product_id):
 
         for unique_product in producto.unique_products.all():
             sector = sector_mapping.get(unique_product.location)
-            if sector:
-                bodega_name = bodega_mapping.get(sector.idoffice)
+            if sector:  # sector ahora es un diccionario
+                bodega_name = bodega_mapping.get(sector['idoffice'])
                 if bodega_name:  # Excluir bodegas desconocidas
-                    bodegas_stock[sector.idoffice] += 1
+                    bodegas_stock[sector['idoffice']] += 1
                     unique_products_data.append({
                         'superid': unique_product.superid,
-                        'locationname': sector.namesector,
+                        'locationname': sector['namesector'],
                         'bodega': bodega_name,
                     })
 
