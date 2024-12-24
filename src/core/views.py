@@ -345,7 +345,7 @@ def buscar_productosAPI(request):
             'unique_products',
             queryset=Uniqueproducts.objects.filter(
                 state=0, location__in=sector_mapping.keys()
-            ).only('location')
+            ).only('location', 'superid')
         )
     )
 
@@ -359,11 +359,13 @@ def buscar_productosAPI(request):
     # Procesar los productos para la respuesta
     productos_data = []
     for producto in productos_page:
-        # Calcular stock total desde productos únicos
-        stock_total = len([
-            up for up in producto.unique_products.all()
-            if sector_mapping.get(up.location, {}).get('idoffice') in bodega_mapping
-        ])
+        # Calcular stock total basado en bodegas válidas
+        stock_total = 0
+        for unique_product in producto.unique_products.all():
+            location = unique_product.location
+            sector = sector_mapping.get(location)
+            if sector and sector['idoffice'] in bodega_mapping:
+                stock_total += 1
 
         productos_data.append({
             'id': producto.id,
@@ -386,6 +388,7 @@ def buscar_productosAPI(request):
         'total_pages': paginator.num_pages,
         'current_page': productos_page.number,
     }, safe=False)
+
 
 
 
