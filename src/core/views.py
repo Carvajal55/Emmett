@@ -372,20 +372,29 @@ def buscar_productosAPI(request):
         productos_page = paginator.page(1)
 
     # Procesar los productos para la respuesta
-    productos_data = [{
-        'id': producto.id,
-        'sku': producto.sku,
-        'name': producto.nameproduct,
-        'price': producto.lastprice or 0,
-        'stock_total': 0,  # Stock general (puedes implementar lógica para calcularlo)
-        'prefixed': producto.prefixed or '',
-        'brands': producto.brands or '',
-        'iderp': producto.iderp or '',
-        'alto': producto.alto or 0,
-        'largo': producto.largo or 0,
-        'profundidad': producto.profundidad or 0,
-        'peso': producto.peso or 0,
-    } for producto in productos_page]
+    productos_data = []
+    for producto in productos_page:
+        # Calcular el stock total para cada producto
+        stock_total = Uniqueproducts.objects.filter(
+            product=producto,
+            state=0,
+            location__in=sector_mapping.keys()
+        ).count()
+
+        productos_data.append({
+            'id': producto.id,
+            'sku': producto.sku,
+            'name': producto.nameproduct,
+            'price': producto.lastprice or 0,
+            'stock_total': stock_total,  # Stock real calculado
+            'prefixed': producto.prefixed or '',
+            'brands': producto.brands or '',
+            'iderp': producto.iderp or '',
+            'alto': producto.alto or 0,
+            'largo': producto.largo or 0,
+            'profundidad': producto.profundidad or 0,
+            'peso': producto.peso or 0,
+        })
 
     # Respuesta JSON
     return JsonResponse({
@@ -393,105 +402,6 @@ def buscar_productosAPI(request):
         'total_pages': paginator.num_pages,
         'current_page': productos_page.number,
     }, safe=False)
-
-
-def obtener_producto_por_superid(request):
-    superid = request.GET.get('superid', '').strip()
-
-    # Respuesta vacía si no hay superid
-    if not superid:
-        return JsonResponse({
-            'product': None,
-        }, status=200)
-
-    # Cache de bodegas seleccionadas
-    bodega_mapping = cache.get('bodega_mapping')
-    if not bodega_mapping:
-        bodegas = Bodega.objects.filter(
-            idoffice__in=[1, 2, 4, 6, 9, 10]
-        ).values('idoffice', 'name')
-        bodega_mapping = {b['idoffice']: b['name'] for b in bodegas}
-        cache.set('bodega_mapping', bodega_mapping, timeout=300)
-
-    # Cache de sectores válidos
-    excluded_sector_ids = cache.get('excluded_sector_ids')
-    if not excluded_sector_ids:
-        excluded_sector_ids = set(
-            Sectoroffice.objects.filter(
-                Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
-            ).values_list('idsectoroffice', flat=True)
-        )
-        cache.set('excluded_sector_ids', excluded_sector_ids, timeout=300)
-
-    sector_mapping = cache.get('sector_mapping')
-    if not sector_mapping:
-        sectores = Sectoroffice.objects.exclude(
-            idsectoroffice__in=excluded_sector_ids
-        ).values('idsectoroffice', 'namesector', 'idoffice')
-        sector_mapping = {sector['idsectoroffice']: sector for sector in sectores}
-        cache.set('sector_mapping', sector_mapping, timeout=300)
-
-    # Obtener el producto por superid
-    producto = Products.objects.filter(unique_products__superid=superid).first()
-    if not producto:
-        return JsonResponse({
-            'product': None,
-        }, status=404)
-
-    # Obtener detalles del producto único relacionado al superid
-    unique_product = Uniqueproducts.objects.filter(product=producto, superid=superid).first()
-    if unique_product:
-        location = unique_product.location
-        sector = sector_mapping.get(location)
-        bodega_name = bodega_mapping.get(sector['idoffice']) if sector else None
-        if not sector or not bodega_name:
-            return JsonResponse({
-                'product': None,
-            }, status=404)
-    else:
-        return JsonResponse({
-            'product': None,
-        }, status=404)
-
-    # Calcular stock total basado en las bodegas seleccionadas
-    stock_total = Uniqueproducts.objects.filter(
-        product=producto,
-        location__in=sector_mapping.keys(),
-        superid=superid,
-    ).count()
-
-    # Preparar los datos del producto
-    producto_data = {
-        'id': producto.id,
-        'sku': producto.sku,
-        'name': producto.nameproduct,
-        'price': producto.lastprice or 0,
-        'prefixed': producto.prefixed or '',
-        'brands': producto.brands or '',
-        'iderp': producto.iderp or '',
-        'alto': producto.alto or 0,
-        'largo': producto.largo or 0,
-        'profundidad': producto.profundidad or 0,
-        'peso': producto.peso or 0,
-        'description': producto.description or '',
-        'currentstock': stock_total,
-        'unique_product_details': {
-            'location': sector['namesector'] if sector else None,
-            'bodega': bodega_name,
-            'state': unique_product.state if unique_product else None,
-            'cost': unique_product.cost if unique_product else None,
-            'soldvalue': unique_product.soldvalue if unique_product else None,
-            'observation': unique_product.observation if unique_product else None,
-        } if unique_product else None,
-    }
-
-    # Respuesta JSON
-    return JsonResponse({
-        'product': producto_data,
-    }, safe=False)
-
-
-
 
 
 
@@ -1198,7 +1108,7 @@ def crear_producto(request):
 
         # Obtener datos del formulario enviados desde el frontend
         nombre_producto = data.get("nombre")
-        precio = data.get("precio")
+        precio = data.get("precio", 0)
         marca = data.get("marca")
         proveedor_id = data.get("proveedor")
         categoria = data.get("categoria")
@@ -1220,7 +1130,7 @@ def crear_producto(request):
         # Generar el SKU con el prefijo correspondiente y el correlativo
         sku = obtener_correlativo(categoria)
 
-        # Generar el código de barras comenzando con "9999"
+        # Generar el código de barras único
         bar_code = f"9999{get_random_string(8, '0123456789')}"
 
         # Crear el JSON para la solicitud a Bsale (Producto Principal)
@@ -1247,12 +1157,15 @@ def crear_producto(request):
         if response_product.status_code == 201:
             bsale_product = response_product.json()
 
+            # Crear un código único para la variante
+            variant_code = f"{sku}{get_random_string(4, '0123456789')}"
+
             # Crear la Variante en Bsale asociada al producto
             bsale_variant_data = {
                 "productId": bsale_product["id"],
-                "description": "",
-                "barCode": f"{bar_code}01",
-                "code": f"{sku}",
+                "description": sku,
+                "barCode": f"{bar_code}",
+                "code": variant_code,
                 "unlimitedStock": 0,
                 "allowNegativeStock": 0
             }
@@ -1266,7 +1179,7 @@ def crear_producto(request):
                 nuevo_producto = Products.objects.create(
                     sku=sku,
                     nameproduct=nombre_producto,
-                    prefixed = alias,
+                    prefixed=alias,
                     brands=marca,
                     codebar=bar_code,
                     iderp=bsale_variant["id"],  # ID de la variante en lugar del producto
@@ -1284,7 +1197,6 @@ def crear_producto(request):
                 return JsonResponse({"error": "Error al crear la variante en Bsale", "details": response_variant.json()}, status=400)
         else:
             return JsonResponse({"error": "Error al crear el producto en Bsale", "details": response_product.json()}, status=400)
-
 
   
 
@@ -2497,7 +2409,7 @@ def dispatch_consumption(request):
                     'floor': 0,
                     'section': 0,
                     'namesector': "Despachados",
-                    'state': 1
+                    'state': 1,
                 }
             )[0]
 
@@ -2562,6 +2474,7 @@ def dispatch_consumption(request):
                     unique_product.datelastinventory = timezone.now()
                     unique_product.state = 1
                     unique_product.ncompany = company
+                    unique_product.locationname = "Despachado"
                     unique_product.save()
 
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
