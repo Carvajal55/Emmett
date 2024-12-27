@@ -317,7 +317,6 @@ def buscar_productosAPI(request):
         )
         cache.set('excluded_sector_ids', excluded_sector_ids, timeout=300)
 
-    # Filtrar sectores válidos
     sector_mapping = cache.get('sector_mapping')
     if not sector_mapping:
         sectores = Sectoroffice.objects.exclude(
@@ -375,7 +374,7 @@ def buscar_productosAPI(request):
     # Procesar los productos para la respuesta
     productos_data = []
     for producto in productos_page:
-        # Calcular el stock total para cada producto
+        # Calcular el stock total utilizando la misma lógica del superid
         stock_total = Uniqueproducts.objects.filter(
             product=producto,
             state=0,
