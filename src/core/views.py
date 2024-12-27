@@ -359,14 +359,6 @@ def buscar_productosAPI(request):
     # Si no es un superid, continuar con la búsqueda habitual
     productos_qs = Products.objects.filter(
         Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
-    ).prefetch_related(
-        Prefetch(
-            'unique_products',
-            queryset=Uniqueproducts.objects.filter(
-                state=0,
-                location__in=sector_mapping.keys()
-            ).only('location', 'superid')
-        )
     ).only(
         'id', 'sku', 'nameproduct', 'lastprice', 'prefixed', 'brands', 'iderp', 'alto', 'largo', 'profundidad', 'peso'
     )
@@ -382,12 +374,12 @@ def buscar_productosAPI(request):
     # Procesar los productos para la respuesta
     productos_data = []
     for producto in productos_page:
-        # Calcular el stock total basado en sectores y bodegas válidas
-        stock_total = 0
-        for unique_product in producto.unique_products.all():
-            sector = sector_mapping.get(unique_product.location)
-            if sector:  # sector debe existir en el mapeo
-                stock_total += 1
+        # Calcular el stock total usando la misma lógica que para el superid
+        stock_total = Uniqueproducts.objects.filter(
+            product=producto,
+            state=0,
+            location__in=sector_mapping.keys()
+        ).count()
 
         productos_data.append({
             'id': producto.id,
