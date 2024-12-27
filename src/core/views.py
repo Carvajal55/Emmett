@@ -333,7 +333,7 @@ def buscar_productosAPI(request):
         # Calcular el stock total real del producto relacionado
         stock_total = Uniqueproducts.objects.filter(
             product=product,
-            state=0,
+            state=1,
             location__in=sector_mapping.keys()
         ).count()
 
@@ -377,7 +377,7 @@ def buscar_productosAPI(request):
         # Calcular el stock total utilizando la misma lógica del superid
         stock_total = Uniqueproducts.objects.filter(
             product=producto,
-            state=0,
+            state=1,
             location__in=sector_mapping.keys()
         ).count()
 
