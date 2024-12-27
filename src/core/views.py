@@ -307,6 +307,9 @@ def buscar_productosAPI(request):
             'current_page': 1
         }, status=200)
 
+    # Lista de bodegas válidas
+    bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1]
+
     # Cache de sectores válidos
     excluded_sector_ids = cache.get('excluded_sector_ids')
     if not excluded_sector_ids:
@@ -321,6 +324,8 @@ def buscar_productosAPI(request):
     if not sector_mapping:
         sectores = Sectoroffice.objects.exclude(
             idsectoroffice__in=excluded_sector_ids
+        ).filter(
+            idoffice__in=bodegas_validas_ids  # Filtrar sectores por bodegas válidas
         ).values('idsectoroffice', 'namesector', 'idoffice')
         sector_mapping = {sector['idsectoroffice']: sector for sector in sectores}
         cache.set('sector_mapping', sector_mapping, timeout=300)
@@ -333,7 +338,7 @@ def buscar_productosAPI(request):
         # Calcular el stock total real del producto relacionado
         stock_total = Uniqueproducts.objects.filter(
             product=product,
-            state=1,
+            state=0,
             location__in=sector_mapping.keys()
         ).count()
 
@@ -374,10 +379,10 @@ def buscar_productosAPI(request):
     # Procesar los productos para la respuesta
     productos_data = []
     for producto in productos_page:
-        # Calcular el stock total utilizando la misma lógica del superid
+        # Calcular el stock total utilizando las bodegas válidas
         stock_total = Uniqueproducts.objects.filter(
             product=producto,
-            state=1,
+            state=0,
             location__in=sector_mapping.keys()
         ).count()
 
