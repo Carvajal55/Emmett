@@ -336,11 +336,17 @@ def buscar_productosAPI(request):
         product = unique_product.product
 
         # Calcular el stock total real del producto relacionado
-        stock_total = Uniqueproducts.objects.filter(
+        stock_query = Uniqueproducts.objects.filter(
             product=product,
             state=0,
             location__in=sector_mapping.keys()
-        ).count()
+        )
+        stock_total = stock_query.count()
+
+        # Imprimir los productos considerados
+        print("Productos considerados para superid:")
+        for up in stock_query:
+            print(f"SuperID: {up.superid}, Location: {up.location}, Product: {up.product.id}")
 
         return JsonResponse({
             'products': [{
@@ -380,11 +386,17 @@ def buscar_productosAPI(request):
     productos_data = []
     for producto in productos_page:
         # Calcular el stock total utilizando las bodegas válidas
-        stock_total = Uniqueproducts.objects.filter(
+        stock_query = Uniqueproducts.objects.filter(
             product=producto,
             state=0,
             location__in=sector_mapping.keys()
-        ).count()
+        )
+        stock_total = stock_query.count()
+
+        # Imprimir los productos considerados
+        print(f"Productos considerados para SKU {producto.sku}:")
+        for up in stock_query:
+            print(f"SuperID: {up.superid}, Location: {up.location}, Product: {up.product.id}")
 
         productos_data.append({
             'id': producto.id,
