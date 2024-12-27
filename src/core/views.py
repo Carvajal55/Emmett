@@ -382,8 +382,12 @@ def buscar_productosAPI(request):
     # Procesar los productos para la respuesta
     productos_data = []
     for producto in productos_page:
-        # Calcular el stock total para cada producto basado en los productos únicos prefiltrados
-        stock_total = producto.unique_products.count()
+        # Calcular el stock total basado en sectores y bodegas válidas
+        stock_total = 0
+        for unique_product in producto.unique_products.all():
+            sector = sector_mapping.get(unique_product.location)
+            if sector:  # sector debe existir en el mapeo
+                stock_total += 1
 
         productos_data.append({
             'id': producto.id,
