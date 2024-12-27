@@ -52,6 +52,7 @@ urlpatterns = [
     path('api/eliminar-usuario/<int:user_id>/', core_views.delete_user, name="eliminar_usuario"),
     #BUSCAR PRODUCTOS
     path('api/buscar-productos/', core_views.buscar_productosAPI, name='buscar_productosAPI'),
+    path('api/obtener_producto_por_superid/', core_views.obtener_producto_por_superid, name='obtener_producto_por_superid'),
     path('api/producto-detalles/<int:product_id>/', core_views.producto_detalles, name='producto_detalles'),
     path('api/listar-bodegas/', core_views.listar_bodegas, name='listar_bodegas'),
     path('api/listar-compras/', core_views.listar_compras, name='listar_compras'),

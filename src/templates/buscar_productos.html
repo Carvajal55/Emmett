@@ -5,13 +5,14 @@
 <div id="app">
     <div class="card">
         <div class="card-body">
-            <div>
+            <!-- Gestión de Productos -->
+            <div v-show="activeTab === 'gestion'">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5>Gestión de Productos</h5>
                     <!-- Campo de Búsqueda con Autocompletar -->
                     <input type="text" class="form-control" placeholder="Buscar por SKU o Nombre" 
-                    v-model="searchQuery" @input="fetchProducts(1)" 
-                    list="productSuggestions" ref="searchInput">
+                        v-model="searchQuery" @input="fetchProducts(1)" 
+                        list="productSuggestions" ref="searchInput">
                 </div>
                 <hr>
 
@@ -118,8 +119,8 @@
                         </tbody>
                     </table>
                 </div>
-
             </div>
+
         </div>
     </div>
 </div>
@@ -133,18 +134,34 @@
         el: '#app',
         delimiters: ['[[', ']]'],
         data: {
+            activeTab: 'gestion',
             products: [],             // Lista de productos
             bodegas: [],              // Lista de sucursales (bodegas)
             searchQuery: '',          // Término de búsqueda
             currentPage: 1,           // Página actual
             totalPages: 1,            // Total de páginas
             maxVisiblePages: 10,      // Máximo de páginas visibles en la paginación
-            selectedProduct: null,    // Producto seleccionado
             cancelTokenSource: null,   // Token para cancelar solicitudes anteriores
             selectedProduct: null,  // Producto seleccionado
             selectedBodega: '', 
+            superidQuery: '', // SuperID para buscar
+            superidProduct: null, // Producto encontrado por SuperID
+            superidError: '', // Error en la búsqueda de SuperID
+            activeTabStyle: {
+                backgroundColor: '#003399',
+                color: 'white',
+                border: '1px solid blue',
+                transition: 'all 0.3s',
+            },
+            inactiveTabStyle: {
+                backgroundColor: 'white',
+                color: 'black',
+                border: '1px solid #ddd',
+                transition: 'all 0.3s',
+            },
         },
         computed: {
+            
             visiblePages() {
                 let pages = [];
                 let start = Math.max(1, this.currentPage - Math.floor(this.maxVisiblePages / 2));
@@ -173,6 +190,31 @@
             }
         },
         methods: {
+            async buscarPorSuperID() {
+                if (!this.superidQuery.trim()) {
+                    this.superidError = 'Por favor ingresa un SuperID válido.';
+                    this.superidProduct = null;
+                    return;
+                }
+
+                try {
+                    const response = await axios.get('/api/obtener_producto_por_superid/', {
+                        params: { superid: this.superidQuery.trim() },
+                    });
+                    this.superidProduct = response.data.product;
+                    this.superidError = '';
+                } catch (error) {
+                    this.superidProduct = null;
+                    if (error.response && error.response.status === 404) {
+                        this.superidError = 'Producto no encontrado.';
+                    } else {
+                        this.superidError = 'Error al buscar el producto.';
+                    }
+                }
+            },
+            switchTab(tabName) {
+                this.activeTab = tabName;
+            },
             // Buscar productos con paginación
             async fetchProducts(page = 1) {
                 // Restablecer el producto seleccionado cuando se realiza una nueva búsqueda

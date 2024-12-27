@@ -298,7 +298,6 @@ from django.db.models import Count
 
 def buscar_productosAPI(request):
     query = request.GET.get('q', '').strip()
-    page = int(request.GET.get('page', 1))
 
     # Respuesta vacía si no hay consulta
     if not query:
@@ -308,7 +307,104 @@ def buscar_productosAPI(request):
             'current_page': 1
         }, status=200)
 
-    # Cache de bodegas
+    # Cache de sectores válidos
+    excluded_sector_ids = cache.get('excluded_sector_ids')
+    if not excluded_sector_ids:
+        excluded_sector_ids = set(
+            Sectoroffice.objects.filter(
+                Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
+            ).values_list('idsectoroffice', flat=True)
+        )
+        cache.set('excluded_sector_ids', excluded_sector_ids, timeout=300)
+
+    sector_mapping = cache.get('sector_mapping')
+    if not sector_mapping:
+        sectores = Sectoroffice.objects.exclude(
+            idsectoroffice__in=excluded_sector_ids
+        ).values('idsectoroffice', 'namesector', 'idoffice')
+        sector_mapping = {sector['idsectoroffice']: sector for sector in sectores}
+        cache.set('sector_mapping', sector_mapping, timeout=300)
+
+    # Comprobar si el query es un superid
+    unique_product = Uniqueproducts.objects.filter(superid=query).select_related('product').first()
+    if unique_product and unique_product.product:
+        product = unique_product.product
+
+        # Calcular el stock total real del producto relacionado
+        stock_total = Uniqueproducts.objects.filter(
+            product=product,
+            state=0,
+            location__in=sector_mapping.keys()
+        ).count()
+
+        return JsonResponse({
+            'products': [{
+                'id': product.id,
+                'sku': product.sku,
+                'name': product.nameproduct,
+                'price': product.lastprice or 0,
+                'stock_total': stock_total,  # Stock real calculado
+                'prefixed': product.prefixed or '',
+                'brands': product.brands or '',
+                'iderp': product.iderp or '',
+                'alto': product.alto or 0,
+                'largo': product.largo or 0,
+                'profundidad': product.profundidad or 0,
+                'peso': product.peso or 0,
+            }],
+            'total_pages': 1,
+            'current_page': 1
+        }, status=200)
+
+    # Si no es un superid, continuar con la búsqueda habitual
+    productos_qs = Products.objects.filter(
+        Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
+    ).only(
+        'id', 'sku', 'nameproduct', 'lastprice', 'prefixed', 'brands', 'iderp', 'alto', 'largo', 'profundidad', 'peso'
+    )
+
+    # Paginación
+    paginator = Paginator(productos_qs, 10)
+    page = int(request.GET.get('page', 1))
+    try:
+        productos_page = paginator.page(page)
+    except (EmptyPage, PageNotAnInteger):
+        productos_page = paginator.page(1)
+
+    # Procesar los productos para la respuesta
+    productos_data = [{
+        'id': producto.id,
+        'sku': producto.sku,
+        'name': producto.nameproduct,
+        'price': producto.lastprice or 0,
+        'stock_total': 0,  # Stock general (puedes implementar lógica para calcularlo)
+        'prefixed': producto.prefixed or '',
+        'brands': producto.brands or '',
+        'iderp': producto.iderp or '',
+        'alto': producto.alto or 0,
+        'largo': producto.largo or 0,
+        'profundidad': producto.profundidad or 0,
+        'peso': producto.peso or 0,
+    } for producto in productos_page]
+
+    # Respuesta JSON
+    return JsonResponse({
+        'products': productos_data,
+        'total_pages': paginator.num_pages,
+        'current_page': productos_page.number,
+    }, safe=False)
+
+
+def obtener_producto_por_superid(request):
+    superid = request.GET.get('superid', '').strip()
+
+    # Respuesta vacía si no hay superid
+    if not superid:
+        return JsonResponse({
+            'product': None,
+        }, status=200)
+
+    # Cache de bodegas seleccionadas
     bodega_mapping = cache.get('bodega_mapping')
     if not bodega_mapping:
         bodegas = Bodega.objects.filter(
@@ -335,58 +431,63 @@ def buscar_productosAPI(request):
         sector_mapping = {sector['idsectoroffice']: sector for sector in sectores}
         cache.set('sector_mapping', sector_mapping, timeout=300)
 
-    # Filtrar productos con solo los campos necesarios
-    productos_qs = Products.objects.filter(
-        Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
-    ).only(
-        'id', 'sku', 'nameproduct', 'lastprice', 'prefixed', 'brands', 'iderp', 'alto', 'largo', 'profundidad', 'peso'
-    ).prefetch_related(
-        Prefetch(
-            'unique_products',
-            queryset=Uniqueproducts.objects.filter(
-                state=0, location__in=sector_mapping.keys()
-            ).only('location', 'superid')
-        )
-    )
+    # Obtener el producto por superid
+    producto = Products.objects.filter(unique_products__superid=superid).first()
+    if not producto:
+        return JsonResponse({
+            'product': None,
+        }, status=404)
 
-    # Paginación optimizada
-    paginator = Paginator(productos_qs, 10)
-    try:
-        productos_page = paginator.page(page)
-    except (EmptyPage, PageNotAnInteger):
-        productos_page = paginator.page(1)
+    # Obtener detalles del producto único relacionado al superid
+    unique_product = Uniqueproducts.objects.filter(product=producto, superid=superid).first()
+    if unique_product:
+        location = unique_product.location
+        sector = sector_mapping.get(location)
+        bodega_name = bodega_mapping.get(sector['idoffice']) if sector else None
+        if not sector or not bodega_name:
+            return JsonResponse({
+                'product': None,
+            }, status=404)
+    else:
+        return JsonResponse({
+            'product': None,
+        }, status=404)
 
-    # Procesar los productos para la respuesta
-    productos_data = []
-    for producto in productos_page:
-        # Calcular stock total basado en bodegas válidas
-        stock_total = 0
-        for unique_product in producto.unique_products.all():
-            location = unique_product.location
-            sector = sector_mapping.get(location)
-            if sector and sector['idoffice'] in bodega_mapping:
-                stock_total += 1
+    # Calcular stock total basado en las bodegas seleccionadas
+    stock_total = Uniqueproducts.objects.filter(
+        product=producto,
+        location__in=sector_mapping.keys(),
+        superid=superid,
+    ).count()
 
-        productos_data.append({
-            'id': producto.id,
-            'sku': producto.sku,
-            'name': producto.nameproduct,
-            'price': producto.lastprice or 0,
-            'stock_total': stock_total,
-            'prefixed': producto.prefixed or '',
-            'brands': producto.brands or '',
-            'iderp': producto.iderp or '',
-            'alto': producto.alto or 0,
-            'largo': producto.largo or 0,
-            'profundidad': producto.profundidad or 0,
-            'peso': producto.peso or 0,
-        })
+    # Preparar los datos del producto
+    producto_data = {
+        'id': producto.id,
+        'sku': producto.sku,
+        'name': producto.nameproduct,
+        'price': producto.lastprice or 0,
+        'prefixed': producto.prefixed or '',
+        'brands': producto.brands or '',
+        'iderp': producto.iderp or '',
+        'alto': producto.alto or 0,
+        'largo': producto.largo or 0,
+        'profundidad': producto.profundidad or 0,
+        'peso': producto.peso or 0,
+        'description': producto.description or '',
+        'currentstock': stock_total,
+        'unique_product_details': {
+            'location': sector['namesector'] if sector else None,
+            'bodega': bodega_name,
+            'state': unique_product.state if unique_product else None,
+            'cost': unique_product.cost if unique_product else None,
+            'soldvalue': unique_product.soldvalue if unique_product else None,
+            'observation': unique_product.observation if unique_product else None,
+        } if unique_product else None,
+    }
 
     # Respuesta JSON
     return JsonResponse({
-        'products': productos_data,
-        'total_pages': paginator.num_pages,
-        'current_page': productos_page.number,
+        'product': producto_data,
     }, safe=False)
 
 
