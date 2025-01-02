@@ -3141,7 +3141,7 @@ def reimprimir_etiqueta_qr(request):
             y_super_id = y_barcode + 30
             pdf.setFont("Helvetica-Bold", 10)
             pdf.drawString(x_qr, y_super_id - 3, f"{super_id}")
-            pdf.drawString(x_qr + 25 * mm, y_super_id - 3, f"{number}")
+            pdf.drawString(x_qr + 25 * mm, y_super_id - 60, f"{number}")
 
             if not is_left and i < qty - 1:
                 pdf.showPage()
