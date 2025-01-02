@@ -3,6 +3,8 @@
 
 {% block content %}
 <div id="app" class="container">
+    <audio id="successSound" src="{% static 'sounds/success.mp3' %}" preload="auto"></audio>
+    <audio id="errorSound" src="{% static 'sounds/error.mp3' %}" preload="auto"></audio>
     <div v-if="showAccessControl" class="row justify-content-center mt-5">
         <div class="col-md-6">
             <div class="card">
@@ -144,6 +146,7 @@
                         // Despachar el producto
                         await this.dispatchConsumption(product);
                         this.internalProducts.push(product); // Agregar a la lista de productos despachados
+                        
                         this.showAlert(`SuperID ${superid} procesado correctamente.`, 'alert-success');
                         this.playSound('successSound'); // Reproducir sonido de éxito
                     } else {
@@ -239,6 +242,11 @@
                     this.isProcessing = false;
                     this.processQueue();
                 }
+            },
+            playSound(type) {
+                const audioElement = type === 'success' ? document.getElementById('successSound') : document.getElementById('errorSound');
+                audioElement.currentTime = 0;
+                audioElement.play();
             },
 
             async dispatchConsumption(product) {
