@@ -2208,69 +2208,76 @@ def reimprimir_etiqueta(request):
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
     try:
-        # Obtener el SuperID desde el frontend
-        superid = request.POST.get('superid')
-        if not superid:
-            return JsonResponse({'error': 'SuperID es obligatorio.'}, status=400)
+        # Obtener los SuperIDs desde el frontend
+        superids = request.POST.getlist('superids[]')  # Espera una lista de SuperIDs
+        if not superids:
+            return JsonResponse({'error': 'Se requiere al menos un SuperID.'}, status=400)
 
-        # Buscar el producto único por SuperID
-        unique_product = Uniqueproducts.objects.filter(superid=superid).select_related('product').first()
-        if not unique_product:
-            return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
-
-        producto = unique_product.product
-
-        # Crear o reimprimir el PDF
-        pdf_filename = f'etiqueta_{unique_product.superid}.pdf'
+        # Crear el PDF
+        pdf_filename = f'reimpresion_etiquetas_{date.today().strftime("%Y%m%d")}.pdf'
         relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
         absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
         os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
         pdf = canvas.Canvas(absolute_file_path, pagesize=(102 * mm, 50 * mm))
 
-        # Generar el QR code con el SuperID
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=5,
-            border=0,
-        )
-        qr.add_data(unique_product.superid)
-        qr.make(fit=True)
+        # Procesar cada SuperID
+        for index, superid in enumerate(superids):
+            unique_product = Uniqueproducts.objects.filter(superid=superid).select_related('product').first()
+            if not unique_product:
+                continue  # Ignorar SuperIDs no válidos
 
-        qr_img = qr.make_image(fill_color="black", back_color="white")
-        buffer = BytesIO()
-        qr_img.save(buffer, format="PNG")
-        buffer.seek(0)
-        qr_image = ImageReader(buffer)
+            producto = unique_product.product
 
-        # Posiciones dinámicas
-        x_qr, y_qr = 3 * mm, 25 * mm
-        qr_width, qr_height = 22 * mm, 22 * mm
+            # Generar QR Code
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=5,
+                border=0,
+            )
+            qr.add_data(superid)
+            qr.make(fit=True)
 
-        pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            buffer = BytesIO()
+            qr_img.save(buffer, format="PNG")
+            buffer.seek(0)
+            qr_image = ImageReader(buffer)
 
-        # Detalles de la etiqueta
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{producto.sku}")
-        pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"SuperID: {unique_product.superid}")
-        pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
+            # Posiciones dinámicas
+            is_left = index % 2 == 0
+            x_offset = 3 * mm if is_left else 56 * mm
+            x_qr, y_qr = x_offset, 25 * mm
+            qr_width, qr_height = 22 * mm, 22 * mm
 
-        # Nombre del producto
-        pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
+            pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
-        # Código de barras
-        barcode_sku = code128.Code128(producto.sku, barWidth=0.38 * mm, barHeight=9 * mm)
-        barcode_sku.drawOn(pdf, x_qr - 6 * mm, y_qr - 50)
+            # Detalles de la etiqueta
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{producto.sku}")
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{superid}")
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
+
+            # Nombre del producto
+            pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
+
+            # Código de barras
+            barcode_sku = code128.Code128(producto.sku, barWidth=0.38 * mm, barHeight=9 * mm)
+            barcode_sku.drawOn(pdf, x_qr - 6 * mm, y_qr - 50)
+
+            # Crear una nueva página si es necesario
+            if not is_left and index < len(superids) - 1:
+                pdf.showPage()
 
         pdf.save()
 
         # Retornar la URL del PDF generado
         pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
         return JsonResponse({
-            'message': 'Etiqueta reimpresa con éxito.',
+            'message': 'Etiquetas reimpresas con éxito.',
             'urlPdf': pdf_url,
-            'superid': unique_product.superid
+            'superids': superids
         })
 
     except Exception as e:
