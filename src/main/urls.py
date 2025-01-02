@@ -37,6 +37,8 @@ urlpatterns = [
     path('crear_sector/', core_views.crear_sector, name='crear_sector'), # URL que apunta al HTML
     path('editar_productos/', core_views.editar_productos, name='editar_productos'), # URL que apunta al HTML
     path('despacho_interno/', core_views.despacho_interno, name='despacho_interno'), # URL que apunta al HTML
+    path('reingres/', core_views.reingreso, name='reingreso'), # URL que apunta al HTML
+
 
 
     # URL que apunta al HTML
@@ -105,12 +107,14 @@ urlpatterns = [
     #conectar conbsale
     path('api/sincronizar-producto/<str:sku>/', core_views.sincronizar_producto, name='sincronizar_producto_por_sku'),
     path('api/recepcion-stock/<str:sku>/', core_views.registrar_recepcion_stock, name='registrar_recepcion_stock'),
-
+    #REingreso
+    path('api/reimprimir-etiqueta/', core_views.reimprimir_etiqueta, name='reimprimir_etiqueta'),
+    path('api/reingresar-producto/', core_views.reingresar_producto, name='reingresar_producto'),
     #Despacho
    path('api/current-dispatch/', core_views.current_dispatch, name='current_dispatch'),
    path('api/details-document/', core_views.details_document, name='details_document'),
-    path('api/generate-dynamic-key/', core_views.generate_dynamic_key, name='generate_dynamic_key'),
-    path('api/validate-dynamic-key/', core_views.validate_dynamic_key, name='validate_dynamic_key'),
+   path('api/generate-dynamic-key/', core_views.generate_dynamic_key, name='generate_dynamic_key'),
+   path('api/validate-dynamic-key/', core_views.validate_dynamic_key, name='validate_dynamic_key'),
    #path('api/dispatch-product/', core_views.dispatch_product, name='dispatch_product'),
    path('api/dispatch-consumption/', core_views.dispatch_consumption, name='dispatch_consumption'),
    path('api/consult-bsale-document/', core_views.get_unique_document, name='get_unique_document'),

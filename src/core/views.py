@@ -122,6 +122,10 @@ def editar_productos(request):
 def despacho_interno(request):
     return render(request, 'despacho_interno.html')
 
+@login_required(login_url='login_view')
+def reingreso(request):
+    return render(request, 'reingreso.html')
+
 
 """ 
 APIS  """
@@ -2099,7 +2103,190 @@ def obtener_stock_bsale(variant_id):
         return response.json()
     else:
         return None
+    
+@csrf_exempt
+def reingresar_producto(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
+    try:
+        superid = request.POST.get('superid')
+        cantidad = int(request.POST.get('cantidad', 1))
+        office_id = 1  # Siempre "Casa Matriz"
+
+        if not superid or cantidad <= 0:
+            return JsonResponse({'error': 'Datos inválidos.'}, status=400)
+
+        # Validar producto en zona DESP
+        unique_product = Uniqueproducts.objects.filter(superid=superid, locationname="DESP").select_related('product').first()
+        if not unique_product:
+            return JsonResponse({'error': 'Producto no encontrado en la zona DESP.'}, status=404)
+
+        producto = unique_product.product
+
+        # Obtener el próximo correlativo
+        with transaction.atomic():
+            correlativo = Uniqueproducts.objects.filter(
+                observation="Re ingreso de stock"
+            ).count() + 1
+
+            # Actualizar stock en Bsale
+            bsale_response = actualizar_stock_bsale(
+                variant_id=producto.iderp,
+                office_id=office_id,
+                new_stock=cantidad,
+                cost=producto.lastcost,
+                document="Reingreso",
+                document_number=correlativo
+            )
+
+            if not bsale_response:
+                return JsonResponse({'error': 'No se pudo actualizar el stock en Bsale.'}, status=500)
+
+            # Actualizar el producto en el sistema
+            unique_product.locationname = "ALMACEN"
+            unique_product.state = 0
+            unique_product.observation = "Re ingreso de stock"
+            unique_product.reingreso_document_number = correlativo
+            unique_product.save()
+
+        return JsonResponse({
+            'message': 'Producto reingresado con éxito.',
+            'producto': {
+                'superid': unique_product.superid,
+                'sku': producto.sku,
+                'name': producto.nameproduct,
+                'location': unique_product.locationname,
+                'state': unique_product.state,
+                'dateadd': unique_product.dateadd.strftime('%d-%m-%Y'),
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+@csrf_exempt
+def reimprimir_etiqueta(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    try:
+        # Obtener el SuperID desde el frontend
+        superid = request.POST.get('superid')
+        if not superid:
+            return JsonResponse({'error': 'SuperID es obligatorio.'}, status=400)
+
+        # Buscar el producto único por SuperID
+        unique_product = Uniqueproducts.objects.filter(superid=superid).select_related('product').first()
+        if not unique_product:
+            return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
+
+        producto = unique_product.product
+
+        # Crear o reimprimir el PDF
+        pdf_filename = f'etiqueta_{unique_product.superid}.pdf'
+        relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
+        absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
+        os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+
+        pdf = canvas.Canvas(absolute_file_path, pagesize=(102 * mm, 50 * mm))
+
+        # Generar el QR code con el SuperID
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=5,
+            border=0,
+        )
+        qr.add_data(unique_product.superid)
+        qr.make(fit=True)
+
+        qr_img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        qr_img.save(buffer, format="PNG")
+        buffer.seek(0)
+        qr_image = ImageReader(buffer)
+
+        # Posiciones dinámicas
+        x_qr, y_qr = 3 * mm, 25 * mm
+        qr_width, qr_height = 22 * mm, 22 * mm
+
+        pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
+
+        # Detalles de la etiqueta
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{producto.sku}")
+        pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"SuperID: {unique_product.superid}")
+        pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
+
+        # Nombre del producto
+        pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
+
+        # Código de barras
+        barcode_sku = code128.Code128(producto.sku, barWidth=0.38 * mm, barHeight=9 * mm)
+        barcode_sku.drawOn(pdf, x_qr - 6 * mm, y_qr - 50)
+
+        pdf.save()
+
+        # Retornar la URL del PDF generado
+        pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
+        return JsonResponse({
+            'message': 'Etiqueta reimpresa con éxito.',
+            'urlPdf': pdf_url,
+            'superid': unique_product.superid
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+@csrf_exempt
+def gestionar_historial_productos(request):
+    if request.method == 'POST':
+        # Agregar un producto al historial
+        try:
+            superid = request.POST.get('superid')
+            if not superid:
+                return JsonResponse({'error': 'SuperID es obligatorio.'}, status=400)
+
+            # Buscar el producto
+            unique_product = Uniqueproducts.objects.filter(superid=superid).select_related('product').first()
+            if not unique_product:
+                return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
+
+            # Obtener o inicializar el historial en la sesión
+            historial = request.session.get('historial_productos', [])
+            producto_data = {
+                'superid': unique_product.superid,
+                'sku': unique_product.product.sku,
+                'name': unique_product.product.nameproduct,
+                'location': unique_product.locationname,
+                'state': unique_product.state,
+                'dateadd': unique_product.dateadd.strftime('%d-%m-%Y'),
+            }
+
+            # Evitar duplicados
+            if producto_data not in historial:
+                historial.append(producto_data)
+                request.session['historial_productos'] = historial
+
+            return JsonResponse({'message': 'Producto agregado al historial.', 'historial': historial}, status=200)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    elif request.method == 'GET':
+        # Obtener el historial
+        historial = request.session.get('historial_productos', [])
+        return JsonResponse({'historial': historial}, status=200)
+
+    elif request.method == 'DELETE':
+        # Limpiar el historial
+        request.session['historial_productos'] = []
+        return JsonResponse({'message': 'Historial limpiado con éxito.'}, status=200)
+
+    else:
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+    
 # Función para actualizar el stock en Bsale
 def actualizar_stock_bsale(variant_id, office_id, new_stock, cost,number):
     url = f"{BSALE_API_URL}/stocks/receptions.json"

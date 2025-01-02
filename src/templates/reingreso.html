@@ -1,0 +1,128 @@
+{% extends 'partials/base.html' %}
+{% load static %}
+
+{% block content %}
+<div id="app" class="container">
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <label for="superid">SuperID</label>
+            <input id="superid" v-model="form.superid" @keyup.enter="reingresarProducto" type="text" class="form-control" placeholder="Ingrese el SuperID" autofocus>
+        </div>
+        
+        <div class="col-md-3 d-flex align-items-end">
+            <button @click="reingresarProducto" class="btn btn-primary w-100">Reingresar</button>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div v-if="alertMessage" :class="alertClass" class="alert" role="alert">[[ alertMessage ]]</div>
+            <h5>Productos Reingresados</h5>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">SuperID</th>
+                            <th scope="col">SKU</th>
+                            <th scope="col">Nombre</th>
+                            <th scope="col">Ubicación</th>
+                            <th scope="col">Estado</th>
+                            <th scope="col">Fecha</th>
+                            <th scope="col">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template v-if="productos.length > 0">
+                            <tr v-for="(producto, index) in productos" :key="index">
+                                <td>[[ index + 1 ]]</td>
+                                <td>[[ producto.superid ]]</td>
+                                <td>[[ producto.sku ]]</td>
+                                <td>[[ producto.name ]]</td>
+                                <td>[[ producto.location ]]</td>
+                                <td>[[ producto.state ]]</td>
+                                <td>[[ producto.dateadd ]]</td>
+                                <td>
+                                    <button @click="imprimirEtiqueta(producto.superid)" class="btn btn-secondary">Reimprimir</button>
+                                </td>
+                            </tr>
+                        </template>
+                        <template v-else>
+                            <tr>
+                                <td colspan="8" class="text-center">No hay productos reingresados.</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block js %}
+<script>
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            form: {
+                superid: '',
+                cantidad: 1
+            },
+            productos: [],       // Lista de productos reingresados
+            alertMessage: '',    // Mensaje de alerta
+            alertClass: ''       // Clase de alerta
+        },
+        methods: {
+            reingresarProducto() {
+                const formData = new FormData();
+                formData.append('superid', this.form.superid);
+                formData.append('cantidad', this.form.cantidad);
+
+                axios.post('/api/reingresar-producto/', formData)
+                    .then(response => {
+                        if (response.data.error) {
+                            this.showAlert(response.data.error, 'alert-danger');
+                        } else {
+                            this.productos.push(response.data.producto);
+                            this.showAlert(response.data.message, 'alert-success');
+                            this.form.superid = '';
+                            this.form.cantidad = 1;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error al reingresar producto:', error);
+                        this.showAlert('Error al reingresar producto.', 'alert-danger');
+                    });
+            },
+            imprimirEtiqueta(superid) {
+                const formData = new FormData();
+                formData.append('superid', superid);
+
+                axios.post('/api/reimprimir-etiqueta/', formData)
+                    .then(response => {
+                        if (response.data.error) {
+                            alert(response.data.error);
+                        } else {
+                            alert('Etiqueta generada con éxito.');
+                            window.open(response.data.urlPdf, '_blank');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error al imprimir etiqueta:', error);
+                        alert('Error al imprimir etiqueta.');
+                    });
+            },
+            showAlert(message, alertClass) {
+                this.alertMessage = message;
+                this.alertClass = alertClass;
+                setTimeout(() => {
+                    this.alertMessage = '';
+                    this.alertClass = '';
+                }, 3000);
+            }
+        }
+    });
+</script>
+{% endblock js %}
