@@ -1122,7 +1122,7 @@ def crear_producto(request):
             bsale_product = response_product.json()
 
             # Crear un código único para la variante
-            variant_code = f"{sku}{get_random_string(4, '0123456789')}"
+            variant_code = sku
 
             # Crear la Variante en Bsale asociada al producto
             bsale_variant_data = {
@@ -2101,7 +2101,7 @@ def obtener_stock_bsale(variant_id):
         return None
 
 # Función para actualizar el stock en Bsale
-def actualizar_stock_bsale(variant_id, office_id, new_stock, cost):
+def actualizar_stock_bsale(variant_id, office_id, new_stock, cost,number):
     url = f"{BSALE_API_URL}/stocks/receptions.json"
     headers = {
         'access_token': BSALE_API_TOKEN,
@@ -2111,7 +2111,7 @@ def actualizar_stock_bsale(variant_id, office_id, new_stock, cost):
     data = {
         "document": "Guía",
         "officeId": office_id,
-        "documentNumber": "123",
+        "documentNumber": number,
         "note": "Actualización de stock",
         "details": [
             {
@@ -2790,7 +2790,7 @@ def imprimir_etiqueta_qr(request):
         pdf.save()
 
         # Actualizar stock en Bsale
-        bsale_response = actualizar_stock_bsale(producto.iderp, 1, qty, producto.lastcost)
+        bsale_response = actualizar_stock_bsale(producto.iderp, 1, qty, producto.lastcost,number)
         if not bsale_response:
             return JsonResponse({'error': 'Etiqueta creada, pero no se pudo actualizar stock en Bsale.'}, status=500)
 

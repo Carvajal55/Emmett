@@ -184,6 +184,7 @@ class Uniqueproducts(models.Model):
     dateadd = models.DateTimeField(db_column='dateAdd', blank=True, null=True)  # Field name made lowercase.
     iddocumentincome = models.IntegerField(db_column='idDocumentIncome', blank=True, null=True)  # Field name made lowercase.
     ncompany = models.IntegerField(blank=True, null=True)  # Field name made lowercase.
+    reingreso_document_number = models.PositiveIntegerField(default=0)  # Nuevo campo para correlativo de reingreso
 
     class Meta:
          db_table = 'uniqueProducts'
