@@ -2156,9 +2156,9 @@ def reingresar_producto(request):
             return JsonResponse({'error': 'Datos inválidos.'}, status=400)
 
         # Validar producto en zona DESP
-        unique_product = Uniqueproducts.objects.filter(superid=superid, locationname="DESP").select_related('product').first()
+        unique_product = Uniqueproducts.objects.filter(superid=superid, locationname="Despachados").select_related('product').first()
         if not unique_product:
-            return JsonResponse({'error': 'Producto no encontrado en la zona DESP.'}, status=404)
+            return JsonResponse({'error': 'Producto no encontrado en la zona Despachados.'}, status=404)
 
         producto = unique_product.product
 
