@@ -2254,11 +2254,11 @@ def reimprimir_etiqueta(request):
             pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
             # Detalles de la etiqueta
-            pdf.setFont("Helvetica-Bold", 10)
+            pdf.setFont("Helvetica-Bold", 9)
             pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{producto.sku}")
             pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
-            pdf.drawString(x_qr, y_qr - 25, f"SuperID: {superid}")
-            pdf.drawString(x_qr, y_qr - 35, f"Doc: {unique_product.ndocincome or 'Sin doc'}")
+            pdf.drawString(x_qr, y_qr - 25, {superid})
+            pdf.drawString(x_qr, y_qr - 35, {unique_product.iddocumentincome or 'Sin doc'})
             pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
 
             # Código de barras
