@@ -2259,7 +2259,7 @@ def reimprimir_etiqueta(request):
             pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
             pdf.drawString(x_qr, y_qr - 25, f"SuperID: {superid}")
             pdf.drawString(x_qr, y_qr - 35, f"Doc: {unique_product.ndocincome or 'Sin doc'}")
-            pdf.drawString(x_qr, y_qr - 45, f"{date.today().strftime('%d-%m-%Y')}")
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
 
             # Código de barras
             barcode_sku = code128.Code128(producto.sku, barWidth=0.38 * mm, barHeight=9 * mm)
