@@ -413,25 +413,63 @@ def buscar_productosAPI(request):
 
 def producto_detalles(request, product_id):
     try:
+        # Cargar producto con productos únicos prefiltrados
+        excluded_sector_ids = Sectoroffice.objects.filter(
+            Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
+        ).values_list('idsectoroffice', flat=True)
+
         producto = Products.objects.prefetch_related(
             Prefetch(
                 'unique_products',
-                queryset=Uniqueproducts.objects.filter(state=0)
+                queryset=Uniqueproducts.objects.exclude(location__in=excluded_sector_ids).only('location', 'superid')
             )
         ).only('id', 'sku', 'nameproduct', 'lastprice').get(id=product_id)
 
-        bodega_mapping = get_bodega_mapping([1, 2, 4, 6, 9, 10])
-        sector_mapping = get_sector_mapping(bodega_mapping.keys())
-        stock_total, unique_products_data = calculate_stock(producto, sector_mapping)
+        # Cargar bodegas válidas
+        bodega_ids_included = [1, 2, 4, 6, 9, 10]
+        bodega_mapping = cache.get('bodega_mapping')
+        if not bodega_mapping:
+            bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included).only('idoffice', 'name')
+            bodega_mapping = {b.idoffice: b.name for b in bodegas}
+            cache.set('bodega_mapping', bodega_mapping, timeout=300)
 
-        return JsonResponse({
+        # Cargar sectores válidos
+        sector_mapping = cache.get('sector_mapping')
+        if not sector_mapping:
+            sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sector_ids).only(
+                'idsectoroffice', 'namesector', 'idoffice'
+            ).values('idsectoroffice', 'namesector', 'idoffice')
+            sector_mapping = {s['idsectoroffice']: s for s in sectores}
+            cache.set('sector_mapping', sector_mapping, timeout=300)
+
+        # Calcular stock total y productos únicos
+        bodegas_stock = {bodega_id: 0 for bodega_id in bodega_ids_included}
+        unique_products_data = []
+
+        for unique_product in producto.unique_products.all():
+            sector = sector_mapping.get(unique_product.location)
+            if sector:  # sector ahora es un diccionario
+                bodega_name = bodega_mapping.get(sector['idoffice'])
+                if bodega_name:  # Excluir bodegas desconocidas
+                    bodegas_stock[sector['idoffice']] += 1
+                    unique_products_data.append({
+                        'superid': unique_product.superid,
+                        'locationname': sector['namesector'],
+                        'bodega': bodega_name,
+                    })
+
+        # Respuesta JSON optimizada
+        response_data = {
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice or 0,
-            'stock_total': stock_total,
+            'stock_total': sum(bodegas_stock.values()),
+            'bodegas': {bodega_mapping[bodega_id]: stock for bodega_id, stock in bodegas_stock.items()},
             'unique_products': unique_products_data,
-        })
+        }
+
+        return JsonResponse(response_data)
 
     except Products.DoesNotExist:
         return JsonResponse({'error': 'Producto no encontrado'}, status=404)
