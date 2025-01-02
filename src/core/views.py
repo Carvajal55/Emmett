@@ -2256,15 +2256,14 @@ def reimprimir_etiqueta(request):
             # Detalles de la etiqueta
             pdf.setFont("Helvetica-Bold", 10)
             pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{producto.sku}")
-            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{superid}")
-            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
-
-            # Nombre del producto
             pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
+            pdf.drawString(x_qr, y_qr - 25, f"SuperID: {superid}")
+            pdf.drawString(x_qr, y_qr - 35, f"Doc: {unique_product.ndocincome or 'Sin doc'}")
+            pdf.drawString(x_qr, y_qr - 45, f"{date.today().strftime('%d-%m-%Y')}")
 
             # Código de barras
             barcode_sku = code128.Code128(producto.sku, barWidth=0.38 * mm, barHeight=9 * mm)
-            barcode_sku.drawOn(pdf, x_qr - 6 * mm, y_qr - 50)
+            barcode_sku.drawOn(pdf, x_qr - 6 * mm, y_qr - 60)
 
             # Crear una nueva página si es necesario
             if not is_left and index < len(superids) - 1:
