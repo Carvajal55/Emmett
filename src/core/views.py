@@ -2174,8 +2174,7 @@ def reingresar_producto(request):
                 office_id=office_id,
                 new_stock=cantidad,
                 cost=producto.lastcost,
-                document="Reingreso",
-                document_number=correlativo
+                number=correlativo
             )
 
             if not bsale_response:
