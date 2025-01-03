@@ -1,5 +1,5 @@
 from django.contrib import admin
-from core.models import Usuario, Products, Supplier, Uniqueproducts, Purchase, Bodega, Sectoroffice,Brand,Category
+from core.models import *
 from openpyxl import Workbook
 from django.http import HttpResponse
 
@@ -77,6 +77,12 @@ class UsuarioAdmin(admin.ModelAdmin):
 admin.site.register(Brand)
 
 admin.site.register(Category)
+
+class CategoryserpAdmin(admin.ModelAdmin):
+    list_display = ('namecategory', 'iderp')  # Muestra estas columnas en el listado
+    search_fields = ('namecategory',)        # Habilita búsqueda por el campo namecategory
+
+admin.site.register(Categoryserp, CategoryserpAdmin)
 
 
 admin.site.register(Usuario, UsuarioAdmin)

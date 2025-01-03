@@ -184,6 +184,15 @@
                             </div>
                             <!-- Categoría -->
                             <div class="col-6 mb-3">
+                                <label for="categoriaProducto" class="form-label">Categoría Bsale</label>
+                                <select class="form-select" v-model="nuevoProducto.categoriaBsale">
+                                    <option v-for="categoria in categorias" :key="categoria.iderp" :value="categoria.iderp">
+                                        [[ categoria.namecategory ]]
+                                    </option>
+                                </select>
+                            </div>
+                            <!-- Categoría -->
+                            <div class="col-6 mb-3">
                                 <label for="categoriaProducto" class="form-label">Categoría</label>
                                 <select class="form-select" v-model="nuevoProducto.categoria">
                                     <option value="audio">Audio</option>
@@ -586,7 +595,9 @@
                 categoria: '',
                 codigoBarra: '',
                 proveedor: null, // Proveedor del producto, tomará el proveedor seleccionado si existe
+                categoriaBsale: "",
             },
+            categorias: [],
             menu: {
                 audio: false,
                 pruebaAudio: false,
@@ -660,6 +671,16 @@
             },
         },
         methods: {
+            cargarCategorias() {
+                fetch("/api/listar-categorias/") // Cambia esta URL según tu endpoint
+                    .then((response) => response.json())
+                    .then((data) => {
+                        this.categorias = data.categorias || [];
+                    })
+                    .catch((error) => {
+                        console.error("Error al cargar las categorías:", error);
+                    });
+            },
             aplicarDescuentoGeneral() {
                 this.productosDocumento.forEach((producto, index) => {
                     // Si no hay descuento específico, aplica el descuento general
@@ -1000,7 +1021,8 @@
                     alto: this.nuevoProducto.alto,          // Dimensiones del producto
                     largo: this.nuevoProducto.largo,
                     profundidad: this.nuevoProducto.profundidad,
-                    peso: this.nuevoProducto.peso           // Peso del producto
+                    peso: this.nuevoProducto.peso,           // Peso del producto
+                    categoriaBsale: this.nuevoProducto.categoriaBsale,
                 };
 
                 // Mostrar SweetAlert de carga
@@ -1153,6 +1175,7 @@
             this.searchProveedores();
             this.cargarProductos();
             this.searchProveedoresProd();
+            this.cargarCategorias();
         }
     });
 </script>

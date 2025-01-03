@@ -141,6 +141,9 @@ urlpatterns = [
     path('api/restore-unique-products/', core_views.restore_unique_products_view, name='restore_unique_products'),
     path('api/restore-unique-products/', core_views.restore_unique_products_view, name='restore_unique_products'),
     path('api/bulk-upload-products/', core_views.bulk_upload_products, name='bulk_upload_products'),
+    path('api/obtener-tipos-productos/', core_views.obtener_tipos_productos_y_guardar),
+    path('api/listar-categorias/', core_views.listar_categorias, name='listar_categorias'),
+    
 
 
 

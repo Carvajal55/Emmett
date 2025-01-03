@@ -919,6 +919,10 @@ def obtener_factura(request):
 
 """ Ingresar Documentos """
 
+def listar_categorias(request):
+    categorias = Categoryserp.objects.values("id", "namecategory","iderp")
+    return JsonResponse({"categorias": list(categorias)})
+
 @csrf_exempt
 def actualizar_precio_masivo(request):
     if request.method == 'POST':
@@ -1123,6 +1127,7 @@ def crear_producto(request):
         profundidad = data.get("profundidad")
         peso = data.get("peso")
         alias = data.get("alias")
+        categoria_bs_id = data.get("categoriaBsale")
 
         # Validar que la marca exista en la base de datos
         marcas_existentes = [brand.name for brand in Brand.objects.all()]
@@ -1149,7 +1154,8 @@ def crear_producto(request):
             "height": alto,
             "width": largo,
             "depth": profundidad,
-            "weight": peso
+            "weight": peso,
+            "productTypeId": categoria_bs_id,  
         }
 
         headers = {
@@ -2155,10 +2161,10 @@ def reingresar_producto(request):
         if not superid or cantidad <= 0:
             return JsonResponse({'error': 'Datos inválidos.'}, status=400)
 
-        # Validar producto en zona DESP
-        unique_product = Uniqueproducts.objects.filter(superid=superid, locationname="Despachado").select_related('product').first()
+        # Validar producto con estado específico (por ejemplo, estado 3 para "Despachado")
+        unique_product = Uniqueproducts.objects.filter(superid=superid, state=3).select_related('product').first()
         if not unique_product:
-            return JsonResponse({'error': 'Producto no encontrado en la zona Despachados.'}, status=404)
+            return JsonResponse({'error': 'Producto no encontrado o no está en estado válido para reingreso.'}, status=404)
 
         producto = unique_product.product
 
@@ -2182,7 +2188,7 @@ def reingresar_producto(request):
 
             # Actualizar el producto en el sistema
             unique_product.locationname = "ALMACEN"
-            unique_product.state = 0
+            unique_product.state = 0  # Cambiar el estado a "Disponible" o el equivalente
             unique_product.observation = "Re ingreso de stock"
             unique_product.reingreso_document_number = correlativo
             unique_product.save()
@@ -4417,3 +4423,108 @@ def bulk_upload_products(request):
     except Exception as e:
         print(f"Error durante la carga: {e}")
         return JsonResponse({"status": "error", "message": str(e)})
+    
+def obtener_tipos_productos_y_guardar(request):
+    try:
+        Categoryserp.objects.all().delete()
+        # Headers para la autenticación
+        headers = {
+            'access_token': BSALE_API_TOKEN,
+            'Accept': 'application/json'
+        }
+
+        # Variables para almacenar resultados
+        resultados = []
+        url = "https://api.bsale.io/v1/product_types.json?state=0"
+
+        # Iterar sobre todas las páginas
+        while url:
+            response = requests.get(url, headers=headers)
+            if response.status_code != 200:
+                return JsonResponse({
+                    'error': f'Error en la solicitud a Bsale. Código: {response.status_code}',
+                    'detalle': response.json()
+                }, status=response.status_code)
+
+            data = response.json()
+
+            # Extraer los nombres e ids de los elementos
+            for item in data.get('items', []):
+                id_erp = item['id']
+                name_category = item['name']
+
+                # Agregar a la lista de resultados
+                resultados.append({
+                    'id': id_erp,
+                    'name': name_category
+                })
+
+                # Guardar o actualizar en el modelo Categoryserp
+                Categoryserp.objects.update_or_create(
+                    iderp=id_erp,
+                    defaults={'namecategory': name_category}
+                )
+
+            # Obtener la URL de la siguiente página
+            url = data.get('next')
+
+        return JsonResponse({'productos': resultados})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+# def obtener_tipos_productos_incremental(request):
+#     try:
+#         # Eliminar todas las categorías existentes en Categoryserp
+#         Categoryserp.objects.all().delete()
+
+#         # Headers para la autenticación
+#         headers = {
+#             'access_token': BSALE_API_TOKEN,
+#             'Accept': 'application/json'
+#         }
+
+#         # Variables para almacenar resultados
+#         resultados = []
+#         id_actual = 1  # ID inicial
+
+#         while True:
+#             url = f"https://api.bsale.io/v1/product_types/{id_actual}.json"
+#             response = requests.get(url, headers=headers)
+
+#             if response.status_code == 404:
+#                 # Si se encuentra un 404, salimos del bucle
+#                 break
+#             elif response.status_code != 200:
+#                 # Si hay otro error, retornamos un mensaje de error
+#                 return JsonResponse({
+#                     'error': f'Error en la solicitud a Bsale. Código: {response.status_code}',
+#                     'detalle': response.json()
+#                 }, status=response.status_code)
+
+#             data = response.json()
+
+#             # Extraer los datos necesarios
+#             id_erp = data['id']
+#             name_category = data['name']
+
+#             # Agregar a la lista de resultados
+#             resultados.append({
+#                 'id': id_erp,
+#                 'name': name_category
+#             })
+
+#             # Guardar en el modelo Categoryserp
+#             Categoryserp.objects.create(
+#                 iderp=id_erp,
+#                 namecategory=name_category
+#             )
+
+#             # Incrementar el ID para la siguiente solicitud
+#             id_actual += 1
+
+#         return JsonResponse({'categorias': resultados})
+
+#     except Exception as e:
+#         return JsonResponse({'error': str(e)}, status=500)
+    
