@@ -139,15 +139,17 @@
                 <tr>
                     <th>SuperID</th>
                     <th>SKU</th>
-                    <th>Descripción</th>
+                    <th>Nombre</th>
+                    <th>Cantidad Escaneada / Total</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="(product, index) in products" :key="index">
-                    <td>[[ product.superid ]]</td>
+                <tr v-for="(product, index) in products" :key="index" :class="getProductRowClass(product)">
+                    <td>[[ product.superid || 'Pendiente' ]]</td>
                     <td>[[ product.code ]]</td>
-                    <td>[[ product.description ]]</td>
+                    <td>[[ product.name ]]</td>
+                    <td>[[ product.quantityScanned ]] / [[ product.quantity ]]</td>
                     <td>
                         <button type="button" class="btn btn-danger btn-sm" @click="removeProduct(index)">Eliminar</button>
                     </td>
@@ -246,11 +248,11 @@
                 }).then(response => {
                     this.products = response.data.map(product => ({
                         code: product.code,
-                        description: product.description,
+                        name: product.name,         // Usar el nombre en lugar de la descripción
+                        description: product.description, // Opcional, si decides mantenerlo
                         totalAmount: product.totalAmount,
-                        quantity: product.quantity,
-                        count: 0,
-                        name: product.name,
+                        quantity: product.quantity, // Cantidad esperada
+                        quantityScanned: 0,         // Cantidad escaneada inicial
                         superid: null
                     }));
                 }).catch(error => {
@@ -267,18 +269,31 @@
                 }
             },
             async validateAndLinkSuperid(isInternal = false) {
-                // Prevenir duplicados o procesar si está vacío
                 if (!this.sid || this.isProcessing) return;
 
                 const superidToValidate = this.sid.trim();
+
+                // Verificar si ya fue escaneado
+                if (this.products.some(p => p.superid === superidToValidate)) {
+                    Swal.fire('Error', `El SuperID ${superidToValidate} ya fue escaneado.`, 'error');
+                    this.playSound('errorSound');
+                    this.sid = ''; // Limpiar el input
+                    return;
+                }
+
                 this.processingQueue.push(superidToValidate); // Agregar a la cola
                 this.sid = ''; // Limpiar el input inmediatamente
                 this.$nextTick(() => document.getElementById('sidProduct').focus()); // Enfocar nuevamente
 
-                // Si no hay un proceso activo, iniciar el procesamiento de la cola
                 if (!this.isProcessing) {
-                    this.processQueue(isInternal);
+                    this.processQueue(isInternal); // Iniciar procesamiento si no hay otro activo
                 }
+            },
+            getProductRowClass(product) {
+                if (product.quantityScanned === product.quantity) {
+                    return 'table-success'; // Verde para completado
+                }
+                return 'table-danger'; // Rojo para incompleto
             },
 
             async processQueue(isInternal) {
@@ -290,30 +305,52 @@
                 this.isProcessing = true; // Marcar como en proceso
                 const superidToProcess = this.processingQueue.shift(); // Extraer el primer SuperID de la cola
 
+                // Verificar si el SuperID ya fue procesado
+                if (this.products.some(p => p.superid === superidToProcess)) {
+                    Swal.fire('Error', `El SuperID ${superidToProcess} ya fue escaneado.`, 'error');
+                    this.playSound('errorSound');
+                    this.processQueue(isInternal); // Continuar con el siguiente
+                    return;
+                }
+
                 try {
                     const response = await axios.post('/api/validate-superid/', { sid: superidToProcess });
 
                     if (response.data.icon === 'success') {
-                        const product = {
-                            superid: superidToProcess,
-                            code: response.data.sku,
-                            description: response.data.description
-                        };
+                        const product = this.products.find(p => p.code === response.data.sku);
 
-                        // Llamar a la función de despacho
-                        await this.dispatchConsumption(product, isInternal);
-                        this.playSound('successSound'); // Sonido de éxito
+                        if (product) {
+                            // Validar cantidad
+                            if (product.quantityScanned < product.quantity) {
+                                // Realizar el descuento en Bsale
+                                await axios.post('/api/dispatch-consumption/', {
+                                    superid: superidToProcess,
+                                    company: this.company,
+                                    documentType: this.typeDocument,
+                                    documentNumber: this.nDocument,
+                                });
+
+                                // Actualizar la cantidad escaneada y SuperID
+                                product.quantityScanned++;
+                                product.superid = superidToProcess;
+                                this.playSound('successSound');
+                            } else {
+                                Swal.fire('Error', `Cantidad escaneada excedida para el producto ${product.name}.`, 'error');
+                                this.playSound('errorSound');
+                            }
+                        } else {
+                            Swal.fire('Error', 'Producto no encontrado para el SuperID.', 'error');
+                            this.playSound('errorSound');
+                        }
                     } else {
-                        // Manejar errores específicos
                         Swal.fire('Error', response.data.title, response.data.icon);
-                        this.playSound('errorSound'); // Sonido de error
+                        this.playSound('errorSound');
                     }
                 } catch (error) {
                     this.playSound('errorSound');
                     console.error('Error al procesar SuperID:', error);
                 } finally {
-                    // Procesar el siguiente SuperID en la cola
-                    this.processQueue(isInternal);
+                    this.processQueue(isInternal); // Procesar el siguiente SuperID en la cola
                 }
             },
 
