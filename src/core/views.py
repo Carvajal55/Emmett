@@ -362,15 +362,30 @@ def buscar_productosAPI(request):
     if not query:
         return JsonResponse({'products': [], 'total_pages': 1, 'current_page': 1}, status=200)
 
+    # Bodegas válidas y sus nombres
     bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1]
+    bodega_mapping = {bodega.idoffice: bodega.name for bodega in Bodega.objects.filter(idoffice__in=bodegas_validas_ids)}
+
     sector_mapping = get_sector_mapping(bodegas_validas_ids)
-    bodega_mapping = get_bodega_mapping(bodegas_validas_ids)
 
     # Buscar por superid
     unique_product = Uniqueproducts.objects.filter(superid=query).select_related('product').first()
     if unique_product and unique_product.product:
         product = unique_product.product
-        stock_total, unique_products_data = calculate_stock(product, sector_mapping)
+
+        # Consultar Sectoroffice relacionado con el campo 'location'
+        sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
+        sector_info = {
+            'sector': sector.namesector if sector else 'Sin información',
+            'bodega': bodega_mapping.get(sector.idoffice, 'Sin información') if sector else 'Sin información',
+            'description': sector.description if sector else 'Sin información',
+        }
+
+        # Calcular el stock total incluyendo productos sin ubicación
+        stock_total = Uniqueproducts.objects.filter(
+            Q(product=product) & (Q(location=None) | Q(location__in=sector_mapping.keys()))
+        ).count()
+
         return JsonResponse({
             'products': [{
                 'id': product.id,
@@ -378,7 +393,8 @@ def buscar_productosAPI(request):
                 'name': product.nameproduct,
                 'price': product.lastprice or 0,
                 'stock_total': stock_total,
-                'unique_products': unique_products_data,
+                'is_unique_product': True,
+                'location_info': sector_info,
             }],
             'total_pages': 1,
             'current_page': 1,
@@ -395,13 +411,18 @@ def buscar_productosAPI(request):
 
     productos_data = []
     for producto in productos_page:
-        stock_total, _ = calculate_stock(producto, sector_mapping)
+        # Calcular el stock total incluyendo productos sin ubicación
+        stock_total = Uniqueproducts.objects.filter(
+            Q(product=producto) & (Q(location=None) | Q(location__in=sector_mapping.keys()))
+        ).count()
+
         productos_data.append({
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice or 0,
             'stock_total': stock_total,
+            'is_unique_product': False,
         })
 
     return JsonResponse({
@@ -413,15 +434,16 @@ def buscar_productosAPI(request):
 
 def producto_detalles(request, product_id):
     try:
-        # Cargar producto con productos únicos prefiltrados
+        # Excluir sectores no válidos
         excluded_sector_ids = Sectoroffice.objects.filter(
             Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
         ).values_list('idsectoroffice', flat=True)
 
+        # Obtener el producto y sus Uniqueproducts
         producto = Products.objects.prefetch_related(
             Prefetch(
                 'unique_products',
-                queryset=Uniqueproducts.objects.exclude(location__in=excluded_sector_ids).only('location', 'superid')
+                queryset=Uniqueproducts.objects.only('location', 'superid')
             )
         ).only('id', 'sku', 'nameproduct', 'lastprice').get(id=product_id)
 
@@ -442,21 +464,36 @@ def producto_detalles(request, product_id):
             sector_mapping = {s['idsectoroffice']: s for s in sectores}
             cache.set('sector_mapping', sector_mapping, timeout=300)
 
-        # Calcular stock total y productos únicos
-        bodegas_stock = {bodega_id: 0 for bodega_id in bodega_ids_included}
+        # Inicializar el recuento de bodegas y datos de productos únicos
+        bodegas_stock = {bodega_mapping[bodega_id]: 0 for bodega_id in bodega_ids_included}
+        bodegas_stock['Sin ubicación'] = 0
         unique_products_data = []
 
+        # Recorrer todos los productos únicos
         for unique_product in producto.unique_products.all():
-            sector = sector_mapping.get(unique_product.location)
-            if sector:  # sector ahora es un diccionario
-                bodega_name = bodega_mapping.get(sector['idoffice'])
-                if bodega_name:  # Excluir bodegas desconocidas
-                    bodegas_stock[sector['idoffice']] += 1
-                    unique_products_data.append({
-                        'superid': unique_product.superid,
-                        'locationname': sector['namesector'],
-                        'bodega': bodega_name,
-                    })
+            location = unique_product.location
+            if location is not None:
+                sector = sector_mapping.get(location)
+                bodega_name = bodega_mapping.get(sector['idoffice']) if sector else 'Sin información'
+                sector_name = sector['namesector'] if sector else 'Sin ubicación'
+            else:
+                bodega_name = 'Sin ubicación'
+                sector_name = 'Sin ubicación'
+
+            # Incrementar el stock solo una vez
+            if bodega_name in bodegas_stock:
+                bodegas_stock[bodega_name] += 1
+
+            # Evitar duplicados en la lista de productos únicos
+            if unique_product.superid not in [up['superid'] for up in unique_products_data]:
+                unique_products_data.append({
+                    'superid': unique_product.superid,
+                    'locationname': sector_name,
+                    'bodega': bodega_name,
+                })
+
+        # Calcular el stock total con base en los productos únicos encontrados
+        stock_total = sum(bodegas_stock.values())
 
         # Respuesta JSON optimizada
         response_data = {
@@ -464,8 +501,8 @@ def producto_detalles(request, product_id):
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice or 0,
-            'stock_total': sum(bodegas_stock.values()),
-            'bodegas': {bodega_mapping[bodega_id]: stock for bodega_id, stock in bodegas_stock.items()},
+            'stock_total': stock_total,
+            'bodegas': bodegas_stock,
             'unique_products': unique_products_data,
         }
 
@@ -1998,6 +2035,10 @@ def cuadrar_productos(request):
                                 'name': producto.product.nameproduct if producto.product else None
                             })
                     
+                    # Enviar correo si hay productos movidos
+                    if productos_movidos:
+                        enviar_correo_a_narnia(productos_movidos, sector)
+
                     return JsonResponse({
                         'resp': 1,
                         'msg': 'Productos movidos exitosamente a Narnia.',
@@ -2023,9 +2064,12 @@ def get_narnia_id():
 
 # Función para enviar el correo con los productos enviados a Narnia
 def enviar_correo_a_narnia(productos, sector):
-    lista_productos = "\n".join([f"Super ID: {p.superid}, Nombre: {p.product.nameproduct}, SKU: {p.product.sku}" for p in productos])
+    """
+    Envía un correo notificando los productos movidos a Narnia.
+    """
+    lista_productos = "\n".join([f"Super ID: {p['superid']}, Nombre: {p['name']}, SKU: {p['sku']}" for p in productos])
     fecha_actual = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
-    
+
     subject = f"Productos enviados a Narnia desde el sector {sector.namesector}"
     message = f"Fecha: {fecha_actual}\n\nProductos enviados a Narnia:\n\n{lista_productos}"
 
@@ -2033,8 +2077,7 @@ def enviar_correo_a_narnia(productos, sector):
         subject,
         message,
         settings.DEFAULT_FROM_EMAIL,
-        #['pfarias@emmett.cl'],  # Cambia por el correo destino
-        ['erp@emmett.cl'],
+        ['pfarias@emmett.cl'],  # Correo destinatario
         fail_silently=False,
     )
 
@@ -2162,7 +2205,7 @@ def reingresar_producto(request):
             return JsonResponse({'error': 'Datos inválidos.'}, status=400)
 
         # Validar producto con estado específico (por ejemplo, estado 3 para "Despachado")
-        unique_product = Uniqueproducts.objects.filter(superid=superid, state=3).select_related('product').first()
+        unique_product = Uniqueproducts.objects.filter(superid=superid, state=1).select_related('product').first()
         if not unique_product:
             return JsonResponse({'error': 'Producto no encontrado o no está en estado válido para reingreso.'}, status=404)
 

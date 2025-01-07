@@ -15,37 +15,40 @@
             <div v-if="alertMessage" :class="alertClass" class="alert" role="alert">[[ alertMessage ]]</div>
             <h5>Productos Reingresados</h5>
             <div class="table-responsive">
-                <table class="table table-striped table-bordered">
+                <table class="table table-striped table-bordered mb-0" v-if="!isLoading">
                     <thead class="thead-dark">
                         <tr>
-                            <th scope="col">
-                                <input type="checkbox" @change="toggleSelectAll" v-model="selectAll">
-                            </th>
                             <th scope="col">#</th>
-                            <th scope="col">SuperID</th>
                             <th scope="col">SKU</th>
                             <th scope="col">Nombre</th>
-                            <th scope="col">Ubicación</th>
-                            <th scope="col">Fecha</th>
+                            <th scope="col">Stock Total</th>
+                            <th scope="col">Precio</th>
+                            <th scope="col">Ubicación</th> <!-- Nueva columna -->
+                            <th scope="col">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <template v-if="productos.length > 0">
-                            <tr v-for="(producto, index) in productos" :key="index">
-                                <td>
-                                    <input type="checkbox" v-model="selectedProducts" :value="producto.superid">
-                                </td>
+                        <template v-if="products.length > 0">
+                            <tr v-for="(product, index) in products" :key="product.id">
                                 <td>[[ index + 1 ]]</td>
-                                <td>[[ producto.superid ]]</td>
-                                <td>[[ producto.sku ]]</td>
-                                <td>[[ producto.name ]]</td>
-                                <td>[[ producto.location ]]</td>
-                                <td>[[ producto.dateadd ]]</td>
+                                <td>[[ product.sku ]]</td>
+                                <td>[[ product.name ]]</td>
+                                <td>[[ product.stock_total ]]</td>
+                                <td>[[ product.price ]]</td>
+                                <td v-if="product.is_unique_product">
+                                    <p><strong>Sector:</strong> [[ product.location_info.sector ]]</p>
+                                    <p><strong>Bodega:</strong> [[ product.location_info.bodega ]]</p>
+                                    <p><strong>Descripción:</strong> [[ product.location_info.description ]]</p>
+                                </td>
+                                <td v-else>-</td> <!-- Si no es Uniqueproduct, mostrar "-" -->
+                                <td>
+                                    <button class="btn btn-primary" @click="verDetallesProducto(product.id)">Ver Detalles</button>
+                                </td>
                             </tr>
                         </template>
                         <template v-else>
                             <tr>
-                                <td colspan="7" class="text-center">No hay productos reingresados.</td>
+                                <td colspan="7" class="text-center">No se encontraron resultados para la búsqueda.</td>
                             </tr>
                         </template>
                     </tbody>

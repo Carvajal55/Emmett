@@ -32,6 +32,7 @@
                                 <th scope="col">Nombre</th>
                                 <th scope="col">Stock Total</th>
                                 <th scope="col">Precio</th>
+                                <th scope="col">Ubicación</th> <!-- Nueva columna -->
                                 <th scope="col">Acciones</th>
                             </tr>
                         </thead>
@@ -43,6 +44,11 @@
                                     <td>[[ product.name ]]</td>
                                     <td>[[ product.stock_total ]]</td>
                                     <td>[[ product.price ]]</td>
+                                    <td v-if="product.is_unique_product">
+                                        <p><strong>Sector:</strong> [[ product.location_info.sector ]]</p>
+                                        <p><strong>Bodega:</strong> [[ product.location_info.bodega ]]</p>
+                                    </td>
+                                    <td v-else>-</td> <!-- Mostrar "-" si no es un Uniqueproduct -->
                                     <td>
                                         <button class="btn btn-primary" @click="verDetallesProducto(product.id)">Ver Detalles</button>
                                     </td>
@@ -50,7 +56,7 @@
                             </template>
                             <template v-else>
                                 <tr>
-                                    <td colspan="6" class="text-center">No se encontraron resultados para la búsqueda.</td>
+                                    <td colspan="7" class="text-center">No se encontraron resultados para la búsqueda.</td>
                                 </tr>
                             </template>
                         </tbody>
