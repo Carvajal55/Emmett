@@ -3055,7 +3055,7 @@ def imprimir_etiqueta_qr(request):
                     printlabel=os.path.join(settings.MEDIA_URL, relative_file_path),
                     iddocumentincome=number,
                     dateadd=date.today(),
-                    location=100000  # ID de la ubicación de Almacén
+                    location=100018  # ID de la ubicación de Almacén
                 )
 
                 current_correlative += 1
