@@ -149,6 +149,8 @@
                         this.totalProductosAgregados = 0; // Reiniciar el contador
                     } else {
                         if (this.sectorSeleccionado) {
+                            this.inputValue = '';
+
                             this.playSound('error');
                             this.mostrarAlerta('Ya hay un sector abierto. Cierra el sector actual antes de abrir uno nuevo.', 'alert-danger');
                             return;
