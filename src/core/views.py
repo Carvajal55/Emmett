@@ -363,7 +363,7 @@ def buscar_productosAPI(request):
         return JsonResponse({'products': [], 'total_pages': 1, 'current_page': 1}, status=200)
 
     # Bodegas válidas y sus nombres
-    bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1]
+    bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1,11]
     bodega_mapping = {bodega.idoffice: bodega.name for bodega in Bodega.objects.filter(idoffice__in=bodegas_validas_ids)}
 
     sector_mapping = get_sector_mapping(bodegas_validas_ids)
@@ -383,7 +383,7 @@ def buscar_productosAPI(request):
 
         # Calcular el stock total incluyendo productos sin ubicación
         stock_total = Uniqueproducts.objects.filter(
-            Q(product=product) & (Q(location=None) | Q(location__in=sector_mapping.keys()))
+            Q(product=product) & ( Q(location__in=sector_mapping.keys()))
         ).count()
 
         return JsonResponse({
@@ -413,7 +413,7 @@ def buscar_productosAPI(request):
     for producto in productos_page:
         # Calcular el stock total incluyendo productos sin ubicación
         stock_total = Uniqueproducts.objects.filter(
-            Q(product=producto) & (Q(location=None) | Q(location__in=sector_mapping.keys()))
+            Q(product=producto) & (Q(location__in=sector_mapping.keys()))
         ).count()
 
         productos_data.append({
@@ -439,16 +439,16 @@ def producto_detalles(request, product_id):
             Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
         ).values_list('idsectoroffice', flat=True)
 
-        # Obtener el producto y sus Uniqueproducts
+        # Obtener el producto y sus Uniqueproducts con estado 0
         producto = Products.objects.prefetch_related(
             Prefetch(
                 'unique_products',
-                queryset=Uniqueproducts.objects.only('location', 'superid')
+                queryset=Uniqueproducts.objects.filter(state=0).only('location', 'superid')
             )
         ).only('id', 'sku', 'nameproduct', 'lastprice').get(id=product_id)
 
         # Cargar bodegas válidas
-        bodega_ids_included = [1, 2, 4, 6, 9, 10]
+        bodega_ids_included = [1, 2, 4, 6, 9, 10, 11]
         bodega_mapping = cache.get('bodega_mapping')
         if not bodega_mapping:
             bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included).only('idoffice', 'name')
@@ -466,7 +466,6 @@ def producto_detalles(request, product_id):
 
         # Inicializar el recuento de bodegas y datos de productos únicos
         bodegas_stock = {bodega_mapping[bodega_id]: 0 for bodega_id in bodega_ids_included}
-        bodegas_stock['Sin ubicación'] = 0
         unique_products_data = []
 
         # Recorrer todos los productos únicos
@@ -474,23 +473,20 @@ def producto_detalles(request, product_id):
             location = unique_product.location
             if location is not None:
                 sector = sector_mapping.get(location)
-                bodega_name = bodega_mapping.get(sector['idoffice']) if sector else 'Sin información'
-                sector_name = sector['namesector'] if sector else 'Sin ubicación'
-            else:
-                bodega_name = 'Sin ubicación'
-                sector_name = 'Sin ubicación'
+                if sector and sector['idoffice'] in bodega_ids_included:  # Verificar bodega válida
+                    bodega_name = bodega_mapping.get(sector['idoffice'], 'Sin información')
+                    sector_name = sector['namesector']
+                    
+                    # Incrementar el stock para la bodega correspondiente
+                    if bodega_name in bodegas_stock:
+                        bodegas_stock[bodega_name] += 1
 
-            # Incrementar el stock solo una vez
-            if bodega_name in bodegas_stock:
-                bodegas_stock[bodega_name] += 1
-
-            # Evitar duplicados en la lista de productos únicos
-            if unique_product.superid not in [up['superid'] for up in unique_products_data]:
-                unique_products_data.append({
-                    'superid': unique_product.superid,
-                    'locationname': sector_name,
-                    'bodega': bodega_name,
-                })
+                    # Añadir producto a la lista de productos únicos
+                    unique_products_data.append({
+                        'superid': unique_product.superid,
+                        'locationname': sector_name,
+                        'bodega': bodega_name,
+                    })
 
         # Calcular el stock total con base en los productos únicos encontrados
         stock_total = sum(bodegas_stock.values())
@@ -3058,7 +3054,8 @@ def imprimir_etiqueta_qr(request):
                     observation="Etiqueta generada automáticamente",
                     printlabel=os.path.join(settings.MEDIA_URL, relative_file_path),
                     iddocumentincome=number,
-                    dateadd=date.today()
+                    dateadd=date.today(),
+                    location=100000  # ID de la ubicación de Almacén
                 )
 
                 current_correlative += 1
