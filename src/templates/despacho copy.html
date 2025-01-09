@@ -196,42 +196,27 @@
                 this.sid = ''; // Limpiar el input
 
                 try {
-                    const response = await axios.post('/api/validate-superid/', {
-                        sid: superidToValidate,
-                        document_products: this.products.map(p => p.code) // Enviar los SKUs del documento
+                    console.log('Enviando SuperID al backend:', superidToValidate);
+
+                    const response = await axios.post('/api/dispatch-consumption/', {
+                        superid: superidToValidate,
+                        company: this.company,
+                        documentType: this.typeDocument,
+                        documentNumber: this.nDocument
                     });
 
+                    console.log('Respuesta del backend:', response.data);
+
                     if (response.data.icon === 'success') {
-                        const product = this.products.find(p => p.code === response.data.sku);
-
-                        if (product) {
-                            if (product.quantityScanned < product.quantity) {
-                                product.quantityScanned++; // Incrementar la cantidad escaneada
-                                product.superid = superidToValidate; // Asignar el SuperID
-
-                                this.playSound('successSound');
-
-                                // Agregar el SuperID a la cola
-                                this.processingQueue.push(superidToValidate);
-
-                                // Ejecutar la cola si no está procesando
-                                if (!this.isProcessing) {
-                                    this.processQueue();
-                                }
-                            } else {
-                                this.playSound('errorSound');
-                            }
-                        } else {
-                            Swal.fire('Error', 'Producto no encontrado en la lista del documento.', 'error');
-                            this.playSound('errorSound');
-                        }
+                        Swal.fire('Éxito', response.data.title, 'success');
+                        this.playSound('successSound');
                     } else {
-                        Swal.fire('Error', response.data.error || 'Validación fallida.', 'error');
+                        Swal.fire('Error', response.data.title, 'error');
                         this.playSound('errorSound');
                     }
                 } catch (error) {
-                    console.error('Error en la validación del SuperID:', error);
-                    Swal.fire('Error', 'No se pudo validar el SuperID.', 'error');
+                    console.error('Error al procesar SuperID:', error);
+                    Swal.fire('Error', 'Ocurrió un problema al despachar el producto.', 'error');
                     this.playSound('errorSound');
                 }
             },
@@ -242,54 +227,62 @@
                 return 'table-danger'; // Rojo para incompleto
             },
 
-            async processQueue() {
+            async processQueue(isInternal) {
                 if (this.processingQueue.length === 0) {
                     this.isProcessing = false;
-                    console.log('Cola de procesamiento vacía.');
                     return; // Nada que procesar
                 }
 
                 this.isProcessing = true; // Marcar como en proceso
-
                 const superidToProcess = this.processingQueue.shift(); // Extraer el primer SuperID de la cola
-                console.log('Procesando SuperID:', superidToProcess);
 
                 try {
-                    const payload = {
-                        nDocument: this.nDocument,
-                        typeDocument: this.typeDocument,
-                        company: this.company,
-                        products: [
-                            {
-                                superid: superidToProcess,
-                                quantity: 1 // Procesamos uno a la vez
-                            }
-                        ]
-                    };
+                    console.log('Procesando SuperID:', superidToProcess);
 
-                    console.log('Payload para despacho:', payload);
-
-                    const response = await axios.post('/api/dispatch-consumption/', payload);
+                    const response = await axios.post('/api/validate-superid/', { sid: superidToProcess });
+                    console.log('Respuesta de validación:', response.data);
 
                     if (response.data.icon === 'success') {
-                        this.playSound('successSound');
+                        const sku = response.data.sku.trim().toUpperCase();
+                        const product = this.products.find(p => p.code === sku);
 
-                        // Actualizar la tabla si es necesario
-                        const product = this.products.find(p => p.superid === superidToProcess);
                         if (product) {
-                            product.superid = null; // Limpiar el SuperID una vez despachado
+                            console.log('Producto encontrado antes de procesar:', product);
+
+                            if (product.quantityScanned < product.quantity) {
+                                product.quantityScanned++;
+                                product.superid = superidToProcess; // Asignar el SuperID escaneado
+                                console.log('Producto actualizado después de escaneo:', product);
+
+                                // Aquí se despacha el producto
+                                await axios.post('/api/dispatch-consumption/', {
+                                    superid: superidToProcess,
+                                    company: this.company,
+                                    documentType: this.typeDocument,
+                                    documentNumber: this.nDocument,
+                                });
+
+                                this.playSound('successSound');
+                            } else {
+                                console.log('Cantidad ya despachada para este producto:', product);
+                                Swal.fire('Error', `Cantidad escaneada excedida para el producto ${product.name}.`, 'error');
+                                this.playSound('errorSound');
+                            }
+                        } else {
+                            console.error('Producto con SKU no encontrado:', sku);
+                            Swal.fire('Error', `Producto con SKU ${sku} no encontrado en la lista de productos.`, 'error');
+                            this.playSound('errorSound');
                         }
                     } else {
-                        Swal.fire('Error', response.data.message || 'No se pudo despachar el producto.', 'error');
+                        Swal.fire('Error', response.data.title, response.data.icon);
                         this.playSound('errorSound');
                     }
                 } catch (error) {
-                    console.error('Error al despachar el SuperID:', error);
-                    Swal.fire('Error', 'Ocurrió un problema al despachar el producto.', 'error');
                     this.playSound('errorSound');
+                    console.error('Error al procesar SuperID:', error);
                 } finally {
-                    // Continuar con el siguiente SuperID en la cola
-                    this.processQueue();
+                    console.log('Finalizando procesamiento de SuperID:', superidToProcess);
+                    this.processQueue(isInternal);
                 }
             },
 

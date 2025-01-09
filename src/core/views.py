@@ -2230,7 +2230,13 @@ def reingresar_producto(request):
             unique_product.state = 0  # Cambiar el estado a "Disponible" o el equivalente
             unique_product.observation = "Re ingreso de stock"
             unique_product.reingreso_document_number = correlativo
+            unique_product.location =100000  # ID de la ubicación de Almacén cambiar a 100000 para local 100018 server
             unique_product.save()
+
+        # Manejar el valor de `dateadd` para evitar errores
+        dateadd_formatted = (
+            unique_product.dateadd.strftime('%d-%m-%Y') if unique_product.dateadd else "Fecha no disponible"
+        )
 
         return JsonResponse({
             'message': 'Producto reingresado con éxito.',
@@ -2240,7 +2246,7 @@ def reingresar_producto(request):
                 'name': producto.nameproduct,
                 'location': unique_product.locationname,
                 'state': unique_product.state,
-                'dateadd': unique_product.dateadd.strftime('%d-%m-%Y'),
+                'dateadd': dateadd_formatted,
             }
         })
 
@@ -2633,13 +2639,32 @@ def format_table(details):
 def dispatch_consumption(request):
     if request.method == "POST":
         try:
+            # Log para depurar los datos recibidos
+            print("Datos recibidos en la solicitud (raw body):", request.body)
+
+            # Parsear los datos
             data = json.loads(request.body)
+            print("Datos parseados (JSON):", data)
+
             n_document = data.get('nDocument', 0)
             type_document = data.get('typeDocument')
             company = data.get('company')
             products = data.get('products', [])
 
-            # Obtener o crear el sector "Despachados" (cacheado para evitar múltiples consultas)
+            # Log para valores individuales
+            print(f"nDocument: {n_document}, typeDocument: {type_document}, company: {company}")
+            print("Productos:", products)
+
+            # Verificar datos obligatorios
+            if not n_document or not type_document or not company or not products:
+                print("Error: Faltan datos obligatorios.")
+                return JsonResponse({
+                    'title': 'Datos incompletos',
+                    'icon': 'error',
+                    'message': 'Faltan datos obligatorios en la solicitud.'
+                }, status=400)
+
+            # Obtener o crear el sector "Despachados"
             sector_despachados = Sectoroffice.objects.get_or_create(
                 zone="DESP",
                 defaults={
@@ -2652,25 +2677,34 @@ def dispatch_consumption(request):
                 }
             )[0]
 
+            print("Sector 'Despachados':", sector_despachados)
+
             sector_despachados_id = sector_despachados.idsectoroffice
 
             # Usar una transacción para manejar las operaciones
             with transaction.atomic():
                 # Obtener todos los superIDs en un solo query
                 superids = [product.get('superid') for product in products]
+                print("SuperIDs recibidos:", superids)
+
                 unique_products = {
                     up.superid: up for up in Uniqueproducts.objects.filter(
                         superid__in=superids, state=0
                     ).select_related('product')
                 }
 
-                # Procesar productos en un solo lote
+                print("Productos únicos encontrados:", unique_products)
+
+                # Procesar productos
                 for product in products:
                     superid = product.get('superid')
                     cantidad = int(product.get('quantity', 1))
 
+                    print(f"Procesando SuperID: {superid}, Cantidad: {cantidad}")
+
                     unique_product = unique_products.get(superid)
                     if not unique_product:
+                        print(f"Error: SuperID {superid} no encontrado.")
                         return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'})
 
                     if unique_product.location is None:
@@ -2682,7 +2716,10 @@ def dispatch_consumption(request):
                         product=unique_product.product, state=0
                     ).count()
 
+                    print(f"Stock disponible para {unique_product.product.sku}: {stock_disponible}")
+
                     if stock_disponible < cantidad:
+                        print(f"Error: Stock insuficiente para {unique_product.product.sku}.")
                         return JsonResponse({
                             'title': f'Stock insuficiente para {unique_product.product.sku}',
                             'icon': 'error',
@@ -2697,10 +2734,14 @@ def dispatch_consumption(request):
                     }
                     headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
+                    print("Datos enviados a Bsale:", data_bsale)
+
                     # Hacer llamada a Bsale
                     response = requests.post(
                         "https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale
                     )
+
+                    print("Respuesta de Bsale:", response.status_code, response.text)
 
                     if response.status_code not in [200, 201]:
                         raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
@@ -2716,11 +2757,16 @@ def dispatch_consumption(request):
                     unique_product.locationname = "Despachado"
                     unique_product.save()
 
+                    print(f"Producto {superid} actualizado: {unique_product}")
+
+            print("Despacho completado con éxito.")
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
         except Exception as e:
+            print("Error durante el despacho:", str(e))
             return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
+    print("Método no permitido.")
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
 #BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
 
@@ -2906,46 +2952,25 @@ def validate_superid_cached(request):
 def validate_superid_simplified(request):
     if request.method == "POST":
         try:
-            # Parsear la solicitud JSON
             body = json.loads(request.body)
             sid = body.get('sid')
-            document_products = set(body.get('document_products', []))  # Convertir a conjunto para búsquedas rápidas
+            document_products = set(body.get('document_products', []))
 
-            # Validar datos de entrada
             if not sid:
                 return JsonResponse({'error': 'El SuperID es obligatorio'}, status=400)
 
-            # Optimizar la consulta de Uniqueproducts
             unique_product = Uniqueproducts.objects.filter(superid=sid).select_related('product').only('superid', 'product__sku').first()
-
             if not unique_product:
                 return JsonResponse({'error': 'SuperID no encontrado'}, status=404)
 
-            # Validar si el producto tiene un SKU asociado
             associated_sku = unique_product.product.sku if unique_product.product else None
             if not associated_sku:
                 return JsonResponse({'error': 'Producto asociado no tiene un SKU válido'}, status=400)
 
-            # Si no se proporcionan productos del documento, considerar "Consumo Interno"
-            if not document_products:
-                return JsonResponse({
-                    'row': 1,
-                    'title': 'SuperID validado para Consumo Interno',
-                    'icon': 'success',
-                    'sku': associated_sku
-                })
-
-            # Validar si el SKU está en los productos del documento
             if associated_sku not in document_products:
                 return JsonResponse({'error': 'El SKU asociado no coincide con los productos del documento'}, status=400)
 
-            # Respuesta exitosa
-            return JsonResponse({
-                'row': 1,
-                'title': 'SuperID y SKU validados correctamente',
-                'icon': 'success',
-                'sku': associated_sku
-            })
+            return JsonResponse({'title': 'SuperID validado correctamente', 'icon': 'success', 'sku': associated_sku})
 
         except Exception as e:
             return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
@@ -3055,7 +3080,7 @@ def imprimir_etiqueta_qr(request):
                     printlabel=os.path.join(settings.MEDIA_URL, relative_file_path),
                     iddocumentincome=number,
                     dateadd=date.today(),
-                    location=100018  # ID de la ubicación de Almacén
+                    location=100018  # ID de la ubicación de Almacén cambiar a 100000 para local
                 )
 
                 current_correlative += 1
