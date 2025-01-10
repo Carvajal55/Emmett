@@ -4136,64 +4136,64 @@ def backup_unique_products_view(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)})
     
-@csrf_exempt
-def restore_unique_products_view(request):
-    try:
-        if request.method != 'POST':
-            return JsonResponse({"status": "error", "message": "Método no permitido."})
+# @csrf_exempt
+# def restore_unique_products_view(request):
+#     try:
+#         if request.method != 'POST':
+#             return JsonResponse({"status": "error", "message": "Método no permitido."})
 
-        # Obtener el archivo cargado desde el request
-        uploaded_file = request.FILES.get('file')
-        if not uploaded_file:
-            return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
+#         # Obtener el archivo cargado desde el request
+#         uploaded_file = request.FILES.get('file')
+#         if not uploaded_file:
+#             return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
 
-        # Leer el contenido del archivo y cargarlo como JSON
-        print("Leyendo el archivo de respaldo...")
-        file_data = uploaded_file.read().decode('utf-8')
-        unique_products = json.loads(file_data)
-        print(f"Archivo leído correctamente. Total de registros: {len(unique_products)}")
+#         # Leer el contenido del archivo y cargarlo como JSON
+#         print("Leyendo el archivo de respaldo...")
+#         file_data = uploaded_file.read().decode('utf-8')
+#         unique_products = json.loads(file_data)
+#         print(f"Archivo leído correctamente. Total de registros: {len(unique_products)}")
 
-        # Eliminar registros actuales
-        print("Eliminando registros existentes...")
-        Uniqueproducts.objects.all().delete()
-        print("Registros eliminados correctamente.")
+#         # Eliminar registros actuales
+#         print("Eliminando registros existentes...")
+#         Uniqueproducts.objects.all().delete()
+#         print("Registros eliminados correctamente.")
 
-        # Procesar e insertar registros en lotes
-        restored_products = []
-        missing_products = []  # Almacenar los IDs de productos faltantes
-        BATCH_SIZE = 5000  # Tamaño del lote para inserción
+#         # Procesar e insertar registros en lotes
+#         restored_products = []
+#         missing_products = []  # Almacenar los IDs de productos faltantes
+#         BATCH_SIZE = 5000  # Tamaño del lote para inserción
 
-        print("Iniciando la restauración de registros...")
-        for index, record in enumerate(tqdm(unique_products, desc="Procesando registros", unit="registro")):
-            product_id = record.pop("product_id")
+#         print("Iniciando la restauración de registros...")
+#         for index, record in enumerate(tqdm(unique_products, desc="Procesando registros", unit="registro")):
+#             product_id = record.pop("product_id")
 
-            try:
-                product = Products.objects.get(id=product_id)  # Buscar producto relacionado
-                restored_products.append(Uniqueproducts(product=product, **record))
-            except Products.DoesNotExist:
-                missing_products.append(product_id)  # Registrar producto faltante
+#             try:
+#                 product = Products.objects.get(id=product_id)  # Buscar producto relacionado
+#                 restored_products.append(Uniqueproducts(product=product, **record))
+#             except Products.DoesNotExist:
+#                 missing_products.append(product_id)  # Registrar producto faltante
 
-            # Insertar en la base de datos cada BATCH_SIZE registros
-            if len(restored_products) >= BATCH_SIZE:
-                Uniqueproducts.objects.bulk_create(restored_products)
-                restored_products = []  # Reiniciar la lista
-                print(f"Lote de {BATCH_SIZE} registros insertado...")
+#             # Insertar en la base de datos cada BATCH_SIZE registros
+#             if len(restored_products) >= BATCH_SIZE:
+#                 Uniqueproducts.objects.bulk_create(restored_products)
+#                 restored_products = []  # Reiniciar la lista
+#                 print(f"Lote de {BATCH_SIZE} registros insertado...")
 
-        # Insertar los registros restantes
-        if restored_products:
-            Uniqueproducts.objects.bulk_create(restored_products)
-            print(f"Último lote de {len(restored_products)} registros insertado.")
+#         # Insertar los registros restantes
+#         if restored_products:
+#             Uniqueproducts.objects.bulk_create(restored_products)
+#             print(f"Último lote de {len(restored_products)} registros insertado.")
 
-        print("Restauración completada.")
-        return JsonResponse({
-            "status": "success",
-            "message": f"Se han restaurado los registros correctamente.",
-            "missing_products": missing_products
-        })
+#         print("Restauración completada.")
+#         return JsonResponse({
+#             "status": "success",
+#             "message": f"Se han restaurado los registros correctamente.",
+#             "missing_products": missing_products
+#         })
 
-    except Exception as e:
-        print(f"Error durante la restauración: {e}")
-        return JsonResponse({"status": "error", "message": str(e)})
+#     except Exception as e:
+#         print(f"Error durante la restauración: {e}")
+#         return JsonResponse({"status": "error", "message": str(e)})
 
 def normalize_keys(data):
     """Convierte las claves de un diccionario o lista de diccionarios a minúsculas."""
@@ -4235,7 +4235,7 @@ def restore_unique_products_view(request):
         # Procesar e insertar registros en lotes
         restored_products = []
         missing_products = []  # Almacenar los SKUs de productos faltantes
-        BATCH_SIZE = 100  # Tamaño del lote para inserción
+        BATCH_SIZE = 500  # Tamaño del lote para inserción
 
         print("Iniciando la restauración de registros...")
         for record in tqdm(unique_products, desc="Restaurando registros", unit="registro"):
