@@ -45,35 +45,60 @@
     </div>
    <!-- Modal -->
    <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog" aria-labelledby="modalPreciosLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalPreciosLabel">Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div v-for="(precio, index) in listasPrecios" :key="index" class="form-group">
-                    <label :for="'precio-' + precio.id">[[ precio.label ]]</label>
-                    <input
-                        type="number"
-                        class="form-control"
-                        v-model="precio.valor"
-                        @input="recalcularMargen(precio)"
-                        :id="'precio-' + precio.id"
-                        placeholder="Ingrese precio"
-                    />
-                    <p><strong>Margen:</strong> [[ precio.margen || 0 ]]%</p>
-                    <button class="btn btn-primary mt-2" @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)">
-                        Guardar para [[ precio.label ]]
+        <div class="modal-dialog" style="max-width: 90%; width: 90%;" role="document"> <!-- Modal más ancho -->
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalPreciosLabel" style="font-size: 1.5rem; font-weight: bold;">
+                        Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="padding: 20px;">
+                    <div class="row">
+                        <div v-for="(precio, index) in listasPrecios" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
+                            <div class="form-group" style="margin-bottom: 15px;">
+                                <label :for="'precio-' + precio.id" style="font-weight: bold; margin-bottom: 5px; display: block;">
+                                    [[ precio.label ]] 
+                                    <span style="font-size: 0.9rem; color: gray;">(Despacho: [[ precio.despacho || 0 ]] CLP)</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    class="form-control"
+                                    v-model="precio.valor"
+                                    @input="recalcularMargen(precio)"
+                                    :id="'precio-' + precio.id"
+                                    placeholder="Ingrese precio"
+                                    style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 5px;"
+                                />
+                                <p style="margin-top: 10px; font-size: 1rem;">
+                                    <strong>Margen:</strong> [[ precio.margen || 0 ]]%
+                                </p>
+                                <button
+                                    class="btn mt-2"
+                                    @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)"
+                                    :style="getButtonStyle(precio.label)"
+                                >
+                                    Guardar para [[ precio.label ]]
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid #dee2e6; padding: 15px;">
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal"
+                        style="padding: 10px 20px; font-size: 1rem;"
+                    >
+                        Cerrar
                     </button>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-            </div>
         </div>
     </div>
-</div>
+
+
 
     <!-- Detalles de la factura -->
     <table v-if="detalles.length > 0" class="table table-striped">
@@ -167,9 +192,12 @@
             errorMsg: '',    // Mensaje de error
             idFactura: null,
             listasPrecios: [
-                { label: 'Falabella', id: 11, valor: null, margen: null }, // Lista para Falabella
-                { label: 'Líder', id: 14, valor: null, margen: null }      // Lista para Líder
-            ], // ID de la factura guardado
+                { label: 'MercadoLibre', id: 1, valor: null, margen: null, comision: 0.2, despacho: 4990, quienPagaDespacho: 'nosotros' },
+                { label: 'Falabella', id: 11, valor: null, margen: null, comision: 0.15, despacho: 0, quienPagaDespacho: 'cliente' },
+                { label: 'Paris', id: 12, valor: null, margen: null, comision: 0.14, despacho: 0, quienPagaDespacho: 'cliente' },
+                { label: 'Ripley', id: 13, valor: null, margen: null, comision: 0.15, despacho: 0, quienPagaDespacho: 'cliente' },
+                { label: 'Walmart', id: 14, valor: null, margen: null, comision: 0.14, despacho: 0, quienPagaDespacho: 'cliente' }
+            ],
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
             stockProductos: {}
@@ -187,6 +215,22 @@
             
         },
         methods: {
+            getButtonStyle(label) {
+                switch (label) {
+                    case 'MercadoLibre':
+                        return 'background-color: #ffdd00; color: black; width: 100%;';
+                    case 'Paris':
+                        return 'background-color: #0056b3; color: white; width: 100%;';
+                    case 'Falabella':
+                        return 'background-color: #76b900; color: white; width: 100%;';
+                    case 'Ripley':
+                        return 'background-color: #4b0082; color: white; width: 100%;';
+                    case 'Walmart':
+                        return 'background-color: #0071ce; color: white; width: 100%;';
+                    default:
+                        return 'background-color: #6c757d; color: white; width: 100%;';
+                }
+            },
             actualizarListaPrecio(detalle, type, bPrice) {
                 if (!bPrice) {
                     alert('Por favor ingresa un precio.');
@@ -341,16 +385,41 @@
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
             recalcularMargen(precio) {
-                const costoNeto = this.detalleSeleccionado.cost; // Usar el costo del detalle seleccionado
-                const precioBaseNeto = precio.valor / 1.19; // El Precio Base sin IVA
-
-                if (precioBaseNeto > 0) {
-                    const margen = (1 - (costoNeto / precioBaseNeto)) * 100; // Fórmula del margen
-                    precio.margen = margen.toFixed(2); // Redondear a 2 decimales
-                } else {
-                    precio.margen = 0; // Si el Precio Base Neto es 0, el margen también lo es
+                // Validar y convertir el valor ingresado en el input
+                const precioConIVA = parseFloat(precio.valor); // Precio ingresado
+                if (isNaN(precioConIVA) || precioConIVA <= 0) {
+                    console.error("Precio inválido. Asegúrese de ingresar un valor numérico positivo.");
+                    precio.margen = 0;
+                    return;
                 }
+
+                // Validar valores adicionales
+                const costo = parseFloat(this.detalleSeleccionado?.cost) || 0; // Costo base
+                const despacho = parseFloat(precio.despacho || 0); // Costo del despacho
+
+                // Calcular Valor Venta
+                const valorVenta = precioConIVA - (precio.quienPagaDespacho === 'nosotros' ? despacho : 0);
+
+                // Calcular Queda sin IVA
+                const quedaSinIVA = valorVenta / 1.19;
+
+                // Calcular Margen
+                if (quedaSinIVA > 0) {
+                    const margen = (1 - (costo / quedaSinIVA)) * 100;
+                    // Ajustar el margen a 2 decimales
+                    precio.margen = margen.toFixed(2);
+                } else {
+                    precio.margen = 0;
+                }
+
+                // Actualizar la consola para verificar cálculos
+                console.log(`Precio Ingresado (con IVA): ${precioConIVA}`);
+                console.log(`Costo: ${costo}`);
+                console.log(`Valor Venta: ${valorVenta}`);
+                console.log(`Queda sin IVA: ${quedaSinIVA}`);
+                console.log(`Margen Calculado: ${precio.margen}%`);
             },
+
             // Función para calcular el costo con descuento
             calcularCostoConDescuento(cost, dctoItem) {
                 const descuento = cost * (dctoItem / 100);
@@ -481,46 +550,39 @@
                 return idFactura;
             },
             actualizarPreciosBaseMasivo() {
-                // Validar si hay detalles en la lista
-                if (this.detalles.length === 0) {
+                if (this.listasPrecios.length === 0) {
                     Swal.fire({
                         title: 'Error',
-                        text: 'No hay productos en la lista para actualizar.',
+                        text: 'No hay precios para actualizar.',
                         icon: 'error',
                         confirmButtonText: 'OK'
                     });
                     return;
                 }
 
-                // Preparar los datos para enviar al backend
-                const data = this.detalles.map(detalle => {
-                    if (!detalle.precioBase) {
-                        console.warn(`El producto con SKU ${detalle.sku} no tiene precio base.`);
-                    }
+                const data = this.listasPrecios.map(precio => {
                     return {
-                        iderp: detalle.iderp,
-                        sku: detalle.sku,
-                        type: 3, // Lista base Bsale Emmett DEV
-                        bPrice: detalle.precioBase || 0 // Asegurar que siempre haya un valor
+                        id: precio.id,
+                        valor: precio.valor,
+                        margen: precio.margen
                     };
                 });
 
-                // Enviar solicitud al backend
-                axios.post('/api/actualizar_precio_masivo/', { detalles: data })
+                axios.post('/api/actualizar_precios_masivo/', { precios: data })
                     .then(response => {
-                        console.log('Precios base actualizados correctamente:', response.data);
+                        console.log('Precios actualizados:', response.data);
                         Swal.fire({
                             title: 'Éxito',
-                            text: 'Todos los precios base se actualizaron correctamente.',
+                            text: 'Todos los precios fueron actualizados correctamente.',
                             icon: 'success',
                             confirmButtonText: 'OK'
                         });
                     })
                     .catch(error => {
-                        console.error('Error al actualizar los precios base masivamente:', error);
+                        console.error('Error al actualizar los precios:', error);
                         Swal.fire({
                             title: 'Error',
-                            text: 'Hubo un problema al actualizar los precios base.',
+                            text: 'Hubo un problema al actualizar los precios.',
                             icon: 'error',
                             confirmButtonText: 'OK'
                         });
