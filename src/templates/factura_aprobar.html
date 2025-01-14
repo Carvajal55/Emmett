@@ -45,58 +45,107 @@
     </div>
    <!-- Modal -->
    <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog" aria-labelledby="modalPreciosLabel" aria-hidden="true">
-        <div class="modal-dialog" style="max-width: 90%; width: 90%;" role="document"> <!-- Modal más ancho -->
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalPreciosLabel" style="font-size: 1.5rem; font-weight: bold;">
-                        Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" style="padding: 20px;">
-                    <div class="row">
-                        <div v-for="(precio, index) in listasPrecios" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
-                            <div class="form-group" style="margin-bottom: 15px;">
-                                <label :for="'precio-' + precio.id" style="font-weight: bold; margin-bottom: 5px; display: block;">
-                                    [[ precio.label ]] 
-                                    <span style="font-size: 0.9rem; color: gray;">(Despacho: [[ precio.despacho || 0 ]] CLP)</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    class="form-control"
-                                    v-model="precio.valor"
-                                    @input="recalcularMargen(precio)"
-                                    :id="'precio-' + precio.id"
-                                    placeholder="Ingrese precio"
-                                    style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 5px;"
-                                />
-                                <p style="margin-top: 10px; font-size: 1rem;">
-                                    <strong>Margen:</strong> [[ precio.margen || 0 ]]%
-                                </p>
-                                <button
-                                    class="btn mt-2"
-                                    @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)"
-                                    :style="getButtonStyle(precio.label)"
-                                >
-                                    Guardar para [[ precio.label ]]
-                                </button>
+    <div class="modal-dialog modal-xl custom-modal-width" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalPreciosLabel" style="font-size: 1.5rem; font-weight: bold;">
+                    Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div v-for="(precio, index) in listasPrecios" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
+                        <div class="form-group">
+                            <!-- Mostrar el label con el Valor Sugerido -->
+                            <label :for="'precio-' + precio.id" style="font-weight: bold; margin-bottom: 5px; display: block;">
+                                [[ precio.label ]]
+                            </label>
+            
+                            <!-- Mostrar el Valor Sugerido -->
+                            <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
+                                Valor Sugerido: [[ precio.valorSugerido || 'Pendiente' ]] CLP
+                            </p>
+            
+                            <!-- Input para ingresar el valor -->
+                            <input
+                                type="number"
+                                class="form-control"
+                                v-model.number="precio.valor"
+                                @input="recalcularMargen(precio)"
+                                :id="'precio-' + precio.id"
+                                placeholder="Ingrese precio"
+                                style="margin-bottom: 10px;"
+                            />
+            
+                            <!-- Mostrar el margen calculado -->
+                            <p style="margin-top: 10px; font-size: 1rem;">
+                                <strong>Margen:</strong> [[ precio.margen || 0 ]]%
+                            </p>
+            
+                            <div class="row">
+                                <div class="col-4">
+                                    <label for="feePercentage" style="font-size: 0.8rem; font-weight: bold;">Comisión (%)</label>
+                                    <input
+                                        type="number"
+                                        class="form-control form-control-sm"
+                                        v-model.number="precio.feePercentage"
+                                        @input="updateFee(precio)"
+                                        id="feePercentage"
+                                        placeholder="%"
+                                    />
+                                </div>
+                            
+                                <div class="col-4">
+                                    <label for="nPercentage" style="font-size: 0.8rem; font-weight: bold;">Margen (%)</label>
+                                    <input
+                                        type="number"
+                                        class="form-control form-control-sm"
+                                        v-model.number="precio.nPercentage"
+                                        @input="updateN(precio)"
+                                        id="nPercentage"
+                                        placeholder="%"
+                                    />
+                                </div>
+                            
+                                <div class="col-4">
+                                    <label for="despacho" style="font-size: 0.8rem; font-weight: bold;">Despacho (CLP)</label>
+                                    <input
+                                        type="number"
+                                        class="form-control form-control-sm"
+                                        v-model.number="precio.despacho"
+                                        @input="recalcularMargen(precio)"
+                                        id="despacho"
+                                        placeholder="CLP"
+                                    />
+                                </div>
                             </div>
+            
+                            <!-- Botón para guardar -->
+                            <button
+                                class="btn btn-primary mt-2 w-100"
+                                @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)"
+                                :style="getButtonStyle(precio.label)"
+                            >
+                                Guardar para [[ precio.label ]]
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer" style="border-top: 1px solid #dee2e6; padding: 15px;">
-                    <button
-                        type="button"
-                        class="btn btn-secondary"
-                        data-bs-dismiss="modal"
-                        style="padding: 10px 20px; font-size: 1rem;"
-                    >
-                        Cerrar
-                    </button>
-                </div>
+            </div>
+            <div class="modal-footer">
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-bs-dismiss="modal"
+                    style="padding: 10px 20px; font-size: 1rem;"
+                >
+                    Cerrar
+                </button>
             </div>
         </div>
     </div>
+</div>
 
 
 
@@ -192,11 +241,11 @@
             errorMsg: '',    // Mensaje de error
             idFactura: null,
             listasPrecios: [
-                { label: 'MercadoLibre', id: 1, valor: null, margen: null, comision: 0.2, despacho: 4990, quienPagaDespacho: 'nosotros' },
-                { label: 'Falabella', id: 11, valor: null, margen: null, comision: 0.15, despacho: 0, quienPagaDespacho: 'cliente' },
-                { label: 'Paris', id: 12, valor: null, margen: null, comision: 0.14, despacho: 0, quienPagaDespacho: 'cliente' },
-                { label: 'Ripley', id: 13, valor: null, margen: null, comision: 0.15, despacho: 0, quienPagaDespacho: 'cliente' },
-                { label: 'Walmart', id: 14, valor: null, margen: null, comision: 0.14, despacho: 0, quienPagaDespacho: 'cliente' }
+                { label: 'MercadoLibre', id: 1, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 4990, margen: null, valor: null, valorSugerido: null },
+                { label: 'Falabella', id: 11, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Paris', id: 12, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Ripley', id: 13, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Walmart', id: 14, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 0, margen: null, valor: null, valorSugerido: null }
             ],
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
@@ -211,10 +260,16 @@
             } else {
                 console.error("No se pudo obtener el ID de la factura desde la URL");
             }
+            this.recalcularTodos();
 
             
         },
         methods: {
+            recalcularTodos() {
+                this.listasPrecios.forEach(precio => {
+                    this.recalcularMargen(precio);
+                });
+            },
             getButtonStyle(label) {
                 switch (label) {
                     case 'MercadoLibre':
@@ -385,39 +440,42 @@
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
             recalcularMargen(precio) {
-                // Validar y convertir el valor ingresado en el input
-                const precioConIVA = parseFloat(precio.valor); // Precio ingresado
-                if (isNaN(precioConIVA) || precioConIVA <= 0) {
-                    console.error("Precio inválido. Asegúrese de ingresar un valor numérico positivo.");
+                const costo = parseFloat(precio.costo) || 0;
+                const fee = parseFloat(precio.fee) || 1.25;
+                const iva = parseFloat(precio.iva) || 1.19;
+                const n = parseFloat(precio.n) || 1.35;
+                const despacho = parseFloat(precio.despacho) || 0;
+                const valorIngresado = parseFloat(precio.valor) || 0;
+
+                if (!costo || !fee || !iva || !n) {
+                    precio.valorSugerido = null;
                     precio.margen = 0;
                     return;
                 }
 
-                // Validar valores adicionales
-                const costo = parseFloat(this.detalleSeleccionado?.cost) || 0; // Costo base
-                const despacho = parseFloat(precio.despacho || 0); // Costo del despacho
+                // Calcular Valor Sugerido y redondear hacia arriba
+                const valorSugerido = Math.ceil((costo * fee * iva * n) + despacho);
+                precio.valorSugerido = valorSugerido;
 
-                // Calcular Valor Venta
-                const valorVenta = precioConIVA - (precio.quienPagaDespacho === 'nosotros' ? despacho : 0);
-
-                // Calcular Queda sin IVA
-                const quedaSinIVA = valorVenta / 1.19;
-
-                // Calcular Margen
-                if (quedaSinIVA > 0) {
-                    const margen = (1 - (costo / quedaSinIVA)) * 100;
-                    // Ajustar el margen a 2 decimales
-                    precio.margen = margen.toFixed(2);
-                } else {
-                    precio.margen = 0;
+                // Calcular Margen basado en el Valor Ingresado
+                let margenIngresado = 0;
+                if (valorIngresado > 0) {
+                    const xIngresado = (valorIngresado / (fee * iva)) - despacho;
+                    margenIngresado = (1 - (costo / xIngresado)) * 100;
                 }
 
-                // Actualizar la consola para verificar cálculos
-                console.log(`Precio Ingresado (con IVA): ${precioConIVA}`);
-                console.log(`Costo: ${costo}`);
-                console.log(`Valor Venta: ${valorVenta}`);
-                console.log(`Queda sin IVA: ${quedaSinIVA}`);
-                console.log(`Margen Calculado: ${precio.margen}%`);
+                // Asignar valores calculados
+                precio.margen = margenIngresado.toFixed(2);
+            },
+            updateFee(precio) {
+                // Convertir porcentaje a formato decimal y recalcular margen
+                precio.fee = 1 + (parseFloat(precio.feePercentage || 0) / 100);
+                this.recalcularMargen(precio);
+            },
+            updateN(precio) {
+                // Convertir porcentaje a formato decimal y recalcular margen
+                precio.n = 1 + (parseFloat(precio.nPercentage || 0) / 100);
+                this.recalcularMargen(precio);
             },
 
             // Función para calcular el costo con descuento
