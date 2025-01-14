@@ -85,26 +85,26 @@
             
                             <div class="row">
                                 <div class="col-4">
-                                    <label for="feePercentage" style="font-size: 0.8rem; font-weight: bold;">Comisión (%)</label>
+                                    <label for="fee" style="font-size: 0.8rem; font-weight: bold;">Comisión (Fee)</label>
                                     <input
                                         type="number"
                                         class="form-control form-control-sm"
-                                        v-model.number="precio.feePercentage"
-                                        @input="updateFee(precio)"
-                                        id="feePercentage"
-                                        placeholder="%"
+                                        v-model.number="precio.fee"
+                                        @input="recalcularMargen(precio)"
+                                        id="fee"
+                                        placeholder="Ej: 1.25"
                                     />
                                 </div>
                             
                                 <div class="col-4">
-                                    <label for="nPercentage" style="font-size: 0.8rem; font-weight: bold;">Margen (%)</label>
+                                    <label for="n" style="font-size: 0.8rem; font-weight: bold;">Margen (N)</label>
                                     <input
                                         type="number"
                                         class="form-control form-control-sm"
-                                        v-model.number="precio.nPercentage"
-                                        @input="updateN(precio)"
-                                        id="nPercentage"
-                                        placeholder="%"
+                                        v-model.number="precio.n"
+                                        @input="recalcularMargen(precio)"
+                                        id="n"
+                                        placeholder="Ej: 1.35"
                                     />
                                 </div>
                             
@@ -116,7 +116,7 @@
                                         v-model.number="precio.despacho"
                                         @input="recalcularMargen(precio)"
                                         id="despacho"
-                                        placeholder="CLP"
+                                        placeholder="Ej: 4990"
                                     />
                                 </div>
                             </div>
@@ -241,11 +241,11 @@
             errorMsg: '',    // Mensaje de error
             idFactura: null,
             listasPrecios: [
-                { label: 'MercadoLibre', id: 1, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 4990, margen: null, valor: null, valorSugerido: null },
-                { label: 'Falabella', id: 11, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                { label: 'Paris', id: 12, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                { label: 'Ripley', id: 13, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                { label: 'Walmart', id: 14, costo: 100000, fee: 1.25, feePercentage: 25, iva: 1.19, n: 1.35, nPercentage: 35, despacho: 0, margen: null, valor: null, valorSugerido: null }
+                { label: 'MercadoLibre', id: 1, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, margen: null, valor: null, valorSugerido: null },
+                { label: 'Falabella', id: 11, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Paris', id: 12, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Ripley', id: 13, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Walmart', id: 14, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null }
             ],
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
