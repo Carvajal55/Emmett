@@ -135,8 +135,11 @@
             },
             // Procesa la entrada de escaneo (sector o SuperID)
             procesarEntrada() {
-                const input = this.scannerInput.trim();
-                
+                let input = this.scannerInput.trim();
+
+                // Reemplazar comillas simples por guiones
+                input = input.replace(/'/g, '-');
+
                 if (input.startsWith('B-')) {
                     // Verificar si hay un sector abierto y si el nuevo input es diferente
                     if (this.previousSector && input !== this.previousSector) {
