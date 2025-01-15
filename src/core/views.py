@@ -3394,11 +3394,13 @@ logger = logging.getLogger(__name__)
 def comparar_stock_bsale(request):
     try:
         # Inicialización
-        print("Iniciando comparación de stock...")  # Log inicial
+        print("Iniciando comparación de stock...")
         total_productos_locales = 0
         productos_comparados = 0
         productos_con_diferencia_stock = []
-        processed_iderps = set()  # Para rastrear productos ya procesados
+        productos_con_errores = []  # Para rastrear SKUs con problemas
+        skus_no_comparados = []  # Para registrar los SKUs que no se pudieron comparar
+        processed_iderps = set()
 
         # Obtener productos locales
         productos_locales = Products.objects.values('sku', 'iderp', 'currentstock')
@@ -3415,6 +3417,8 @@ def comparar_stock_bsale(request):
                     "total_productos_locales": total_productos_locales,
                     "productos_comparados": 0,
                     "productos_con_diferencias": 0,
+                    "productos_con_errores": [],
+                    "skus_no_comparados": [],
                     "detalles": []
                 }
             }, status=200)
@@ -3440,23 +3444,35 @@ def comparar_stock_bsale(request):
                 if not variant:
                     continue
                 iderp = variant.get('id')
-                bsale_stock = item.get('quantity', 0)
+                bsale_stock = item.get('quantity', 0) or 0
 
                 # Solo procesar productos locales y no procesados previamente
                 if iderp in iderp_locales and iderp not in processed_iderps:
                     processed_iderps.add(iderp)  # Marcar como procesado
                     productos_comparados += 1
                     producto_local = productos_local_dict[iderp]
-                    diferencia_stock = bsale_stock - producto_local['currentstock']
 
-                    if diferencia_stock != 0:
-                        productos_con_diferencia_stock.append({
+                    try:
+                        current_stock_local = producto_local['currentstock'] or 0
+                        diferencia_stock = bsale_stock - current_stock_local
+
+                        if diferencia_stock != 0:
+                            productos_con_diferencia_stock.append({
+                                "sku": producto_local['sku'],
+                                "stock_local": current_stock_local,
+                                "stock_bsale": bsale_stock,
+                                "diferencia": diferencia_stock
+                            })
+                            print(f"Diferencia encontrada para SKU {producto_local['sku']}: {diferencia_stock}")
+
+                    except Exception as e:
+                        # Registrar el SKU con error
+                        print(f"Error procesando SKU {producto_local['sku']}: {str(e)}")
+                        productos_con_errores.append({
                             "sku": producto_local['sku'],
-                            "stock_local": producto_local['currentstock'],
-                            "stock_bsale": bsale_stock,
-                            "diferencia": diferencia_stock
+                            "error": str(e)
                         })
-                        print(f"Diferencia encontrada para SKU {producto_local['sku']}: {diferencia_stock}")
+                        skus_no_comparados.append(producto_local['sku'])
 
             next_url = data.get('next', None)
 
@@ -3465,6 +3481,8 @@ def comparar_stock_bsale(request):
             "total_productos_locales": total_productos_locales,
             "productos_comparados": productos_comparados,
             "productos_con_diferencias": len(productos_con_diferencia_stock),
+            "productos_con_errores": productos_con_errores,
+            "skus_no_comparados": skus_no_comparados,
             "detalles": productos_con_diferencia_stock
         }
         print("Comparación completada. Resumen:")
@@ -3476,8 +3494,9 @@ def comparar_stock_bsale(request):
         }, status=200)
 
     except Exception as e:
-        print(f"Error inesperado: {str(e)}")  # Mostrar el error en consola
+        print(f"Error inesperado: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
+
     
 
 
