@@ -88,7 +88,7 @@ urlpatterns = [
     path('api/get-document-lines/<int:document_id>/', core_views.get_document_lines, name='get_document_lines'),
     path('api/save-document-lines/', core_views.save_document_lines, name='save_document_lines'),
     path('api/actualizar_precio/', core_views.actualizar_precio, name='actualizar_precio'),
-    path('api/actualizar_precio_masivo/', core_views.actualizar_precio_masivo, name='actualizar_precio_masivo'),
+    path('api/actualizar_precios_masivo/', core_views.actualizar_precio_masivo, name='actualizar_precio_masivo'),
 
 
 
@@ -142,6 +142,7 @@ urlpatterns = [
     path('api/bulk-upload-products/', core_views.bulk_upload_products, name='bulk_upload_products'),
     path('api/obtener-tipos-productos/', core_views.obtener_tipos_productos_y_guardar),
     path('api/listar-categorias/', core_views.listar_categorias, name='listar_categorias'),
+
 
     #Exportar excel 
     path('api/generar-excel-stock/', core_views.generar_excel_stock, name='generar_excel_stock'),
