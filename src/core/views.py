@@ -616,6 +616,7 @@ def actualizar_precio(request):
     except Exception as e:
         print(f"Error inesperado: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
+    
 def listar_compras(request):
     # Obtener parámetros de filtro y paginación desde el request
     status = request.GET.get('status')  # Aceptará '0', '1', '2', '3' o 'all'
@@ -961,100 +962,92 @@ def listar_categorias(request):
     return JsonResponse({"categorias": list(categorias)})
 
 @csrf_exempt
+@require_POST
 def actualizar_precio_masivo(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            detalles = data.get('detalles', [])
+    try:
+        # Cargar los datos enviados desde el frontend
+        data = json.loads(request.body)
+        precios = data.get('precios', [])
 
-            if not detalles:
-                return JsonResponse({'status': 'error', 'message': 'No se proporcionaron detalles para actualizar.'}, status=400)
+        if not precios:
+            return JsonResponse({'error': 'No se proporcionaron precios para actualizar.'}, status=400)
 
-            errores = []
-            actualizados = []
+        errores = []
+        actualizados = []
 
-            for detalle in detalles:
+        # Iterar sobre cada precio enviado
+        for precio in precios:
+            id_erp = precio.get('iderp')
+            sku = precio.get('sku')
+            b_price = precio.get('bPrice')
+            type = precio.get('type', 3)  # Lista de precios predeterminada
+
+            if not id_erp or not sku or not b_price or not type:
+                errores.append({'sku': sku, 'message': 'Datos incompletos'})
+                continue
+
+            try:
+                # Paso 1: Consultar detalle del precio en Bsale
+                url_costs = f"{BSALE_API_URL}/price_lists/{type}/details.json?variantid={id_erp}"
+                headers = {
+                    'access_token': BSALE_API_TOKEN,
+                    'Content-Type': 'application/json'
+                }
+                response = requests.get(url_costs, headers=headers)
+
+                if response.status_code != 200:
+                    errores.append({'sku': sku, 'message': f'Error al obtener detalle de precio en Bsale: {response.text}'})
+                    continue
+
+                bsale_data = response.json()
+                items = bsale_data.get('items', [])
+                if not items:
+                    errores.append({'sku': sku, 'message': 'No se encontraron ítems en Bsale'})
+                    continue
+
+                id_detalle = items[0].get('id')
+                if not id_detalle:
+                    errores.append({'sku': sku, 'message': 'No se encontró id_detalle en Bsale'})
+                    continue
+
+                # Paso 2: Actualizar precio en Bsale
+                url_update_price = f"{BSALE_API_URL}/price_lists/{type}/details/{id_detalle}.json"
+                variant_value = float(b_price) / 1.19
+                update_data = {
+                    'variantValue': variant_value,
+                    'id': id_detalle
+                }
+                put_response = requests.put(url_update_price, headers=headers, json=update_data)
+
+                if put_response.status_code != 200:
+                    errores.append({'sku': sku, 'message': f'Error al actualizar precio en Bsale: {put_response.text}'})
+                    continue
+
+                # Paso 3: Actualizar el precio en la base de datos local
                 try:
-                    id_erp = detalle.get('iderp')
-                    sku = detalle.get('sku')
-                    b_price = detalle.get('bPrice')
-                    type = detalle.get('type', 3)  # Lista base predeterminada
-
-                    if not id_erp or not sku or not b_price:
-                        errores.append({'sku': sku, 'message': 'Datos incompletos'})
-                        continue
-
-                    # Paso 1: Consultar el detalle de la lista de precios en Bsale
-                    try:
-                        url_costs = f"{BSALE_API_URL}/price_lists/{type}/details.json?variantid={id_erp}"
-                        headers = {
-                            'access_token': BSALE_API_TOKEN,
-                            'Content-Type': 'application/json'
-                        }
-
-                        response = requests.get(url_costs, headers=headers)
-                        if response.status_code != 200:
-                            errores.append({'sku': sku, 'message': 'Error al obtener datos de Bsale'})
-                            continue
-
-                        bsale_data = response.json()
-                        items = bsale_data.get('items', [])
-                        if not items:
-                            errores.append({'sku': sku, 'message': 'No se encontró ningún ítem en Bsale'})
-                            continue
-
-                        id_detalle = items[0].get('id')
-                        if not id_detalle:
-                            errores.append({'sku': sku, 'message': 'No se encontró id_detalle en Bsale'})
-                            continue
-                    except Exception as e:
-                        errores.append({'sku': sku, 'message': f'Error al consultar Bsale: {str(e)}'})
-                        continue
-
-                    # Paso 2: Actualizar el precio en Bsale
-                    try:
-                        url_update_price = f"{BSALE_API_URL}/price_lists/{type}/details/{id_detalle}.json"
-                        variant_value = float(b_price) / 1.19
-                        update_data = {'variantValue': variant_value, "id": id_detalle}
-
-                        put_response = requests.put(url_update_price, headers=headers, json=update_data)
-                        if put_response.status_code != 200:
-                            errores.append({'sku': sku, 'message': 'Error al actualizar el precio en Bsale'})
-                            continue
-                    except Exception as e:
-                        errores.append({'sku': sku, 'message': f'Error al actualizar en Bsale: {str(e)}'})
-                        continue
-
-                    # Paso 3: Actualizar el precio en la base de datos local
-                    try:
-                        product = Products.objects.get(sku=sku)
-                        product.lastprice = float(b_price)
-                        product.save()
-                        actualizados.append({'sku': sku, 'message': 'Precio actualizado correctamente'})
-                    except Products.DoesNotExist:
-                        errores.append({'sku': sku, 'message': 'Producto no encontrado en la base de datos local'})
-                    except ValueError:
-                        errores.append({'sku': sku, 'message': f'Valor inválido para Precio Base: {b_price}'})
-                    except Exception as e:
-                        errores.append({'sku': sku, 'message': f'Error al actualizar en la base de datos local: {str(e)}'})
-
+                    product = Products.objects.get(sku=sku)
+                    product.lastprice = float(b_price)
+                    product.save()
+                    actualizados.append({'sku': sku, 'message': 'Precio actualizado correctamente'})
+                except Products.DoesNotExist:
+                    errores.append({'sku': sku, 'message': 'Producto no encontrado en la base de datos local'})
                 except Exception as e:
-                    errores.append({'sku': detalle.get('sku', 'Desconocido'), 'message': f'Error inesperado: {str(e)}'})
+                    errores.append({'sku': sku, 'message': f'Error al actualizar la base de datos local: {str(e)}'})
 
-            # Respuesta final
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Precios procesados.',
-                'actualizados': actualizados,
-                'errores': errores
-            }, status=200)
+            except Exception as e:
+                errores.append({'sku': sku, 'message': f'Error inesperado: {str(e)}'})
 
-        except json.JSONDecodeError:
-            return JsonResponse({'status': 'error', 'message': 'Datos inválidos'}, status=400)
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        # Respuesta final
+        return JsonResponse({
+            'status': 'success',
+            'actualizados': actualizados,
+            'errores': errores,
+        }, status=200)
 
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Datos inválidos'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 @csrf_exempt
 def create_category(request):

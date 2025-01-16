@@ -241,11 +241,10 @@
             errorMsg: '',    // Mensaje de error
             idFactura: null,
             listasPrecios: [
-                { label: 'MercadoLibre', id: 1, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, margen: null, valor: null, valorSugerido: null },
-                { label: 'Falabella', id: 11, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                { label: 'Paris', id: 12, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                { label: 'Ripley', id: 13, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                { label: 'Walmart', id: 14, costo: 100000, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null }
+                { label: 'MercadoLibre', id: 1, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Paris', id: 12,  fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null }
             ],
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
@@ -360,6 +359,13 @@
             abrirModal(detalle) {
                 this.skuSeleccionado = detalle.sku;
                 this.detalleSeleccionado = detalle;
+
+                // Asignar el costo del producto al abrir el modal
+                this.listasPrecios = this.listasPrecios.map(precio => ({
+                    ...precio,
+                    costo: detalle.cost || 0 // Usar el costo con descuento del detalle
+                }));
+
                 $('#modalPrecios').modal('show');
             },
             actualizarListasPrecios() {
@@ -440,6 +446,7 @@
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
             recalcularMargen(precio) {
+                console.log(precio,"PRECIO")
                 const costo = parseFloat(precio.costo) || 0;
                 const fee = parseFloat(precio.fee) || 1.25;
                 const iva = parseFloat(precio.iva) || 1.19;
@@ -608,7 +615,7 @@
                 return idFactura;
             },
             actualizarPreciosBaseMasivo() {
-                if (this.listasPrecios.length === 0) {
+                if (this.detalles.length === 0) {
                     Swal.fire({
                         title: 'Error',
                         text: 'No hay precios para actualizar.',
@@ -618,26 +625,27 @@
                     return;
                 }
 
-                const data = this.listasPrecios.map(precio => {
-                    return {
-                        id: precio.id,
-                        valor: precio.valor,
-                        margen: precio.margen
-                    };
-                });
+                const precios = this.detalles.map(detalle => ({
+                    iderp: detalle.iderp,
+                    sku: detalle.sku,
+                    bPrice: detalle.precioBase, // Precio bruto con impuestos
+                    type: 3 // ID de la lista de precios base
+                }));
 
-                axios.post('/api/actualizar_precios_masivo/', { precios: data })
+                console.log("Datos enviados a la API para actualización masiva:", precios);
+
+                axios.post('/api/actualizar_precios_masivo/', { precios })
                     .then(response => {
-                        console.log('Precios actualizados:', response.data);
+                        console.log('Respuesta de la API:', response.data);
                         Swal.fire({
                             title: 'Éxito',
-                            text: 'Todos los precios fueron actualizados correctamente.',
+                            text: 'Precios actualizados correctamente.',
                             icon: 'success',
                             confirmButtonText: 'OK'
                         });
                     })
                     .catch(error => {
-                        console.error('Error al actualizar los precios:', error);
+                        console.error('Error al actualizar los precios:', error.response.data);
                         Swal.fire({
                             title: 'Error',
                             text: 'Hubo un problema al actualizar los precios.',
@@ -646,6 +654,7 @@
                         });
                     });
             }
+
 
         },
         mounted() {
