@@ -153,24 +153,21 @@
     <table v-if="detalles.length > 0" class="table table-striped">
         <thead>
             <tr>
-                <th>#</th>
-                <th>SKU</th>
-                <th>PRODUCTO</th>
-                <th>QTY</th>
-                <th>DCTO</th>
-                <th>COSTO REAL</th>
-                <th>COSTO </th>
-                <th>Ú.COSTO</th>
-                <th>Ú.PRECIO</th>
-                <th>PRECIO BSALE</th> <!-- Nueva columna -->
-                <th>TOTAL</th>
-                <th>PRECIO BASE</th>
-                <th>MARGEN</th>
-                <th>STOCK</th>
-                <th>Accion</th>
-                <button class="btn btn-primary mb-3" @click="actualizarPreciosBaseMasivo">
-                    Actualizar Todos los Precios Base
-                </button>
+                <th style="width: 3%;">#</th>
+                <th style="width: 8%;">SKU</th>
+                <th style="width: 15%;">PRODUCTO</th>
+                <th style="width: 5%; text-align: center;">QTY</th>
+                <th style="width: 5%; text-align: center;">DCTO</th>
+                <th style="width: 10%; text-align: right;">COSTO REAL</th>
+                <th style="width: 10%; text-align: right;">COSTO</th>
+                <th style="width: 8%; text-align: right;">Ú.COSTO</th>
+                <th style="width: 8%; text-align: right;">Ú.PRECIO</th>
+                <th style="width: 10%; text-align: right;">PRECIO BSALE</th>
+                <th style="width: 10%; text-align: right;">TOTAL</th>
+                <th style="width: 18%;">PRECIO BASE</th>
+                <th style="width: 5%; text-align: center;">MARGEN</th>
+                <th style="width: 5%; text-align: center;">STOCK</th>
+                <th style="width: 10%;">ACCIÓN</th>
             </tr>
         </thead>
         <tbody>
@@ -178,42 +175,40 @@
                 <td>[[ index + 1 ]]</td>
                 <td>[[ detalle.sku ]]</td>
                 <td>[[ detalle.model ]]</td>
-                <td>[[ detalle.qty ]]</td>
-                <td>[[ detalle.dctoItem ]] %</td>
-                <td>[[ formatCurrency(detalle.cost_with_discount) ]]</td>
-                <td>[[ formatCurrency(detalle.cost) ]]</td>
-                <td>[[ formatCurrency(detalle.lastCost || 0) ]]</td>
-                <td>[[ formatCurrency(detalle.lastPrice || 0) ]]</td>
-                <td>[[ formatCurrency(detalle.bsalePrice || 0) ]]</td>
-                <td>[[ formatCurrency(calcularTotal(detalle.cost_with_discount, detalle.qty)) ]]</td>
-                <td style="width: 300px;">
+                <td style="text-align: center;">[[ detalle.qty ]]</td>
+                <td style="text-align: center;">[[ detalle.dctoItem ]] %</td>
+                <td style="text-align: right;">[[ formatCurrency(detalle.cost_with_discount) ]]</td>
+                <td style="text-align: right;">[[ formatCurrency(detalle.cost) ]]</td>
+                <td style="text-align: right;">[[ formatCurrency(detalle.lastCost || 0) ]]</td>
+                <td style="text-align: right;">[[ formatCurrency(detalle.lastPrice || 0) ]]</td>
+                <td style="text-align: right;">[[ formatCurrency(detalle.bsalePrice || 0) ]]</td>
+                <td style="text-align: right;">[[ formatCurrency(calcularTotal(detalle.cost_with_discount, detalle.qty)) ]]</td>
+                <td>
                     <input
                         type="number"
-                        class="form-control"
+                        class="form-control px-0"
                         v-model="detalle.precioBase"
                         placeholder="Precio Base"
                         @input="calcularMargen(detalle)" 
-                        style="font-size: 0.9rem;" 
+                        style="font-size: 0.9rem; width: 100%;" 
                     />
                 </td>
-                <td>[[ detalle.margen ]]%</td>
-                <td>[[ detalle.totalStock ]]</td>
+                <td style="text-align: center;">[[ detalle.margen ]]%</td>
+                <td style="text-align: center;">[[ detalle.totalStock ]]</td>
                 <td>
                     <button
-                        class="btn btn-info"
+                        class="btn btn-info btn-sm"
                         style="font-size: 0.9rem;" 
                         @click="abrirModal(detalle)"
                     >
-                       Precios MarketPlace
+                       P.MarketPlace
                     </button>
-                </td>
-                <td>
                     <button
-                        class="btn btn-primary"
+                        class="btn btn-primary btn-sm mt-1"
                         style="font-size: 0.9rem;"
                         @click="actualizarPrecioBase(detalle)"
                     >
-                        Precio Base
+                        P.Base
                     </button>
                 </td>
             </tr>
