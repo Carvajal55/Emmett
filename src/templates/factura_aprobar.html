@@ -16,6 +16,7 @@
                 <p><strong>Ingresado Por:</strong> [[ factura.headers.userProcess ]]</p>
                 <p><strong>Estado Resumen:</strong> OK</p>
                 <p><strong>PDF:</strong> <a :href="`/media/${factura.headers.urlImg}`" target="_blank">Ver PDF</a></p>
+            
 
             </div>
 
@@ -43,14 +44,27 @@
             </div>
         </div>
     </div>
+    <div class="col-12  mt-4">
+        <button class="btn btn-primary" @click="actualizarPreciosBaseMasivo">
+            Actualizar Todos los Precios Base
+        </button>
+    </div>
    <!-- Modal -->
    <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog" aria-labelledby="modalPreciosLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl custom-modal-width" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalPreciosLabel" style="font-size: 1.5rem; font-weight: bold;">
-                    Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]
-                </h5>
+                <div>
+                    <h4 class="modal-title" id="modalPreciosLabel" style="font-size: 1.5rem; font-weight: bold;">
+                        Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]
+                    </h4>
+                    <p style="font-size: 1.2rem; font-weight: bold;">
+                        Nombre: [[ nombreSeleccionado ]]
+                    </p>
+                    <p style="font-size: 1.2rem; font-weight: bold;">
+                        Precio Base Bsale: [[ precioSeleccionado ]]
+                    </p>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -65,6 +79,9 @@
                             <!-- Mostrar el Valor Sugerido -->
                             <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
                                 Valor Sugerido: [[ precio.valorSugerido || 'Pendiente' ]] CLP
+                            </p>
+                            <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
+                                Valor Actual: [[ precio.valorActual || 'Pendiente' ]] CLP
                             </p>
             
                             <!-- Input para ingresar el valor -->
@@ -236,13 +253,16 @@
             errorMsg: '',    // Mensaje de error
             idFactura: null,
             listasPrecios: [
-                { label: 'MercadoLibre', id: 1, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4900, margen: null, valor: null, valorSugerido: null },
+                { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4900, margen: null, valor: null, valorSugerido: null },
                 { label: 'Paris', id: 12,  fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
                 { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null }
+                { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                
             ],
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
+            precioSeleccionado: null,
+            nombreSeleccionado: null,
             stockProductos: {}
         },
         mounted() {
@@ -259,12 +279,30 @@
             
         },
         methods: {
+            obtenerValorActual(precio) {
+                const data = {
+                    price_list_id: precio.id, // ID de la lista de precios
+                    sku: this.skuSeleccionado // SKU seleccionado
+                };
+
+                axios.post('/api/obtener_valor_actual/', data)
+                    .then(response => {
+                        const valorRecibido = response.data.valor_actual;
+                        precio.valorActual = valorRecibido ? Math.floor(valorRecibido) : 'No disponible';
+                    })
+                    .catch(error => {
+                        console.error('Error al obtener el valor actual:', error);
+                        precio.valorActual = 'Error';
+                    });
+            },
             initializeListasPrecios(detalle) {
                 return [
-                    { label: 'MercadoLibre', id: 1, fee: 1.25, iva: 1.19, n: 1.35, despacho: 4900, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
+                    { label: 'MercadoLibre', id: 10, fee: 1.25, iva: 1.19, n: 1.35, despacho: 4900, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
                     { label: 'Paris', id: 12, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
                     { label: 'Ripley', id: 13, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
-                    { label: 'Walmart', id: 14, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null }
+                    { label: 'Walmart', id: 14, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
+                    { label: 'Falabella', id: 11, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null }
+
                 ];
             },
             recalcularTodos() {
@@ -361,10 +399,17 @@
             },
             abrirModal(detalle) {
                 this.skuSeleccionado = detalle.sku;
+                this.nombreSeleccionado = detalle.model;
+                this.precioSeleccionado = detalle.precioBase;
                 this.detalleSeleccionado = detalle;
+                console.log(detalle,"Detalle")
 
                 // Inicializar las listas de precios al abrir el modal
                 this.listasPrecios = this.initializeListasPrecios(detalle);
+                // Llamar a obtenerValorActual para cada precio en las listas de precios
+                this.listasPrecios.forEach(precio => {
+                    this.obtenerValorActual(precio);
+                });
 
                 $('#modalPrecios').modal('show');
             },

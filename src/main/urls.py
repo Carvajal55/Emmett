@@ -89,6 +89,7 @@ urlpatterns = [
     path('api/save-document-lines/', core_views.save_document_lines, name='save_document_lines'),
     path('api/actualizar_precio/', core_views.actualizar_precio, name='actualizar_precio'),
     path('api/actualizar_precios_masivo/', core_views.actualizar_precio_masivo, name='actualizar_precio_masivo'),
+    path('api/obtener_valor_actual/', core_views.obtener_valor_actual, name='obtener_valor_actual'),
 
 
 

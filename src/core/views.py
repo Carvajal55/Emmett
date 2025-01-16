@@ -801,6 +801,49 @@ def rechazar_factura(request):
 
 #Aprobar Facturas
 
+@csrf_exempt
+def obtener_valor_actual(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            price_list_id = data.get('price_list_id')  # ID de la lista de precios
+            sku = data.get('sku')  # SKU del producto
+
+            if not price_list_id or not sku:
+                return JsonResponse({'error': 'ID de lista de precios y SKU son requeridos'}, status=400)
+
+            # Construir la URL para la solicitud a Bsale
+            url = f"https://api.bsale.io/v1/price_lists/{price_list_id}/details.json?code={sku}"
+            headers = {
+                'access_token': '1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc',  # Reemplaza con tu token real
+                'Content-Type': 'application/json'
+            }
+
+            # Realizar la solicitud GET a la API de Bsale
+            response = requests.get(url, headers=headers)
+
+            # Verificar el estado de la respuesta
+            if response.status_code != 200:
+                return JsonResponse({'error': 'Error al obtener datos de Bsale', 'detalle': response.text}, status=response.status_code)
+
+            # Extraer el valor actual del precio
+            bsale_data = response.json()
+            items = bsale_data.get('items', [])
+            if not items:
+                return JsonResponse({'error': 'No se encontró información para el SKU proporcionado'}, status=404)
+
+            # Tomar el primer ítem (asumiendo que solo hay uno)
+            valor_actual = items[0].get('variantValue')
+
+            return JsonResponse({'valor_actual': valor_actual}, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Datos inválidos'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    else:
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
 def calcular_stock_bodegas(request):
     """
     Calcula el stock total de los productos que están en las bodegas especificadas.
