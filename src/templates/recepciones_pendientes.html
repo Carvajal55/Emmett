@@ -5,17 +5,36 @@
 <div id="app" class="m-2">
     <div class="container-fluid">
         <!-- Búsqueda por folio -->
+       <!-- Filtro por estado de facturas -->
         <div class="row mb-3">
-            <h5>Facturas por Revisar</h5>
+            <h5>Gestión de Facturas</h5>
             <div class="col-md-4">
-                <input type="text" class="form-control" placeholder="Buscar por folio" v-model="searchQuery" @input="fetchFacturas(1)">
+                <input
+                    type="text"
+                    class="form-control"
+                    placeholder="Buscar por folio"
+                    v-model="searchQuery"
+                    @input="fetchFacturas(1)"
+                />
+            </div>
+            <div class="col-md-4">
+                <select
+                    v-model="estadoSeleccionado"
+                    class="form-select"
+                    @change="fetchFacturas(1)"
+                >
+                    <option value="pendientes">Por Aprobar</option>
+                    <option value="aprobadas">Aprobadas</option>
+                </select>
             </div>
         </div>
 
+
+        <!-- Tabla para las facturas -->
         <!-- Tabla para las facturas -->
         <div class="row scrollable">
             <div class="col-md-12">
-               <table class="table table-striped table-hover" style="width:100%">
+                <table class="table table-striped table-hover" style="width:100%">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -39,24 +58,53 @@
                             <td>[[ formatCurrency(factura.subtotal) ]]</td>
                             <td>[[ factura.dateAdd ]]</td>
                             <td>
-                                <!-- Botón Aceptar -->
-                                <button type="button" class="btn btn-success m-1 px-5" @click="aprobarFactura(factura.id)">
-                                    <div class="icon-box-inner">
-                                        <div class="icon-base"><i class="fadeIn animated bx bx-check"></i></div>
-                                        Aceptar
-                                    </div>
-                                </button>
-                                <!-- Botón Rechazar -->
-                                <button type="button" class="btn btn-danger m-1 px-5" @click="rechazarFactura(factura.id)">
-                                    <div class="icon-box-inner">
-                                        <div class="icon-base"><i class="fadeIn animated bx bx-x"></i></div>
-                                        Rechazar
-                                    </div>
-                                </button>
+                                <template v-if="estadoSeleccionado === 'pendientes'">
+                                    <!-- Botón Aceptar -->
+                                    <button
+                                        type="button"
+                                        class="btn btn-success m-1 px-5"
+                                        @click="aprobarFactura(factura.id)"
+                                    >
+                                        <div class="icon-box-inner">
+                                            <div class="icon-base">
+                                                <i class="fadeIn animated bx bx-check"></i>
+                                            </div>
+                                            Aceptar
+                                        </div>
+                                    </button>
+                                    <!-- Botón Rechazar -->
+                                    <button
+                                        type="button"
+                                        class="btn btn-danger m-1 px-5"
+                                        @click="rechazarFactura(factura.id)"
+                                    >
+                                        <div class="icon-box-inner">
+                                            <div class="icon-base">
+                                                <i class="fadeIn animated bx bx-x"></i>
+                                            </div>
+                                            Rechazar
+                                        </div>
+                                    </button>
+                                </template>
+                                <template v-else>
+                                    <!-- Botón Editar para facturas aprobadas -->
+                                    <button
+                                        type="button"
+                                        class="btn btn-warning m-1 px-5"
+                                        @click="aprobarFactura(factura.id)"
+                                    >
+                                        <div class="icon-box-inner">
+                                            <div class="icon-base">
+                                                <i class="fadeIn animated bx bx-edit"></i>
+                                            </div>
+                                            Editar
+                                        </div>
+                                    </button>
+                                </template>
                             </td>
                         </tr>
                     </tbody>
-               </table>  
+                </table>
             </div>
         </div>
 
@@ -91,7 +139,8 @@
             facturas: [],  // Lista de facturas
             searchQuery: '',  // Búsqueda por folio
             currentPage: 1,  // Página actual
-            totalPages: 1  // Total de páginas
+            totalPages: 1,  // Total de páginas
+            estadoSeleccionado: 'pendientes'
         },
         methods: {
             aprobarFactura(idFactura) {
@@ -101,11 +150,18 @@
             // Obtener las facturas pendientes desde la API
             fetchFacturas(page = 1) {
                 this.currentPage = page;
-                let params = {
-                    status: 0,  // Estado 0 para facturas pendientes de revisión
-                    page: this.currentPage,
-                    q: this.searchQuery
+                // Mapear estado seleccionado a valores de status
+                const statusMapping = {
+                    pendientes: 0, // Status 0: facturas pendientes
+                    aprobadas: 1   // Status 1: facturas aprobadas
                 };
+
+                let params = {
+                    status: statusMapping[this.estadoSeleccionado], // Dinámicamente según el estado seleccionado
+                    page: this.currentPage,
+                    q: this.searchQuery // Búsqueda por folio
+                };
+
                 axios.get('/api/listar-facturas-pendientes/', { params })
                     .then(response => {
                         this.facturas = response.data.data;

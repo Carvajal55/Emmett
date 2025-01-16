@@ -733,45 +733,49 @@ def resumen_factura(request):
 
 @csrf_exempt
 def listar_facturas_pendientes(request):
-    query = request.GET.get('q', '')
+    # Obtener parámetros de consulta
+    query = request.GET.get('q', '').strip()
     page = request.GET.get('page', 1)
+    status = request.GET.get('status', 0)  # Por defecto, buscar facturas pendientes (status=0)
 
-    # Filtrar facturas pendientes (status = 0) y ordenar por fecha de creación descendente
-    facturas = Purchase.objects.filter(status=0).order_by('-dateadd')  # Asegúrate de que `dateadd` sea el campo correcto
-
-    # Filtrar por número de folio si se introduce una búsqueda
-    if query:
-        facturas = facturas.filter(number__icontains=query)
-
-    # Paginación (10 facturas por página)
-    paginator = Paginator(facturas, 10)
     try:
-        facturas_page = paginator.page(page)
-    except PageNotAnInteger:
-        facturas_page = paginator.page(1)
-    except EmptyPage:
-        facturas_page = paginator.page(paginator.num_pages)
+        # Filtrar facturas según el estado y la búsqueda
+        facturas = Purchase.objects.filter(status=status).order_by('-dateadd')
 
-    # Formatear los datos de las facturas
-    facturas_data = [{
-        'id': factura.id,
-        'typeDocument': factura.typedoc, 
-        'number': factura.number,
-        'supplier': factura.supplier,
-        'supplierName': factura.suppliername,
-        'subtotal': factura.subtotal,
-        'status': factura.status,
-        'dateAdd': factura.dateadd.strftime('%Y-%m-%d'),  # Formatear la fecha
-    } for factura in facturas_page]
+        if query:
+            facturas = facturas.filter(Q(number__icontains=query) | Q(suppliername__icontains=query))
 
-    # Crear la respuesta
-    response = {
-        'data': facturas_data,
-        'total_pages': paginator.num_pages,
-        'current_page': facturas_page.number,
-    }
+        # Paginación (10 facturas por página)
+        paginator = Paginator(facturas, 10)
+        try:
+            facturas_page = paginator.page(page)
+        except PageNotAnInteger:
+            facturas_page = paginator.page(1)
+        except EmptyPage:
+            facturas_page = paginator.page(paginator.num_pages)
 
-    return JsonResponse(response)
+        # Preparar los datos de las facturas
+        facturas_data = [{
+            'id': factura.id,
+            'typeDocument': factura.typedoc,
+            'number': factura.number,
+            'supplier': factura.supplier,
+            'supplierName': factura.suppliername,
+            'subtotal': factura.subtotal,
+            'status': factura.status,
+            'dateAdd': factura.dateadd.strftime('%Y-%m-%d'),
+        } for factura in facturas_page]
+
+        # Crear la respuesta
+        response = {
+            'data': facturas_data,
+            'total_pages': paginator.num_pages,
+            'current_page': facturas_page.number,
+        }
+        return JsonResponse(response, safe=False, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 @csrf_exempt
 def rechazar_factura(request):
@@ -970,47 +974,55 @@ def actualizar_precio_masivo(request):
             actualizados = []
 
             for detalle in detalles:
-                id_erp = detalle.get('iderp')
-                sku = detalle.get('sku')
-                b_price = detalle.get('bPrice')
-                type = detalle.get('type', 3)  # Lista base predeterminada
-
-                if not id_erp or not sku or not b_price:
-                    errores.append({'sku': sku, 'message': 'Datos incompletos'})
-                    continue
-
                 try:
+                    id_erp = detalle.get('iderp')
+                    sku = detalle.get('sku')
+                    b_price = detalle.get('bPrice')
+                    type = detalle.get('type', 3)  # Lista base predeterminada
+
+                    if not id_erp or not sku or not b_price:
+                        errores.append({'sku': sku, 'message': 'Datos incompletos'})
+                        continue
+
                     # Paso 1: Consultar el detalle de la lista de precios en Bsale
-                    url_costs = f"{BSALE_API_URL}/price_lists/{type}/details.json?variantid={id_erp}"
-                    headers = {
-                        'access_token': BSALE_API_TOKEN,
-                        'Content-Type': 'application/json'
-                    }
+                    try:
+                        url_costs = f"{BSALE_API_URL}/price_lists/{type}/details.json?variantid={id_erp}"
+                        headers = {
+                            'access_token': BSALE_API_TOKEN,
+                            'Content-Type': 'application/json'
+                        }
 
-                    response = requests.get(url_costs, headers=headers)
-                    if response.status_code != 200:
-                        errores.append({'sku': sku, 'message': 'Error al obtener datos de Bsale'})
-                        continue
+                        response = requests.get(url_costs, headers=headers)
+                        if response.status_code != 200:
+                            errores.append({'sku': sku, 'message': 'Error al obtener datos de Bsale'})
+                            continue
 
-                    bsale_data = response.json()
-                    items = bsale_data.get('items', [])
-                    if not items:
-                        errores.append({'sku': sku, 'message': 'No se encontró ningún ítem en Bsale'})
-                        continue
+                        bsale_data = response.json()
+                        items = bsale_data.get('items', [])
+                        if not items:
+                            errores.append({'sku': sku, 'message': 'No se encontró ningún ítem en Bsale'})
+                            continue
 
-                    id_detalle = items[0].get('id')
-                    if not id_detalle:
-                        errores.append({'sku': sku, 'message': 'No se encontró id_detalle en Bsale'})
+                        id_detalle = items[0].get('id')
+                        if not id_detalle:
+                            errores.append({'sku': sku, 'message': 'No se encontró id_detalle en Bsale'})
+                            continue
+                    except Exception as e:
+                        errores.append({'sku': sku, 'message': f'Error al consultar Bsale: {str(e)}'})
                         continue
 
                     # Paso 2: Actualizar el precio en Bsale
-                    url_update_price = f"{BSALE_API_URL}/price_lists/{type}/details/{id_detalle}.json"
-                    variant_value = float(b_price) / 1.19
-                    update_data = {'variantValue': variant_value, "id": id_detalle}
+                    try:
+                        url_update_price = f"{BSALE_API_URL}/price_lists/{type}/details/{id_detalle}.json"
+                        variant_value = float(b_price) / 1.19
+                        update_data = {'variantValue': variant_value, "id": id_detalle}
 
-                    put_response = requests.put(url_update_price, headers=headers, json=update_data)
-                    if put_response.status_code != 200:
-                        errores.append({'sku': sku, 'message': 'Error al actualizar el precio en Bsale'})
+                        put_response = requests.put(url_update_price, headers=headers, json=update_data)
+                        if put_response.status_code != 200:
+                            errores.append({'sku': sku, 'message': 'Error al actualizar el precio en Bsale'})
+                            continue
+                    except Exception as e:
+                        errores.append({'sku': sku, 'message': f'Error al actualizar en Bsale: {str(e)}'})
                         continue
 
                     # Paso 3: Actualizar el precio en la base de datos local
@@ -1023,9 +1035,11 @@ def actualizar_precio_masivo(request):
                         errores.append({'sku': sku, 'message': 'Producto no encontrado en la base de datos local'})
                     except ValueError:
                         errores.append({'sku': sku, 'message': f'Valor inválido para Precio Base: {b_price}'})
+                    except Exception as e:
+                        errores.append({'sku': sku, 'message': f'Error al actualizar en la base de datos local: {str(e)}'})
 
                 except Exception as e:
-                    errores.append({'sku': sku, 'message': f'Error inesperado: {str(e)}'})
+                    errores.append({'sku': detalle.get('sku', 'Desconocido'), 'message': f'Error inesperado: {str(e)}'})
 
             # Respuesta final
             return JsonResponse({
