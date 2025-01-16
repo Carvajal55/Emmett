@@ -132,33 +132,55 @@
 
         <div class="col-md-6 mb-4">
             <div class="card h-100">
+                <!-- Encabezado de la tarjeta -->
                 <div class="card-header" style="background-color: #003399; color: white;">
-                    <h6 class="mb-0" style="color: white;">Gestión de Unique Products</h6>
+                    <h6 class="mb-0">Gestión de Unique Products</h6>
                 </div>
+        
+                <!-- Cuerpo principal -->
                 <div class="card-body">
+                    <!-- Botones de respaldo -->
                     <button @click="hacerRespaldo" class="btn btn-primary mt-3">Hacer Respaldo</button>
                     <button @click="descargarBackup" class="btn btn-primary mt-3">Descargar Respaldo</button>
-                    <div class="card-heade" style="background-color: #003399; color: white;">
-                        <h6 class="mb-0" style="color: white;">Cargar Respaldo</h6>
+                    <button @click="descargarBackupExcel" class="btn btn-primary mt-3">Descargar Respaldo Excel</button>
+        
+                    <!-- Cargar respaldo -->
+                    <div class="card-header mt-4" >
+                        <h6 class="mb-0">Cargar Respaldo</h6>
                     </div>
                     <div class="card-body">
-                        <input type="file" id="fileInput" @change="uploadFile" accept="application/json"
-                            class="form-control">
-                        <button @click="cargarRespaldo" class="btn btn-warning mt-3">Cargar Respaldo de Productos Unicos</button>
+                        <input 
+                            type="file" 
+                            id="fileInput" 
+                            @change="uploadFile" 
+                            accept="application/json"
+                            class="form-control"
+                        />
+                        <button @click="cargarRespaldo" class="btn btn-warning mt-3">Cargar Respaldo de Productos Únicos</button>
                     </div>
-                    
+        
                     <hr>
+        
+                    <!-- Cargar nueva data -->
                     <h6>Cargar Nueva Data</h6>
-                    <input type="file" id="fileInput" @change="uploadFile">
+                    <input 
+                        type="file" 
+                        id="fileInput" 
+                        @change="uploadFile" 
+                        class="form-control"
+                    />
                     <button @click="cargarNuevaData" class="btn btn-success mt-3">Cargar Data</button>
+        
                     <hr>
+        
+                    <!-- Cargar productos -->
                     <h6>Cargar Productos</h6>
-                    
-                    
-                    <input type="file" @change="handleFileUpload">
+                    <input 
+                        type="file" 
+                        @change="handleFileUpload" 
+                        class="form-control"
+                    />
                     <button @click="uploadProductsFile" class="btn btn-primary mt-3">Cargar Productos</button>
-
-
                 </div>
             </div>
         </div>
@@ -214,6 +236,27 @@
         mounted() {
         },
         methods: {
+            descargarBackupExcel() {
+                const url = '/api/generar-excel-stock/';
+                axios({
+                    url: url,
+                    method: 'GET',
+                    responseType: 'blob', // Asegura que el archivo se maneje como binario
+                })
+                    .then(response => {
+                        // Crear un enlace para descargar el archivo
+                        const url = window.URL.createObjectURL(new Blob([response.data]));
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.setAttribute('download', 'stock_bodegas.xlsx'); // Nombre del archivo
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                    })
+                    .catch(error => {
+                        console.error('Error al descargar el respaldo:', error);
+                    });
+            },
             async uploadProductsFile() {
                 if (!this.file) {
                     Swal.fire('Advertencia', 'Debe seleccionar un archivo JSON.', 'warning');

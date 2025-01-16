@@ -142,6 +142,9 @@ urlpatterns = [
     path('api/bulk-upload-products/', core_views.bulk_upload_products, name='bulk_upload_products'),
     path('api/obtener-tipos-productos/', core_views.obtener_tipos_productos_y_guardar),
     path('api/listar-categorias/', core_views.listar_categorias, name='listar_categorias'),
+
+    #Exportar excel 
+    path('api/generar-excel-stock/', core_views.generar_excel_stock, name='generar_excel_stock'),
     
 
 

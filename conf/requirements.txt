@@ -54,5 +54,6 @@ pandas
 qrcode[pil]
 python-dotenv
 reportlab
+XlsxWriter
 
 

@@ -4557,6 +4557,79 @@ def obtener_tipos_productos_y_guardar(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
+
+def generar_excel_stock(request):
+    # Bodegas válidas
+    bodega_ids_included = [1, 2, 4, 6, 9, 10, 11]
+    bodega_mapping = cache.get('bodega_mapping')
+    if not bodega_mapping:
+        bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included).only('idoffice', 'name')
+        bodega_mapping = {b.idoffice: b.name for b in bodegas}
+        cache.set('bodega_mapping', bodega_mapping, timeout=300)
+
+    # Cargar sectores válidos
+    excluded_sector_ids = Sectoroffice.objects.filter(
+        Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
+    ).values_list('idsectoroffice', flat=True)
+    sector_mapping = cache.get('sector_mapping')
+    if not sector_mapping:
+        sectores = Sectoroffice.objects.exclude(idsectoroffice__in=excluded_sector_ids).only(
+            'idsectoroffice', 'namesector', 'idoffice'
+        ).values('idsectoroffice', 'namesector', 'idoffice')
+        sector_mapping = {s['idsectoroffice']: s for s in sectores}
+        cache.set('sector_mapping', sector_mapping, timeout=300)
+
+    # Obtener todos los productos
+    productos = Products.objects.prefetch_related(
+        Prefetch(
+            'unique_products',
+            queryset=Uniqueproducts.objects.filter(state=0).only('location', 'superid')
+        )
+    ).only('id', 'sku', 'nameproduct', 'prefixed', 'brands', 'currentstock','lastprice')
+
+    # Crear estructura de datos
+    data = []
+    for producto in productos:
+        bodegas_stock = {bodega_mapping[bodega_id]: 0 for bodega_id in bodega_ids_included}
+
+        # Procesar productos únicos
+        for unique_product in producto.unique_products.all():
+            location = unique_product.location
+            if location is not None:
+                sector = sector_mapping.get(location)
+                if sector and sector['idoffice'] in bodega_ids_included:
+                    bodega_name = bodega_mapping.get(sector['idoffice'], 'Sin información')
+                    bodegas_stock[bodega_name] += 1
+
+        # Total de stock disponible
+        stock_total = sum(bodegas_stock.values())
+
+        # Agregar datos al Excel
+        row = {
+            'SKU': producto.sku,
+            'Nombre': producto.nameproduct,
+            'Prefijo': producto.prefixed,
+            'Marca': producto.brands,
+            'Stock Total': stock_total,
+            'Precio':producto.lastprice
+        }
+        row.update(bodegas_stock)  # Añadir las columnas de bodegas
+        data.append(row)
+
+    # Crear DataFrame para Excel
+    df = pd.DataFrame(data)
+
+    # Crear archivo Excel en memoria
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Stock')
+    buffer.seek(0)
+
+    # Descargar archivo Excel
+    response = HttpResponse(buffer, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="stock_bodegas.xlsx"'
+    return response
+    
 # def obtener_tipos_productos_incremental(request):
 #     try:
 #         # Eliminar todas las categorías existentes en Categoryserp
