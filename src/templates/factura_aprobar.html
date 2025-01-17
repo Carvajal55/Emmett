@@ -481,11 +481,12 @@
                     .then(response => {
                         console.log(`Precio para lista ${type} actualizado correctamente:`, response.data);
                         Swal.fire({
-                            title: 'Éxito',
-                            text: `El precio para la lista ${type} se actualizó correctamente.`,
-                            icon: 'success',
-                            confirmButtonText: 'OK'
-                        });
+                        title: 'Éxito',
+                        text: `El precio para la lista ${type} se actualizó correctamente.`,
+                        icon: 'success',
+                        showConfirmButton: false, // Ocultar el botón de confirmación
+                        timer: 500 // Cerrar automáticamente después de 500ms
+                    });
                     })
                     .catch(error => {
                         console.error(`Error al actualizar el precio para la lista ${type}:`, error);
