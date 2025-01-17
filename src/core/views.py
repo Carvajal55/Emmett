@@ -801,6 +801,8 @@ def rechazar_factura(request):
 
 #Aprobar Facturas
 
+
+
 @csrf_exempt
 def obtener_valor_actual(request):
     if request.method == 'POST':
