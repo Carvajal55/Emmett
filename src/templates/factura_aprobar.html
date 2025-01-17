@@ -68,6 +68,28 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <div class="form-group col-6 mb-3">
+                        <div class="form-check">
+                            <input 
+                                type="checkbox" 
+                                id="toggleGlobalInput" 
+                                class="form-check-input" 
+                                v-model="habilitarInputGlobal"
+                            />
+                            <label for="toggleGlobalInput" class="form-check-label" style="font-weight: bold;">Habilitar Precio Global</label>
+                        </div>
+                    
+                        <label for="inputGlobal" style="font-weight: bold; font-size: 1rem;">Precio Global</label>
+                        <input
+                            type="number"
+                            id="inputGlobal"
+                            class="form-control"
+                            v-model.number="precioGlobal"
+                            @input="asignarPrecioGlobal"
+                            placeholder="Ingrese un precio global"
+                            :disabled="!habilitarInputGlobal"
+                        />
+                    </div>
                     <div class="row">
                         <div v-for="(precio, index) in listasPrecios" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
                             <div class="form-group">
@@ -83,6 +105,7 @@
                                 <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
                                     Valor Actual: [[ precio.valorActual || 'Pendiente' ]] CLP
                                 </p>
+                               
                 
                                 <!-- Input para ingresar el valor -->
                                 <input
@@ -258,6 +281,7 @@
         el: '#app',
         delimiters: ['[[', ']]'],  // Evitar conflictos con las etiquetas de Django
         data: {
+            habilitarInputGlobal: false,
             factura: null,  // Datos de la factura
             detalles: [],   // Detalles de la factura
             errorMsg: '',    // Mensaje de error
@@ -273,7 +297,8 @@
             skuSeleccionado: null, // SKU del producto seleccionado
             precioSeleccionado: null,
             nombreSeleccionado: null,
-            stockProductos: {}
+            stockProductos: {},
+            precioGlobal: null,
         },
         mounted() {
             console.log("Componente montado"); // Verificar que el mounted se ejecuta
@@ -289,6 +314,14 @@
             
         },
         methods: {
+            asignarPrecioGlobal() {
+                // Verificar que el precio global sea válido y el input esté habilitado
+                if (this.habilitarInputGlobal && this.precioGlobal !== null && this.precioGlobal >= 0) {
+                    this.listasPrecios.forEach(precio => {
+                        precio.valor = this.precioGlobal; // Actualizar cada valor
+                    });
+                }
+            },
             actualizarTodosLosPrecios() {
                 if (this.listasPrecios.length === 0) {
                     Swal.fire({
@@ -300,14 +333,24 @@
                     return;
                 }
 
+                // Mapear todas las actualizaciones de precios
                 const actualizaciones = this.listasPrecios.map(precio => {
+                    // Validar que se ingresó un valor
+                    if (!precio.valor || precio.valor <= 0) {
+                        return Promise.resolve({
+                            label: precio.label,
+                            status: 'error',
+                            message: `El valor ingresado para ${precio.label} no es válido.`
+                        });
+                    }
+
                     const url = `https://api.bsale.io/v1/price_lists/${precio.id}/details.json?code=${this.skuSeleccionado}`;
                     const headers = {
                         access_token: '1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc',
                         'Content-Type': 'application/json'
                     };
 
-                    // Lógica para obtener `id_detalle` y luego actualizar el precio
+                    // Obtener el detalle del precio (id_detalle)
                     return axios.get(url, { headers })
                         .then(response => {
                             const items = response.data.items || [];
@@ -319,7 +362,7 @@
                             // Actualizar el precio en Bsale
                             const urlUpdate = `https://api.bsale.io/v1/price_lists/${precio.id}/details/${idDetalle}.json`;
                             const dataUpdate = {
-                                variantValue: Math.ceil(precio.valor),
+                                variantValue: Math.ceil(precio.valor / 1.19), // Convertir el valor con IVA a neto
                                 id: idDetalle
                             };
 
@@ -333,11 +376,11 @@
                         .catch(error => ({
                             label: precio.label,
                             status: 'error',
-                            message: error.message || `Error al actualizar precio en ${precio.label}`
+                            message: error.response?.data?.message || error.message || `Error al actualizar precio en ${precio.label}`
                         }));
                 });
 
-                // Esperar todas las actualizaciones
+                // Procesar los resultados
                 Promise.all(actualizaciones)
                     .then(results => {
                         const errores = results.filter(result => result.status === 'error');
@@ -345,7 +388,7 @@
 
                         // Mostrar un resumen de los resultados
                         Swal.fire({
-                            title: 'Resultados',
+                            title: 'Resultados de la Actualización',
                             html: `
                                 <p><strong>Actualizados con éxito:</strong> ${exitos.length}</p>
                                 <p><strong>Errores:</strong> ${errores.length}</p>
