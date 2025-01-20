@@ -118,9 +118,12 @@ urlpatterns = [
    path('api/validate-access-key/', core_views.validate_dynamic_key, name='validate_dynamic_key'),
    #path('api/dispatch-product/', core_views.dispatch_product, name='dispatch_product'),
    path('api/dispatch-consumption/', core_views.dispatch_consumption, name='dispatch_consumption'),
+   path('api/dispatch-consumption-interno/', core_views.dispatch_consumption_interno, name='dispatch_consumption'),
+
    path('api/consult-bsale-document/', core_views.get_unique_document, name='get_unique_document'),
    path('api/validate-superid/', core_views.validate_superid_simplified, name='validate_superid'),
-   path('api/dispatch-product/', core_views.validate_superid_simplified, name='dispatch_product'),
+   path('api/validate-superid-interno/', core_views.validate_superid_simplified_interno, name='validate_superid'),
+
 
    path('api/comparar-stock-bsale/', core_views.comparar_stock_bsale, name='comparar_stock_bsale'),
 

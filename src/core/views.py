@@ -2688,6 +2688,100 @@ def format_table(details):
     return formatted
 
 @csrf_exempt
+def dispatch_consumption_interno(request):
+    if request.method == "POST":
+        try:
+            # Log para depurar los datos recibidos
+            print("Datos recibidos en la solicitud (raw body):", request.body)
+
+            # Parsear los datos
+            data = json.loads(request.body)
+            print("Datos parseados (JSON):", data)
+
+            # Obtener datos con valores predeterminados flexibles
+            n_document = data.get('nDocument')  # Puede ser None
+            type_document = data.get('typeDocument', 0)  # Tipo predeterminado: 0
+            company = data.get('company')
+            products = data.get('products', [])
+
+            # Log para valores individuales
+            print(f"nDocument: {n_document}, typeDocument: {type_document}, company: {company}")
+            print("Productos:", products)
+
+            # Verificar datos obligatorios
+            if not company or not products:
+                print("Error: Faltan datos obligatorios.")
+                return JsonResponse({
+                    'title': 'Datos incompletos',
+                    'icon': 'error',
+                    'message': 'La compañía y los productos son obligatorios.'
+                }, status=400)
+
+            # Reutilizar lógica existente desde aquí
+            # Obtener o crear el sector "Despachados"
+            sector_despachados = Sectoroffice.objects.get_or_create(
+                zone="DESP",
+                defaults={
+                    'idoffice': 0,
+                    'iduserresponsible': 0,
+                    'floor': 0,
+                    'section': 0,
+                    'namesector': "Despachados",
+                    'state': 1,
+                }
+            )[0]
+
+            print("Sector 'Despachados':", sector_despachados)
+
+            sector_despachados_id = sector_despachados.idsectoroffice
+
+            # Usar una transacción para manejar las operaciones
+            with transaction.atomic():
+                superids = [product.get('superid') for product in products]
+                print("SuperIDs recibidos:", superids)
+
+                unique_products = {
+                    up.superid: up for up in Uniqueproducts.objects.filter(
+                        superid__in=superids, state=0
+                    ).select_related('product')
+                }
+
+                print("Productos únicos encontrados:", unique_products)
+
+                for product in products:
+                    superid = product.get('superid')
+                    cantidad = int(product.get('quantity', 1))
+
+                    print(f"Procesando SuperID: {superid}, Cantidad: {cantidad}")
+
+                    unique_product = unique_products.get(superid)
+                    if not unique_product:
+                        print(f"Error: SuperID {superid} no encontrado.")
+                        return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'})
+                    
+                    # Actualizar producto despachado
+                    unique_product.location = sector_despachados_id
+                    unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
+                    unique_product.typedocout = type_document
+                    unique_product.ndocout = n_document
+                    unique_product.datelastinventory = timezone.now()
+                    unique_product.state = 1
+                    unique_product.ncompany = company
+                    unique_product.locationname = "Despachado"
+                    unique_product.save()
+                   
+
+            print("Despacho flexible completado con éxito.")
+            return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
+
+        except Exception as e:
+            print("Error durante el despacho flexible:", str(e))
+            return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
+
+    print("Método no permitido.")
+    return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
+
+@csrf_exempt
 def dispatch_consumption(request):
     if request.method == "POST":
         try:
@@ -2998,7 +3092,54 @@ def validate_superid_cached(request):
 
     return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
 
+@csrf_exempt
+def validate_superid_simplified_interno(request):
+    if request.method == "POST":
+        try:
+            # Parsear el cuerpo de la solicitud
+            body = json.loads(request.body)
+            sid = body.get('sid')
+            document_products = set(body.get('document_products', []))  # Puede estar vacío para despacho interno
 
+            # Validar que el SuperID sea proporcionado
+            if not sid:
+                return JsonResponse({'error': 'El SuperID es obligatorio'}, status=400)
+
+            # Buscar el producto asociado al SuperID
+            unique_product = Uniqueproducts.objects.filter(superid=sid).select_related('product').only('superid', 'product__sku').first()
+            if not unique_product:
+                return JsonResponse({'error': 'SuperID no encontrado'}, status=404)
+
+            # Validar que el producto tenga un SKU asociado
+            associated_sku = unique_product.product.sku if unique_product.product else None
+            if not associated_sku:
+                return JsonResponse({'error': 'Producto asociado no tiene un SKU válido'}, status=400)
+
+            # Si es un despacho interno, no es necesario validar contra el documento
+            if not document_products:
+                return JsonResponse({
+                    'title': 'SuperID validado para Despacho Interno',
+                    'icon': 'success',
+                    'sku': associated_sku
+                })
+
+            # Validar el SKU contra los productos del documento
+            if associated_sku not in document_products:
+                return JsonResponse({'error': 'El SKU asociado no coincide con los productos del documento'}, status=400)
+
+            # Respuesta exitosa
+            return JsonResponse({
+                'title': 'SuperID validado correctamente',
+                'icon': 'success',
+                'sku': associated_sku
+            })
+
+        except Exception as e:
+            # Manejo de errores inesperados
+            return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
+
+    # Respuesta si el método no es POST
+    return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
 
 @csrf_exempt
 def validate_superid_simplified(request):

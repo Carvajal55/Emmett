@@ -134,7 +134,7 @@
             async processSuperID(superid) {
                 try {
                     // Validar SuperID con la API
-                    const response = await axios.post('/api/validate-superid/', { sid: superid });
+                    const response = await axios.post('/api/validate-superid-interno/', { sid: superid });
 
                     if (response.data.icon === 'success') {
                         const product = {
@@ -214,7 +214,7 @@
 
                 try {
                     // Validar SuperID con la API
-                    const response = await axios.post('/api/validate-superid/', { sid: superidToProcess });
+                    const response = await axios.post('/api/validate-superid-interno/', { sid: superidToProcess });
 
                     if (response.data.icon === 'success') {
                         const product = {
@@ -251,24 +251,34 @@
 
             async dispatchConsumption(product) {
                 const payload = {
+                    nDocument: this.nDocument || null, // Puede ser null
+                    typeDocument: this.typeDocument || 0, // Predeterminado 0 si no está definido
                     company: this.company,
-                    products: [product]
+                    products: [
+                        {
+                            superid: product.superid,
+                            code: product.code
+                        }
+                    ]
                 };
 
                 try {
-                    const response = await axios.post('/api/dispatch-consumption/', payload);
+                    console.log('Payload enviado al backend:', payload);
+                    const response = await axios.post('/api/dispatch-consumption-interno/', payload);
 
-                    if (response.data.icon !== 'success') {
+                    if (response.data.icon === 'success') {
+                        console.log(`Despacho exitoso para SuperID: ${product.superid}`);
+                        this.showAlert(`Despacho exitoso para SuperID: ${product.superid}`, 'alert-success');
+                        this.playSound('successSound');
+                    } else {
                         console.error('Error en la API de despacho:', response.data);
                         this.showAlert(`Error al despachar SuperID: ${product.superid}`, 'alert-danger');
                         this.playSound('errorSound');
-                        throw new Error(`Error en el despacho: ${response.data.title}`);
                     }
                 } catch (error) {
                     console.error('Error al realizar el despacho:', error);
                     this.showAlert(`Error en el despacho de SuperID: ${product.superid}`, 'alert-danger');
                     this.playSound('errorSound');
-                    throw error;
                 }
             },
 
