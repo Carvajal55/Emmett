@@ -86,19 +86,17 @@
                     <p><strong>Precio:</strong> [[ selectedProduct.price ]]</p>
                     <p><strong>Stock Total:</strong> [[ selectedProduct.stock_total ]]</p>
                 
-                    <h6>Filtrar por Bodega</h6>
-                    <select v-model="selectedBodega" class="form-select mb-3">
-                        <option value="">Todas las Bodegas</option>
-                        <option v-for="(stock, bodega) in selectedProduct.bodegas" :key="bodega" :value="bodega">
-                            [[ bodega ]]
-                        </option>
-                    </select>
                     <h6>Stock por Bodega</h6>
                     <table class="table table-bordered">
                         <thead>
                             <tr>
-                                <th>Bodega</th>
-                                <th v-for="(stock, bodega) in selectedProduct.bodegas" :key="bodega">
+                                <!-- Hacer clic en "Bodega" para ver todos los productos -->
+                                <th @click="selectedBodega = ''" style="cursor: pointer; background-color: lightblue;" :class="{'table-primary': !selectedBodega}">
+                                    Bodega
+                                </th>
+                                <th v-for="(stock, bodega) in selectedProduct.bodegas" :key="bodega" @click="selectedBodega = bodega" 
+                                    style="cursor: pointer;" 
+                                    :class="{'table-primary': selectedBodega === bodega}">
                                     [[ bodega ]]
                                 </th>
                             </tr>
@@ -106,7 +104,9 @@
                         <tbody>
                             <tr>
                                 <td>Stock Total</td>
-                                <td v-for="(stock, bodega) in selectedProduct.bodegas" :key="bodega">
+                                <td v-for="(stock, bodega) in selectedProduct.bodegas" :key="bodega" @click="selectedBodega = bodega" 
+                                    style="cursor: pointer;" 
+                                    :class="{'table-primary': selectedBodega === bodega}">
                                     [[ stock ]]
                                 </td>
                             </tr>

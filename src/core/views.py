@@ -1853,23 +1853,18 @@ def add_product_to_sector(request):
                 if sector:
                     productos_no_encontrados = []
                     productos_actualizados = 0
-                    productos_stock_actualizado = 0
 
                     for producto_data in productos:
                         superid = producto_data.get('superid', '')
                         if superid:
+                            # Buscar el producto con el superid proporcionado
                             producto = Uniqueproducts.objects.filter(superid=superid).first()
 
                             if producto:
-                                # Si el producto proviene de la bodega "despachados" (id 0)
-                                if producto.location == 0:
-                                    # Buscar el SKU asociado y actualizar el stock
-                                    sku = producto.product.sku
-                                    product = Products.objects.filter(sku=sku).first()
-                                    if product:
-                                        product.currentstock += 1
-                                        product.save()
-                                        productos_stock_actualizado += 1
+                                # Validar que el producto no tenga estado 1 (vendido o no disponible)
+                                if producto.state == 1:
+                                    productos_no_encontrados.append(superid)  # Añadir a los productos no procesados
+                                    continue  # Saltar al siguiente producto
 
                                 # Actualizar la ubicación del producto al sector correspondiente
                                 producto.location = sector.idsectoroffice
@@ -1881,12 +1876,12 @@ def add_product_to_sector(request):
                         else:
                             productos_no_encontrados.append(superid)
 
+                    # Construir la respuesta según los resultados
                     if productos_no_encontrados:
                         return JsonResponse({
                             'resp': 2,
-                            'msg': f'Algunos productos no fueron encontrados: {", ".join(productos_no_encontrados)}',
+                            'msg': f'Algunos productos no fueron encontrados o no están disponibles: {", ".join(productos_no_encontrados)}',
                             'productos_actualizados': productos_actualizados,
-                            'productos_stock_actualizado': productos_stock_actualizado,
                             'sector': sector.namesector
                         })
                     else:
@@ -1894,7 +1889,6 @@ def add_product_to_sector(request):
                             'resp': 1,
                             'msg': 'Todos los productos fueron añadidos con éxito.',
                             'productos_actualizados': productos_actualizados,
-                            'productos_stock_actualizado': productos_stock_actualizado,
                             'sector': sector.namesector
                         })
                 else:
@@ -2278,11 +2272,11 @@ def reingresar_producto(request):
                 return JsonResponse({'error': 'No se pudo actualizar el stock en Bsale.'}, status=500)
 
             # Actualizar el producto en el sistema
-            unique_product.locationname = "ALMACEN"
+            unique_product.locationname = "Re Ingreso"
             unique_product.state = 0  # Cambiar el estado a "Disponible" o el equivalente
             unique_product.observation = "Re ingreso de stock"
             unique_product.reingreso_document_number = correlativo
-            unique_product.location =100000  # ID de la ubicación de Almacén cambiar a 100000 para local 100018 server
+            unique_product.location =100018  # ID de la ubicación de Almacén cambiar a 100000 para local 100018 server
             unique_product.save()
 
         # Manejar el valor de `dateadd` para evitar errores
@@ -3106,7 +3100,7 @@ def validate_superid_simplified_interno(request):
                 return JsonResponse({'error': 'El SuperID es obligatorio'}, status=400)
 
             # Buscar el producto asociado al SuperID
-            unique_product = Uniqueproducts.objects.filter(superid=sid).select_related('product').only('superid', 'product__sku').first()
+            unique_product = Uniqueproducts.objects.filter(superid=sid, state=0).select_related('product').only('superid', 'product__sku').first()
             if not unique_product:
                 return JsonResponse({'error': 'SuperID no encontrado'}, status=404)
 
@@ -3583,54 +3577,50 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Variable global para almacenar el progreso
+progreso_comparacion = {"avance": 0, "estado": "iniciado", "archivo": None}
+
 @csrf_exempt
 def comparar_stock_bsale(request):
+    global progreso_comparacion
     try:
-        # Inicialización
         print("Iniciando comparación de stock...")
+        progreso_comparacion = {"avance": 0, "estado": "procesando", "archivo": None}
+
         total_productos_locales = 0
         productos_comparados = 0
         productos_con_diferencia_stock = []
-        productos_con_errores = []  # Para rastrear SKUs con problemas
-        skus_no_comparados = []  # Para registrar los SKUs que no se pudieron comparar
         processed_iderps = set()
 
-        # Obtener productos locales
-        productos_locales = Products.objects.values('sku', 'iderp', 'currentstock')
+        # Obtener productos locales con stock de Uniqueproducts (state=0)
+        productos_locales = (
+            Products.objects.annotate(
+                stock_unique=Count('unique_products', filter=Q(unique_products__state=0))
+            ).values('sku', 'iderp', 'stock_unique')
+        )
         productos_local_dict = {producto['iderp']: producto for producto in productos_locales}
         total_productos_locales = len(productos_local_dict)
         print(f"Productos locales obtenidos: {total_productos_locales}")
 
         iderp_locales = set(productos_local_dict.keys())
         if not iderp_locales:
-            print("No hay productos locales para comparar.")
-            return JsonResponse({
-                "message": "No hay productos locales para comparar.",
-                "resumen": {
-                    "total_productos_locales": total_productos_locales,
-                    "productos_comparados": 0,
-                    "productos_con_diferencias": 0,
-                    "productos_con_errores": [],
-                    "skus_no_comparados": [],
-                    "detalles": []
-                }
-            }, status=200)
+            progreso_comparacion = {"avance": 100, "estado": "completado", "archivo": None}
+            return JsonResponse({"message": "No hay productos locales para comparar."}, status=200)
 
         # Procesar datos de Bsale
         next_url = f'{BSALE_API_URL}/stocks.json'
+        total_bsale_items = 0
         while next_url:
-            print(f"Consultando Bsale en: {next_url}")
             response = requests.get(next_url, headers={'access_token': BSALE_API_TOKEN})
             if response.status_code != 200:
-                print(f"Error al obtener datos de Bsale: {response.status_code}")
+                progreso_comparacion = {"avance": 100, "estado": "error", "archivo": None}
                 return JsonResponse({
                     "message": f"Error al obtener datos de Bsale: {response.status_code}",
-                    "resumen": {}
                 }, status=response.status_code)
 
             data = response.json()
             items = data.get('items', [])
-            print(f"Productos obtenidos de Bsale en este lote: {len(items)}")
+            total_bsale_items += len(items)
 
             for item in items:
                 variant = item.get('variant')
@@ -3639,56 +3629,49 @@ def comparar_stock_bsale(request):
                 iderp = variant.get('id')
                 bsale_stock = item.get('quantity', 0) or 0
 
-                # Solo procesar productos locales y no procesados previamente
                 if iderp in iderp_locales and iderp not in processed_iderps:
-                    processed_iderps.add(iderp)  # Marcar como procesado
+                    processed_iderps.add(iderp)
                     productos_comparados += 1
                     producto_local = productos_local_dict[iderp]
 
-                    try:
-                        current_stock_local = producto_local['currentstock'] or 0
-                        diferencia_stock = bsale_stock - current_stock_local
+                    current_stock_local = producto_local['stock_unique'] or 0
+                    diferencia_stock = bsale_stock - current_stock_local
 
-                        if diferencia_stock != 0:
-                            productos_con_diferencia_stock.append({
-                                "sku": producto_local['sku'],
-                                "stock_local": current_stock_local,
-                                "stock_bsale": bsale_stock,
-                                "diferencia": diferencia_stock
-                            })
-                            print(f"Diferencia encontrada para SKU {producto_local['sku']}: {diferencia_stock}")
-
-                    except Exception as e:
-                        # Registrar el SKU con error
-                        print(f"Error procesando SKU {producto_local['sku']}: {str(e)}")
-                        productos_con_errores.append({
+                    if diferencia_stock != 0:
+                        productos_con_diferencia_stock.append({
                             "sku": producto_local['sku'],
-                            "error": str(e)
+                            "stock_local": current_stock_local,
+                            "stock_bsale": bsale_stock,
+                            "diferencia": diferencia_stock
                         })
-                        skus_no_comparados.append(producto_local['sku'])
+
+                # Actualizar el progreso
+                progreso_comparacion["avance"] = (productos_comparados / total_productos_locales) * 100
+                print(f"Progreso: {progreso_comparacion['avance']:.2f}%")
+                time.sleep(0.1)  # Simulación de procesamiento
 
             next_url = data.get('next', None)
 
-        # Resumen final
-        resumen = {
-            "total_productos_locales": total_productos_locales,
-            "productos_comparados": productos_comparados,
-            "productos_con_diferencias": len(productos_con_diferencia_stock),
-            "productos_con_errores": productos_con_errores,
-            "skus_no_comparados": skus_no_comparados,
-            "detalles": productos_con_diferencia_stock
-        }
-        print("Comparación completada. Resumen:")
-        print(resumen)
+        # Crear archivo Excel
+        df = pd.DataFrame(productos_con_diferencia_stock)
+        excel_file = '/mnt/data/diferencias_stock.xlsx'
+        df.to_excel(excel_file, index=False)
+        print(f"Archivo Excel generado: {excel_file}")
 
-        return JsonResponse({
-            "message": "Proceso completado.",
-            "resumen": resumen
-        }, status=200)
+        # Actualizar el progreso final
+        progreso_comparacion = {"avance": 100, "estado": "completado", "archivo": excel_file}
+
+        return JsonResponse({"message": "Proceso completado."}, status=200)
 
     except Exception as e:
+        progreso_comparacion = {"avance": 100, "estado": "error", "archivo": None}
         print(f"Error inesperado: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
+
+
+def obtener_progreso(request):
+    global progreso_comparacion
+    return JsonResponse(progreso_comparacion)
 
     
 

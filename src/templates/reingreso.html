@@ -103,6 +103,8 @@
                         console.error('Error al reingresar producto:', error);
                         this.showAlert('Error al reingresar producto.', 'alert-danger');
                     });
+
+                    this.form.superid = '';
             },
             toggleSelectAll() {
                 if (this.selectAll) {

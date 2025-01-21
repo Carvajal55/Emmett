@@ -473,21 +473,48 @@
             },
             iniciarComparacion() {
                 this.loading = true;
+                this.progreso = 0;
+
                 axios.get('/api/comparar-stock-bsale/')
-                    .then(response => {
-                        const data = response.data;
+                    .then(() => {
+                        // Iniciar consulta de progreso
+                        const progresoInterval = setInterval(() => {
+                            axios.get('/api/obtener-progreso/')
+                                .then(response => {
+                                    const data = response.data;
+                                    this.progreso = data.avance;
 
-                        if (data.resumen) {
-                            this.comparacionResultado = data.resumen.detalles;
-                            Swal.fire('Éxito', 'La comparación se completó correctamente.', 'success');
-                        } else {
-                            Swal.fire('Atención', 'No se encontraron diferencias en el stock.', 'info');
-                        }
+                                    if (data.estado === 'completado') {
+                                        clearInterval(progresoInterval); // Detener consulta
+                                        this.loading = false;
 
-                        this.loading = false;
+                                        if (data.archivo) {
+                                            Swal.fire({
+                                                title: '¡Éxito!',
+                                                text: 'La comparación se completó correctamente.',
+                                                icon: 'success',
+                                                confirmButtonText: 'Descargar Excel'
+                                            }).then(() => {
+                                                window.location.href = `/descargar-excel/?path=${data.archivo}`;
+                                            });
+                                        }
+                                    }
+
+                                    if (data.estado === 'error') {
+                                        clearInterval(progresoInterval); // Detener consulta
+                                        this.loading = false;
+                                        Swal.fire('Error', 'Ocurrió un error durante la comparación.', 'error');
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error obteniendo el progreso:', error);
+                                    clearInterval(progresoInterval); // Detener consulta en caso de error
+                                    this.loading = false;
+                                });
+                        }, 1000); // Consultar cada segundo
                     })
                     .catch(error => {
-                        Swal.fire('Error', 'Ocurrió un error durante la comparación.', 'error');
+                        Swal.fire('Error', 'Ocurrió un error al iniciar la comparación.', 'error');
                         console.error(error);
                         this.loading = false;
                     });
