@@ -27,25 +27,32 @@
                     <h6 class="mb-0" style="color: white;">Comparar Stock con Bsale</h6>
                 </div>
                 <div class="card-body">
+                    <!-- Botón para iniciar la comparación -->
                     <button @click="iniciarComparacion" class="btn btn-primary mt-3" :disabled="loading">
                         [[ loading ? 'Comparando...' : 'Comparar Stock en Bsale' ]]
                     </button>
-                    <button @click="imprimirTabla" class="btn btn-secondary mt-3"
-                        v-if="comparacionResultado.length > 0">
-                        Imprimir Tabla
-                    </button>
-
+        
                     <!-- Barra de progreso -->
-                    <div class="progress mt-3" v-if="loading">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
-                            :style="{ width: progress + '%' }" aria-valuemin="0" aria-valuemax="100">
-                            [[ progress ]]%
+                    <div v-if="loading" class="mt-4">
+                        <h6>Progreso de la Comparación</h6>
+                        <div class="progress">
+                            <div 
+                                class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                role="progressbar"
+                                :style="{ width: progress + '%' }"
+                                :aria-valuenow="progress"
+                                aria-valuemin="0"
+                                aria-valuemax="100">
+                                [[ progress ]]%
+                            </div>
                         </div>
+                        <p class="text-center mt-2">[[ progressMessage ]]</p>
                     </div>
-
-                    <div v-if="comparacionResultado.length > 0">
+        
+                    <!-- Resultados de la comparación -->
+                    <div v-if="comparacionResultado.length > 0" class="mt-4">
                         <h6>Resumen de la Comparación:</h6>
-                        <table class="table table-striped mt-3">
+                        <table class="table table-striped">
                             <thead>
                                 <tr>
                                     <th>SKU</th>
@@ -63,6 +70,11 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+        
+                    <!-- Mensaje de estado si no hay resultados -->
+                    <div v-else-if="!loading && comparacionResultado.length === 0" class="mt-4">
+                        <p class="text-muted">No se han encontrado diferencias en el stock.</p>
                     </div>
                 </div>
             </div>
@@ -473,19 +485,18 @@
             },
             iniciarComparacion() {
                 this.loading = true;
-                this.progreso = 0;
+                this.progress = 0;
 
                 axios.get('/api/comparar-stock-bsale/')
                     .then(() => {
-                        // Iniciar consulta de progreso
                         const progresoInterval = setInterval(() => {
                             axios.get('/api/obtener-progreso/')
                                 .then(response => {
                                     const data = response.data;
-                                    this.progreso = data.avance;
+                                    this.progress = data.avance;
 
                                     if (data.estado === 'completado') {
-                                        clearInterval(progresoInterval); // Detener consulta
+                                        clearInterval(progresoInterval);
                                         this.loading = false;
 
                                         if (data.archivo) {
@@ -495,23 +506,23 @@
                                                 icon: 'success',
                                                 confirmButtonText: 'Descargar Excel'
                                             }).then(() => {
-                                                window.location.href = `/descargar-excel/?path=${data.archivo}`;
+                                                window.location.href = data.archivo; // Descargar el archivo
                                             });
                                         }
                                     }
 
                                     if (data.estado === 'error') {
-                                        clearInterval(progresoInterval); // Detener consulta
+                                        clearInterval(progresoInterval);
                                         this.loading = false;
                                         Swal.fire('Error', 'Ocurrió un error durante la comparación.', 'error');
                                     }
                                 })
                                 .catch(error => {
                                     console.error('Error obteniendo el progreso:', error);
-                                    clearInterval(progresoInterval); // Detener consulta en caso de error
+                                    clearInterval(progresoInterval);
                                     this.loading = false;
                                 });
-                        }, 1000); // Consultar cada segundo
+                        }, 1000);
                     })
                     .catch(error => {
                         Swal.fire('Error', 'Ocurrió un error al iniciar la comparación.', 'error');

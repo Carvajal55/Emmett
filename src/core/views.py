@@ -2752,7 +2752,28 @@ def dispatch_consumption_interno(request):
                     if not unique_product:
                         print(f"Error: SuperID {superid} no encontrado.")
                         return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'})
-                    
+
+                    # Si n_document es None, descontar en Bsale
+                    if n_document is None:
+                        data_bsale = {
+                            "note": f"Despacho desde empresa {company}",
+                            "officeId": 1,
+                            "details": [{"quantity": cantidad, "variantId": unique_product.product.iderp}]
+                        }
+                        headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+
+                        print("Datos enviados a Bsale:", data_bsale)
+
+                        # Hacer llamada a Bsale
+                        response = requests.post(
+                            "https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale
+                        )
+
+                        print("Respuesta de Bsale:", response.status_code, response.text)
+
+                        if response.status_code not in [200, 201]:
+                            raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
+
                     # Actualizar producto despachado
                     unique_product.location = sector_despachados_id
                     unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
@@ -2763,7 +2784,6 @@ def dispatch_consumption_interno(request):
                     unique_product.ncompany = company
                     unique_product.locationname = "Despachado"
                     unique_product.save()
-                   
 
             print("Despacho flexible completado con éxito.")
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
@@ -2866,25 +2886,6 @@ def dispatch_consumption(request):
                             'message': f'Stock disponible: {stock_disponible}'
                         })
 
-                    # Preparar datos para Bsale
-                    data_bsale = {
-                        "note": f"Despacho desde empresa {company}",
-                        "officeId": 1,
-                        "details": [{"quantity": cantidad, "variantId": unique_product.product.iderp}]
-                    }
-                    headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-
-                    print("Datos enviados a Bsale:", data_bsale)
-
-                    # Hacer llamada a Bsale
-                    response = requests.post(
-                        "https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale
-                    )
-
-                    print("Respuesta de Bsale:", response.status_code, response.text)
-
-                    if response.status_code not in [200, 201]:
-                        raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
 
                     # Actualizar producto despachado
                     unique_product.location = sector_despachados_id
@@ -3648,18 +3649,25 @@ def comparar_stock_bsale(request):
                 # Actualizar el progreso
                 progreso_comparacion["avance"] = (productos_comparados / total_productos_locales) * 100
                 print(f"Progreso: {progreso_comparacion['avance']:.2f}%")
-                time.sleep(0.1)  # Simulación de procesamiento
 
             next_url = data.get('next', None)
 
-        # Crear archivo Excel
+        # Crear archivo Excel en la carpeta `static/exports`
+        static_exports_path = os.path.join(settings.BASE_DIR, 'static', 'exports')
+        os.makedirs(static_exports_path, exist_ok=True)  # Crear la carpeta si no existe
+        excel_file = os.path.join(static_exports_path, 'diferencias_stock.xlsx')
+
+        # Guardar el archivo
         df = pd.DataFrame(productos_con_diferencia_stock)
-        excel_file = '/mnt/data/diferencias_stock.xlsx'
         df.to_excel(excel_file, index=False)
         print(f"Archivo Excel generado: {excel_file}")
 
         # Actualizar el progreso final
-        progreso_comparacion = {"avance": 100, "estado": "completado", "archivo": excel_file}
+        progreso_comparacion = {
+            "avance": 100,
+            "estado": "completado",
+            "archivo": f'/static/exports/diferencias_stock.xlsx'
+        }
 
         return JsonResponse({"message": "Proceso completado."}, status=200)
 
