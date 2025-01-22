@@ -2,96 +2,80 @@
 {% load static %}
 
 {% block content %}
-<body class="" >
-    <head>
-        <audio id="successSound" src="{% static 'sounds/success.mp3' %}" preload="auto"></audio>
-        <audio id="errorSound" src="{% static 'sounds/error.mp3' %}" preload="auto"></audio>
+<div id="app" class="container mt-4">
+    <audio id="successSound" src="{% static 'sounds/success.mp3' %}" preload="auto"></audio>
+    <audio id="errorSound" src="{% static 'sounds/error.mp3' %}" preload="auto"></audio>
+    <!-- Selección de compañía -->
+    <div class="mb-3">
+        <label for="cbCompany">Compañía</label>
+        <select id="cbCompany" v-model="company" class="form-select">
+            <option value="1">EMMETT</option>
+            <option value="2">SOUNDSTORE</option>
+            <option value="3">GROBEN</option>
+        </select>
+    </div>
 
-        <meta charset="utf-8">
-        <title>Despacho</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-        <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
-    </head>
-    <body>
-        <div id="app" class="container">
-            <div>
-                <label for="cbCompany">Compañía</label>
-                <select id="cbCompany" v-model="company" class="form-select">
-                    <option value="1">EMMETT</option>
-                    <option value="2">SOUNDSTORE</option>
-                    <option value="3">GROBEN</option>
-                </select>
-            </div>
-            <div>
-                <label for="cbTypeDocument">Tipo Documento</label>
-                <select id="cbTypeDocument" v-model="typeDocument" class="form-select">
-                    <option value="39">BOLETA</option>
-                    <option value="33">FACTURA</option>
-                    <option value="52">GUIA</option>
-                </select>
-            </div>
-            <div>
-                <label for="nDocument">N° Documento</label>
-                <input id="nDocument" type="number" v-model="nDocument" @change="fetchDetails" class="form-control">
-            </div>   
-            <div>
-                <label for="sidProduct">ID Producto</label>
-                <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid(false)" class="form-control">
-            </div>             
-            
-            
-            
+    <!-- Selección de tipo de documento -->
+    <div class="mb-3">
+        <label for="cbTypeDocument">Tipo Documento</label>
+        <select id="cbTypeDocument" v-model="typeDocument" class="form-select">
+            <option value="39">BOLETA</option>
+            <option value="33">FACTURA</option>
+            <option value="52">GUIA</option>
+        </select>
+    </div>
 
+    <!-- Ingreso de número de documento -->
+    <div class="mb-3">
+        <label for="nDocument">N° Documento</label>
+        <input id="nDocument" type="number" v-model="nDocument" @change="fetchDetails" class="form-control">
+    </div>
 
-            <!-- Modal para ingresar la clave dinámica -->
-            <div class="modal fade" id="dynamicKeyModal" tabindex="-1" aria-labelledby="dynamicKeyModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            
-                            <h5 class="modal-title" id="dynamicKeyModalLabel">Acceso al Despacho Interno</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            
-                            <input type="text" v-model="dynamicKey" placeholder="Ingrese la clave de acceso" class="form-control" />
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="button" @click="validateDynamicKey" class="btn btn-primary">Ingresar</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-           
-        
-            
-        <table class="table mt-3">
-            <thead>
-                <tr>
-                    <th>SuperID</th>
-                    <th>SKU</th>
-                    <th>Nombre</th>
-                    <th>Descripción</th>
-                    <th>Cantidad Escaneada / Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="(product, index) in products" :key="index" :class="getProductRowClass(product)">
-                    <td>[[ product.superid || 'Pendiente' ]]</td>
-                    <td>[[ product.code ]]</td>
-                    <td>[[ product.name ]]</td>
-                    <td>[[ product.description ]]</td>
-                    <td>[[ product.quantityScanned ]] / [[ product.quantity ]]</td>
+    <!-- Ingreso de SuperID -->
+    <div class="mb-3">
+        <label for="sidProduct">SuperID</label>
+        <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid" class="form-control">
+    </div>
 
-                </tr>
-            </tbody>
-        </table>
-            
-        </div>
-</body>
+    <!-- Tabla de productos -->
+    <table class="table mt-4">
+        <thead>
+            <tr>
+                <th>SuperID</th>
+                <th>SKU</th>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th>Cantidad Escaneada / Total</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr v-for="(product, index) in products" :key="index" :class="getProductRowClass(product)">
+                <td>
+                    <ul>
+                        <li v-for="(superid, idx) in product.superids" :key="idx">[[ superid ]]</li>
+                    </ul>
+                </td>
+                <td>[[ product.code ]]</td>
+                <td>[[ product.name ]]</td>
+                <td>[[ product.description ]]</td>
+                <td>[[ product.quantityScanned ]] / [[ product.quantity ]]</td>
+                <td>
+                    <button class="btn btn-warning btn-sm" @click="forceComplete(index)">
+                        Forzar Completo
+                    </button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Botón para completar el despacho -->
+    <div class="mt-4">
+        <button class="btn btn-success" @click="completeDispatch" :disabled="!allProductsComplete">
+            Marcar Documento como Despachado
+        </button>
+    </div>
+</div>
 {% endblock %}
 
 {% block js %}
@@ -100,248 +84,177 @@
         el: '#app',
         delimiters: ['[[', ']]'],
         data: {
-            dynamicKey: '',           // Clave ingresada por el usuario
-            generatedKey: '',         // Clave generada
-            validKey: false, 
             company: 1,
             typeDocument: 39,
             nDocument: null,
-            sid: null,
+            sid: '',
             products: [],
-            newProduct: { superid: '', code: '', quantity: 1 },
-            internalProducts: [], // Lista de productos para despacho interno
-            alertasuccess:false,
-            alertaerror:false,
-            processingQueue: [],     // Cola de SuperIDs en espera
-            isProcessing: false,     // Bandera para evitar procesos simultáneos
+            dispatchReady: false, // Control para evitar disparo automático de completeDispatch
+        },
+        computed: {
+            allProductsComplete() {
+                // Verifica si todos los productos están completos (escaneados o forzados)
+                return this.products.every(product => product.is_complete);
+            }
         },
         watch: {
-            typeDocument() {
-                if (this.nDocument) this.fetchDetails();
+            allProductsComplete(value) {
+                if (value && this.dispatchReady) {
+                    this.completeDispatch();
+                }
             },
-            company() {
-                if (this.nDocument) this.fetchDetails();
-            }
         },
-        mounted() {
-            // Inicializar el modal del despacho interno
-            const modalElement = document.getElementById('internalDispatchModal');
-            if (modalElement) {
-                this.modalInstance = new bootstrap.Modal(modalElement, {
-                    keyboard: false,    // Prevenir cierre con teclado
-                    backdrop: 'static'  // Prevenir cierre al hacer clic fuera
-                });
-            }
-        },
-
         methods: {
-            requestDynamicKeyAccess() {
-                new bootstrap.Modal(document.getElementById('dynamicKeyModal')).show();
-            },
-            removeInternalProduct(index) {
-                this.internalProducts.splice(index, 1); // Eliminar producto de la lista interna
-            },
-            validateDynamicKey() {
-                axios.post('/api/validate-dynamic-key/', { key: this.dynamicKey })
-                    .then(response => {
-                        if (response.data.valid) {
-                            this.validKey = true;
-                            new bootstrap.Modal(document.getElementById('dynamicKeyModal')).hide();
-                            new bootstrap.Modal(document.getElementById('internalDispatchModal')).show();
-                        } else {
-                            Swal.fire('Error', 'Clave no válida o expirada.', 'error');
-                        }
-                    })
+            fetchProductDetails(sku) {
+                return axios.get('/api/fetch-product-details/', { params: { sku } })
+                    .then(response => response.data)
                     .catch(error => {
-                        Swal.fire('Error', 'No se pudo validar la clave.', 'error');
-                        console.error(error);
+                        console.error(`Error al obtener detalles del producto para SKU ${sku}:`, error);
+                        return { name: 'Desconocido', description: 'Desconocido' };
                     });
             },
+
             fetchDetails() {
                 this.products = [];
-                axios.get('/api/consult-bsale-document/', {
+                this.dispatchReady = false; // Resetea al cargar nuevos productos
+                axios.get('/api/fetch-invoice-products/', {
                     params: { number: this.nDocument, type: this.typeDocument }
-                }).then(response => {
-                    console.log('Productos recibidos:', response.data); // Depuración
+                }).then(async response => {
+                    console.log('Productos obtenidos del modelo:', response.data.products);
 
-                    // Asegurarse de mapear correctamente los datos
-                    this.products = response.data.map(product => ({
-                        code: product.code.trim().toUpperCase(), // Asegúrate de normalizar el código
-                        name: product.name,
-                        description: product.description,
-                        totalAmount: product.totalAmount,
-                        quantity: product.quantity,
-                        quantityScanned: 0, // Inicial
-                        superid: null
+                    // Mapear productos y obtener detalles adicionales
+                    this.products = await Promise.all(response.data.products.map(async product => {
+                        const details = await this.fetchProductDetails(product.code);
+                        return {
+                            code: product.code,
+                            name: details.name,
+                            description: details.description,
+                            quantity: product.total_quantity,
+                            quantityScanned: product.dispatched_quantity,
+                            superids: [], // Si tienes superids relacionados
+                            is_complete: product.is_complete,
+                        };
                     }));
 
                     console.log('Productos procesados:', this.products); // Depuración
+
+                    // Habilitar despacho solo después de cargar los productos
+                    this.dispatchReady = true;
                 }).catch(error => {
                     Swal.fire('Error', 'No se pudieron obtener los detalles del documento.', 'error');
                     console.error('Error al obtener productos:', error);
                 });
             },
-            playSound(soundId) {
-                const audioElement = document.getElementById(soundId);
-                if (audioElement) {
-                    audioElement.play();
-                } else {
-                    console.error(`El sonido con ID ${soundId} no se encontró.`);
-                }
-            },
-            async validateAndLinkSuperid() {
-                if (!this.sid || this.isProcessing) return;
 
-                const superidToValidate = this.sid.trim();
-                this.sid = ''; // Limpiar el input
+            validateAndLinkSuperid() {
+                if (!this.sid) return;
 
-                try {
-                    const response = await axios.post('/api/validate-superid/', {
-                        sid: superidToValidate,
-                        document_products: this.products.map(p => p.code) // Enviar los SKUs del documento
-                    });
+                const superid = this.sid.trim();
+                this.sid = ''; // Limpiar el campo
 
-                    if (response.data.icon === 'success') {
-                        const product = this.products.find(p => p.code === response.data.sku);
+                // Validar si el SuperID ya fue agregado
+                const product = this.products.find(product => 
+                    product.quantityScanned < product.quantity &&
+                    !product.superids.includes(superid)
+                );
 
-                        if (product) {
-                            if (product.quantityScanned < product.quantity) {
-                                product.quantityScanned++; // Incrementar la cantidad escaneada
-                                product.superid = superidToValidate; // Asignar el SuperID
-
-                                this.playSound('successSound');
-
-                                // Agregar el SuperID a la cola
-                                this.processingQueue.push(superidToValidate);
-
-                                // Ejecutar la cola si no está procesando
-                                if (!this.isProcessing) {
-                                    this.processQueue();
-                                }
-                            } else {
-                                this.playSound('errorSound');
-                            }
-                        } else {
-                            Swal.fire('Error', 'Producto no encontrado en la lista del documento.', 'error');
-                            this.playSound('errorSound');
-                        }
-                    } else {
-                        Swal.fire('Error', response.data.error || 'Validación fallida.', 'error');
-                        this.playSound('errorSound');
-                    }
-                } catch (error) {
-                    console.error('Error en la validación del SuperID:', error);
-                    Swal.fire('Error', 'No se pudo validar el SuperID.', 'error');
-                    this.playSound('errorSound');
-                }
-            },
-            getProductRowClass(product) {
-                if (product.quantityScanned === product.quantity) {
-                    return 'table-success'; // Verde para completado
-                }
-                return 'table-danger'; // Rojo para incompleto
-            },
-
-            async processQueue() {
-                if (this.processingQueue.length === 0) {
-                    this.isProcessing = false;
-                    console.log('Cola de procesamiento vacía.');
-                    return; // Nada que procesar
-                }
-
-                this.isProcessing = true; // Marcar como en proceso
-
-                const superidToProcess = this.processingQueue.shift(); // Extraer el primer SuperID de la cola
-                console.log('Procesando SuperID:', superidToProcess);
-
-                try {
-                    const payload = {
-                        nDocument: this.nDocument,
-                        typeDocument: this.typeDocument,
-                        company: this.company,
-                        products: [
-                            {
-                                superid: superidToProcess,
-                                quantity: 1 // Procesamos uno a la vez
-                            }
-                        ]
-                    };
-
-                    console.log('Payload para despacho:', payload);
-
-                    const response = await axios.post('/api/dispatch-consumption/', payload);
-
-                    if (response.data.icon === 'success') {
-                        this.playSound('successSound');
-
-                        // Actualizar la tabla si es necesario
-                        const product = this.products.find(p => p.superid === superidToProcess);
-                        if (product) {
-                            product.superid = null; // Limpiar el SuperID una vez despachado
-                        }
-                    } else {
-                        Swal.fire('Error', response.data.message || 'No se pudo despachar el producto.', 'error');
-                        this.playSound('errorSound');
-                    }
-                } catch (error) {
-                    console.error('Error al despachar el SuperID:', error);
-                    Swal.fire('Error', 'Ocurrió un problema al despachar el producto.', 'error');
-                    this.playSound('errorSound');
-                } finally {
-                    // Continuar con el siguiente SuperID en la cola
-                    this.processQueue();
-                }
-            },
-
-            async dispatchConsumption(superid) {
-                if (!superid) {
-                    console.error('Error: SuperID no proporcionado para despacho.');
+                if (!product) {
+                    this.playSound('error');
+                    Swal.fire('Error', 'No se puede asociar este SuperID. Verifica el SKU o cantidad.', 'error');
                     return;
                 }
 
+                // Asociar el SuperID al producto
+                product.superids.push(superid);
+                product.quantityScanned++;
+
+                // Realizar el despacho
+                this.dispatchSuperid(superid, product.code);
+            },
+
+            async dispatchSuperid(superid, sku) {
                 const payload = {
                     nDocument: this.nDocument,
                     typeDocument: this.typeDocument,
                     company: this.company,
-                    superid: superid // Enviar solo un SuperID
+                    products: [
+                        { superid, sku }
+                    ]
                 };
-
-                console.log('Payload para despacho:', payload);
 
                 try {
                     const response = await axios.post('/api/dispatch-consumption/', payload);
                     if (response.data.icon === 'success') {
-                        // Buscar el producto en la tabla por SKU o código
-                        const product = this.products.find(p => p.superid === null && p.code === response.data.sku);
-
-                        if (product) {
-                            product.quantityScanned++; // Incrementar el conteo de despachados
-                            product.superid = superid; // Asignar el SuperID
-                        }
-
-                        this.playSound('successSound'); // Sonido de éxito
+                        this.playSound('success');
+                        Swal.fire('Éxito', `SuperID ${superid} despachado correctamente.`, 'success');
                     } else {
-                        Swal.fire('Error', response.data.title, 'error');
-                        this.playSound('errorSound'); // Sonido de error
+                        this.playSound('error');
+                        Swal.fire('Error', response.data.message || 'Error al despachar.', 'error');
                     }
                 } catch (error) {
                     console.error('Error al despachar:', error);
-                    Swal.fire('Error', 'Ocurrió un problema al despachar el producto.', 'error');
-                    this.playSound('errorSound'); // Sonido de error
+                    this.playSound('error');
+                    Swal.fire('Error', 'No se pudo procesar el despacho.', 'error');
                 }
             },
-            updateDispatchedProducts(product) {
-                // Agregar el producto despachado a una lista visible en el modal
-                this.internalProducts.push({
-                    superid: product.superid,
-                    code: product.code,
-                    description: product.description
-                });
+            
+            async forceComplete(index) {
+                const product = this.products[index];
+                product.quantityScanned = product.quantity;
+                product.is_complete = true;
+
+                // Actualizar el estado del producto en el backend
+                try {
+                    const response = await axios.post('/api/force-complete-product/', {
+                        nDocument: this.nDocument,
+                        typeDocument: this.typeDocument,
+                        sku: product.code,
+                    });
+
+                    if (response.data.icon === 'success') {
+                        this.playSound('success');
+                        Swal.fire('Éxito', `Producto ${product.code} marcado como completo.`, 'success');
+                    } else {
+                        this.playSound('error');
+                        Swal.fire('Error', response.data.message || 'Error al marcar como completo.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error al forzar el producto:', error);
+                    this.playSound('error');
+                    Swal.fire('Error', 'No se pudo marcar el producto como completo.', 'error');
+                }
             },
-            openInternalDispatchModal() {
-                new bootstrap.Modal(document.getElementById('internalDispatchModal')).show();
-            }
-        }
+
+            async completeDispatch() {
+                try {
+                    const response = await axios.post('/api/complete-dispatch/', {
+                        nDocument: this.nDocument,
+                        typeDocument: this.typeDocument
+                    });
+
+                    if (response.data.icon === 'success') {
+                        this.playSound('success');
+                        Swal.fire('Éxito', 'El documento fue marcado como despachado.', 'success');
+                    } else {
+                        this.playSound('error');
+                        Swal.fire('Error', response.data.message || 'Error al completar el despacho.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error al completar el despacho:', error);
+                    this.playSound('error');
+                    Swal.fire('Error', 'No se pudo completar el despacho.', 'error');
+                }
+            },
+            playSound(type) {
+                const audioElement = type === 'success' ? document.getElementById('successSound') : document.getElementById('errorSound');
+                audioElement.currentTime = 0;
+                audioElement.play();
+            },
+
+            getProductRowClass(product) {
+                return product.quantityScanned === product.quantity ? 'table-success' : 'table-danger';
+            },
+        },
     });
 </script>
 {% endblock js %}

@@ -86,3 +86,47 @@ admin.site.register(Categoryserp, CategoryserpAdmin)
 
 
 admin.site.register(Usuario, UsuarioAdmin)
+
+# Personalización para el modelo InvoiceProductSuperID
+class InvoiceProductSuperIDInline(admin.TabularInline):
+    model = InvoiceProductSuperID
+    extra = 0  # No añadir líneas adicionales por defecto
+    fields = ('superid', 'dispatched')
+    readonly_fields = ('superid',)
+    can_delete = False  # Evitar eliminar desde el admin
+
+
+# Personalización para el modelo InvoiceProduct
+class InvoiceProductInline(admin.TabularInline):
+    model = InvoiceProduct
+    extra = 0
+    fields = ('product_sku', 'total_quantity', 'dispatched_quantity', 'is_complete')
+    readonly_fields = ('product_sku', 'total_quantity', 'dispatched_quantity', 'is_complete')
+    inlines = [InvoiceProductSuperIDInline]  # Mostrar los SuperIDs asociados
+
+
+# Configuración del modelo Invoice
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    list_display = ('id', 'document_type', 'document_number', 'dispatched', 'created_at', 'updated_at')
+    list_filter = ('dispatched', 'document_type', 'created_at')
+    search_fields = ('document_number',)
+    inlines = [InvoiceProductInline]  # Mostrar productos asociados
+    readonly_fields = ('created_at', 'updated_at')  # Campos de solo lectura
+
+
+# Configuración del modelo InvoiceProduct
+@admin.register(InvoiceProduct)
+class InvoiceProductAdmin(admin.ModelAdmin):
+    list_display = ('id', 'invoice', 'product_sku', 'total_quantity', 'dispatched_quantity', 'is_complete')
+    list_filter = ('is_complete',)
+    search_fields = ('product_sku',)
+    inlines = [InvoiceProductSuperIDInline]
+
+
+# Configuración del modelo InvoiceProductSuperID
+@admin.register(InvoiceProductSuperID)
+class InvoiceProductSuperIDAdmin(admin.ModelAdmin):
+    list_display = ('id', 'product', 'superid', 'dispatched')
+    list_filter = ('dispatched',)
+    search_fields = ('superid',)

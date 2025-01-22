@@ -242,5 +242,40 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+    
+class Invoice(models.Model):
+    DOCUMENT_TYPES = [
+        (0, 'Boleta'),
+        (1, 'Factura'),
+    ]
+
+    document_type = models.IntegerField(choices=DOCUMENT_TYPES)  # Tipo de documento
+    document_number = models.CharField(max_length=50, unique=True)  # Número único del documento
+    dispatched = models.BooleanField(default=False)  # ¿Fue completamente despachada?
+    created_at = models.DateTimeField(auto_now_add=True)  # Fecha de creación
+    updated_at = models.DateTimeField(auto_now=True)  # Última modificación
+
+    def __str__(self):
+        return f"{self.get_document_type_display()} - {self.document_number}"
+
+
+class InvoiceProduct(models.Model):
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='products')  # Relación con Invoice
+    product_sku = models.CharField(max_length=100)  # SKU del producto
+    total_quantity = models.IntegerField()  # Cantidad total del producto
+    dispatched_quantity = models.IntegerField(default=0)  # Cantidad despachada
+    is_complete = models.BooleanField(default=False)  # ¿Está completo el despacho?
+
+    def __str__(self):
+        return f"{self.product_sku} - {self.dispatched_quantity}/{self.total_quantity}"
+
+
+class InvoiceProductSuperID(models.Model):
+    product = models.ForeignKey(InvoiceProduct, on_delete=models.CASCADE, related_name='superids')  # Relación con Producto
+    superid = models.CharField(max_length=100, unique=True)  # SuperID único
+    dispatched = models.BooleanField(default=False)  # ¿Fue despachado?
+
+    def __str__(self):
+        return f"SuperID: {self.superid} - Despachado: {self.dispatched}"
 
 

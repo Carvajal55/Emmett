@@ -2233,71 +2233,117 @@ def obtener_stock_bsale(variant_id):
     else:
         return None
     
+from django.utils.timezone import now
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.timezone import now
+from django.db import transaction
+import json
+import requests
+
+# Reemplaza con tu token de Bsale
+
+
 @csrf_exempt
 def reingresar_producto(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+    if request.method == "POST":
+        try:
+            print("Datos recibidos en la solicitud (raw body):", request.body)
+            data = json.loads(request.body)
+            print("Datos parseados (JSON):", data)
 
-    try:
-        superid = request.POST.get('superid')
-        cantidad = int(request.POST.get('cantidad', 1))
-        office_id = 1  # Siempre "Casa Matriz"
+            superid = data.get("superid")
+            cantidad = int(data.get("cantidad", 1))
+            n_document = data.get("nDocument")  # Puede ser None
+            company = data.get("company", 1)  # Valor por defecto 1 para "company"
 
-        if not superid or cantidad <= 0:
-            return JsonResponse({'error': 'Datos inválidos.'}, status=400)
+            print(f"SuperID: {superid}, Cantidad: {cantidad}, nDocument: {n_document}, Company: {company}")
 
-        # Validar producto con estado específico (por ejemplo, estado 3 para "Despachado")
-        unique_product = Uniqueproducts.objects.filter(superid=superid, state=1).select_related('product').first()
-        if not unique_product:
-            return JsonResponse({'error': 'Producto no encontrado o no está en estado válido para reingreso.'}, status=404)
+            if not superid:
+                print("Error: El SuperID es obligatorio.")
+                return JsonResponse({
+                    'error': 'El SuperID es obligatorio.'
+                }, status=400)
 
-        producto = unique_product.product
+            with transaction.atomic():
+                print(f"Buscando el producto único con SuperID: {superid} y estado '1'")
+                unique_product = Uniqueproducts.objects.filter(superid=superid, state=1).select_related('product').first()
 
-        # Obtener el próximo correlativo
-        with transaction.atomic():
-            correlativo = Uniqueproducts.objects.filter(
-                observation="Re ingreso de stock"
-            ).count() + 1
+                if not unique_product:
+                    print(f"Error: El SuperID {superid} no se encuentra registrado como despachado.")
+                    return JsonResponse({
+                        'error': f"El SuperID {superid} no se encuentra registrado como despachado."
+                    }, status=404)
 
-            # Actualizar stock en Bsale
-            bsale_response = actualizar_stock_bsale(
-                variant_id=producto.iderp,
-                office_id=office_id,
-                new_stock=cantidad,
-                cost=producto.lastcost,
-                number=correlativo
-            )
+                print(f"Producto encontrado: {unique_product.product.sku} - {unique_product.product.nameproduct}")
 
-            if not bsale_response:
-                return JsonResponse({'error': 'No se pudo actualizar el stock en Bsale.'}, status=500)
+                if not n_document:
+                    print("No se proporcionó número de documento. Se realizará la actualización en Bsale.")
+                    if not unique_product.product.iderp:
+                        print(f"Error: El producto con SuperID {superid} no tiene un ID válido en Bsale.")
+                        return JsonResponse({
+                            'error': f"El producto con SuperID {superid} no tiene un ID válido en Bsale."
+                        }, status=400)
 
-            # Actualizar el producto en el sistema
-            unique_product.locationname = "Re Ingreso"
-            unique_product.state = 0  # Cambiar el estado a "Disponible" o el equivalente
-            unique_product.observation = "Re ingreso de stock"
-            unique_product.reingreso_document_number = correlativo
-            unique_product.location =100018  # ID de la ubicación de Almacén cambiar a 100000 para local 100018 server
-            unique_product.save()
+                    data_bsale = {
+                        "note": f"Reingreso interno desde empresa {company}",
+                        "officeId": 1,
+                        "details": [{"quantity": cantidad, "variantId": unique_product.product.iderp}]
+                    }
+                    headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+                    print("Datos enviados a Bsale:", data_bsale)
 
-        # Manejar el valor de `dateadd` para evitar errores
-        dateadd_formatted = (
-            unique_product.dateadd.strftime('%d-%m-%Y') if unique_product.dateadd else "Fecha no disponible"
-        )
+                    try:
+                        response = requests.post(
+                            "https://api.bsale.io/v1/stocks/receptions.json", headers=headers, json=data_bsale
+                        )
+                        print(f"Respuesta de Bsale: {response.status_code} - {response.text}")
 
-        return JsonResponse({
-            'message': 'Producto reingresado con éxito.',
-            'producto': {
-                'superid': unique_product.superid,
-                'sku': producto.sku,
-                'name': producto.nameproduct,
-                'location': unique_product.locationname,
-                'state': unique_product.state,
-                'dateadd': dateadd_formatted,
-            }
-        })
+                        if response.status_code not in [200, 201]:
+                            raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
+                        else:
+                            print("Actualización en Bsale completada con éxito.")
 
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+                    except Exception as e:
+                        print(f"Error al conectar con Bsale: {str(e)}")
+                        raise Exception(f"Error en Bsale: {str(e)}")
+
+                else:
+                    print(f"Se proporcionó número de documento: {n_document}. Solo se actualizará localmente.")
+
+                print(f"Actualizando localmente el producto con SuperID: {superid}")
+                unique_product.location = None
+                unique_product.state = 0
+                unique_product.observation = f"Reingreso: {n_document or 'Sin documento'} | Empresa: {company}"
+                unique_product.datelastinventory = now()
+                unique_product.ncompany = company
+                unique_product.locationname = "Reingresado"
+                unique_product.save()
+
+                print(f"Producto {superid} actualizado localmente con éxito.")
+
+                producto_reingresado = {
+                    'superid': unique_product.superid,
+                    'sku': unique_product.product.sku,
+                    'name': unique_product.product.nameproduct,
+                    'location': unique_product.locationname,
+                    'dateadd': unique_product.datelastinventory.strftime('%Y-%m-%d %H:%M:%S')
+                }
+
+            print(f"Proceso de reingreso completado para el SuperID {superid}.")
+            return JsonResponse({
+                'message': f"El producto con SuperID {superid} fue reingresado correctamente.",
+                'producto': producto_reingresado
+            }, status=200)
+
+        except Exception as e:
+            print("Error durante el reingreso del producto:", str(e))
+            return JsonResponse({'error': f"Error en el reingreso: {str(e)}"}, status=500)
+
+    print("Método no permitido.")
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
     
 @csrf_exempt
 def reimprimir_etiqueta(request):
@@ -2685,24 +2731,20 @@ def format_table(details):
 def dispatch_consumption_interno(request):
     if request.method == "POST":
         try:
-            # Log para depurar los datos recibidos
             print("Datos recibidos en la solicitud (raw body):", request.body)
-
-            # Parsear los datos
             data = json.loads(request.body)
             print("Datos parseados (JSON):", data)
 
-            # Obtener datos con valores predeterminados flexibles
-            n_document = data.get('nDocument')  # Puede ser None
+            n_document = data.get('nDocument')  # Número de documento, puede ser None
             type_document = data.get('typeDocument', 0)  # Tipo predeterminado: 0
             company = data.get('company')
             products = data.get('products', [])
 
-            # Log para valores individuales
-            print(f"nDocument: {n_document}, typeDocument: {type_document}, company: {company}")
-            print("Productos:", products)
+            print(f"nDocument: {n_document}")
+            print(f"typeDocument: {type_document}")
+            print(f"company: {company}")
+            print(f"products: {products}")
 
-            # Verificar datos obligatorios
             if not company or not products:
                 print("Error: Faltan datos obligatorios.")
                 return JsonResponse({
@@ -2711,8 +2753,6 @@ def dispatch_consumption_interno(request):
                     'message': 'La compañía y los productos son obligatorios.'
                 }, status=400)
 
-            # Reutilizar lógica existente desde aquí
-            # Obtener o crear el sector "Despachados"
             sector_despachados = Sectoroffice.objects.get_or_create(
                 zone="DESP",
                 defaults={
@@ -2729,7 +2769,6 @@ def dispatch_consumption_interno(request):
 
             sector_despachados_id = sector_despachados.idsectoroffice
 
-            # Usar una transacción para manejar las operaciones
             with transaction.atomic():
                 superids = [product.get('superid') for product in products]
                 print("SuperIDs recibidos:", superids)
@@ -2750,13 +2789,15 @@ def dispatch_consumption_interno(request):
 
                     unique_product = unique_products.get(superid)
                     if not unique_product:
-                        print(f"Error: SuperID {superid} no encontrado.")
+                        print(f"Error: SuperID {superid} no encontrado en la base de datos.")
                         return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'})
 
-                    # Si n_document es None, descontar en Bsale
-                    if n_document is None:
+                    # Descontar de Bsale solo si no hay número de documento
+                    if not n_document:
+                        print(f"SuperID {superid}: Descontando en Bsale ya que no hay nDocument.")
+
                         data_bsale = {
-                            "note": f"Despacho desde empresa {company}",
+                            "note": f"Despacho interno desde empresa {company}",
                             "officeId": 1,
                             "details": [{"quantity": cantidad, "variantId": unique_product.product.iderp}]
                         }
@@ -2764,7 +2805,6 @@ def dispatch_consumption_interno(request):
 
                         print("Datos enviados a Bsale:", data_bsale)
 
-                        # Hacer llamada a Bsale
                         response = requests.post(
                             "https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale
                         )
@@ -2772,9 +2812,14 @@ def dispatch_consumption_interno(request):
                         print("Respuesta de Bsale:", response.status_code, response.text)
 
                         if response.status_code not in [200, 201]:
+                            print(f"Error al descontar en Bsale para SuperID {superid}: {response.text}")
                             raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
 
-                    # Actualizar producto despachado
+                    else:
+                        print(f"SuperID {superid}: No se descuenta en Bsale porque nDocument está presente.")
+
+                    # Actualizar producto despachado localmente
+                    print(f"Actualizando SuperID {superid} localmente.")
                     unique_product.location = sector_despachados_id
                     unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
                     unique_product.typedocout = type_document
@@ -2785,15 +2830,44 @@ def dispatch_consumption_interno(request):
                     unique_product.locationname = "Despachado"
                     unique_product.save()
 
-            print("Despacho flexible completado con éxito.")
+                    print(f"SuperID {superid} actualizado correctamente en el sistema local.")
+
+            print("Despacho interno completado con éxito.")
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
         except Exception as e:
-            print("Error durante el despacho flexible:", str(e))
+            print("Error durante el despacho interno:", str(e))
             return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
     print("Método no permitido.")
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
+
+
+@csrf_exempt
+def force_complete_product(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            n_document = data.get('nDocument')
+            type_document = data.get('typeDocument')
+            sku = data.get('sku')
+
+            invoice = Invoice.objects.filter(document_type=type_document, document_number=n_document).first()
+            if not invoice:
+                return JsonResponse({'icon': 'error', 'message': 'Documento no encontrado.'}, status=404)
+
+            product = InvoiceProduct.objects.filter(invoice=invoice, product_sku=sku).first()
+            if not product:
+                return JsonResponse({'icon': 'error', 'message': 'Producto no encontrado.'}, status=404)
+
+            product.dispatched_quantity = product.total_quantity
+            product.is_complete = True
+            product.save()
+
+            return JsonResponse({'icon': 'success', 'message': f'Producto {sku} marcado como completo.'})
+        except Exception as e:
+            return JsonResponse({'icon': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'icon': 'error', 'message': 'Método no permitido.'}, status=405)
 
 @csrf_exempt
 def dispatch_consumption(request):
@@ -2811,106 +2885,180 @@ def dispatch_consumption(request):
             company = data.get('company')
             products = data.get('products', [])
 
-            # Log para valores individuales
-            print(f"nDocument: {n_document}, typeDocument: {type_document}, company: {company}")
-            print("Productos:", products)
-
             # Verificar datos obligatorios
             if not n_document or not type_document or not company or not products:
-                print("Error: Faltan datos obligatorios.")
                 return JsonResponse({
                     'title': 'Datos incompletos',
                     'icon': 'error',
                     'message': 'Faltan datos obligatorios en la solicitud.'
                 }, status=400)
 
-            # Obtener o crear el sector "Despachados"
-            sector_despachados = Sectoroffice.objects.get_or_create(
-                zone="DESP",
-                defaults={
-                    'idoffice': 0,
-                    'iduserresponsible': 0,
-                    'floor': 0,
-                    'section': 0,
-                    'namesector': "Despachados",
-                    'state': 1,
-                }
-            )[0]
-
-            print("Sector 'Despachados':", sector_despachados)
-
-            sector_despachados_id = sector_despachados.idsectoroffice
-
-            # Usar una transacción para manejar las operaciones
+            # Usar una transacción para garantizar consistencia
             with transaction.atomic():
-                # Obtener todos los superIDs en un solo query
-                superids = [product.get('superid') for product in products]
-                print("SuperIDs recibidos:", superids)
-
-                unique_products = {
-                    up.superid: up for up in Uniqueproducts.objects.filter(
-                        superid__in=superids, state=0
-                    ).select_related('product')
-                }
-
-                print("Productos únicos encontrados:", unique_products)
-
-                # Procesar productos
                 for product in products:
                     superid = product.get('superid')
-                    cantidad = int(product.get('quantity', 1))
+                    sku = product.get('sku')
 
-                    print(f"Procesando SuperID: {superid}, Cantidad: {cantidad}")
-
-                    unique_product = unique_products.get(superid)
-                    if not unique_product:
-                        print(f"Error: SuperID {superid} no encontrado.")
-                        return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'})
-
-                    if unique_product.location is None:
-                        unique_product.location = sector_despachados_id
-                        unique_product.save()
-
-                    # Validar stock disponible
-                    stock_disponible = Uniqueproducts.objects.filter(
-                        product=unique_product.product, state=0
-                    ).count()
-
-                    print(f"Stock disponible para {unique_product.product.sku}: {stock_disponible}")
-
-                    if stock_disponible < cantidad:
-                        print(f"Error: Stock insuficiente para {unique_product.product.sku}.")
+                    if not superid or not sku:
                         return JsonResponse({
-                            'title': f'Stock insuficiente para {unique_product.product.sku}',
+                            'title': 'Datos incompletos',
                             'icon': 'error',
-                            'message': f'Stock disponible: {stock_disponible}'
-                        })
+                            'message': 'Faltan el SuperID o el SKU en los productos enviados.'
+                        }, status=400)
 
+                    # Obtener la factura
+                    invoice = Invoice.objects.filter(document_type=type_document, document_number=n_document).first()
+                    if not invoice:
+                        return JsonResponse({
+                            'title': 'Documento no encontrado',
+                            'icon': 'error',
+                            'message': 'El documento no existe en la base de datos.'
+                        }, status=404)
 
-                    # Actualizar producto despachado
-                    unique_product.location = sector_despachados_id
-                    unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
-                    unique_product.typedocout = type_document
-                    unique_product.ndocout = n_document
-                    unique_product.datelastinventory = timezone.now()
-                    unique_product.state = 1
-                    unique_product.ncompany = company
+                    # Verificar el producto asociado a la factura
+                    invoice_product = InvoiceProduct.objects.filter(invoice=invoice, product_sku=sku).first()
+                    if not invoice_product:
+                        return JsonResponse({
+                            'title': 'Producto no encontrado',
+                            'icon': 'error',
+                            'message': f'El producto con SKU {sku} no está asociado al documento.'
+                        }, status=404)
+
+                    # Validar si el SuperID ya fue procesado
+                    if InvoiceProductSuperID.objects.filter(product=invoice_product, superid=superid).exists():
+                        return JsonResponse({
+                            'title': 'SuperID ya registrado',
+                            'icon': 'error',
+                            'message': f'El SuperID {superid} ya está registrado para el SKU {sku}.'
+                        }, status=400)
+
+                    # Asociar el SuperID al producto
+                    InvoiceProductSuperID.objects.create(
+                        product=invoice_product,
+                        superid=superid,
+                        dispatched=True
+                    )
+
+                    # Actualizar cantidad despachada y estado del producto
+                    invoice_product.dispatched_quantity += 1
+                    invoice_product.is_complete = invoice_product.dispatched_quantity >= invoice_product.total_quantity
+                    invoice_product.save()
+
+                    # Descontar stock en la tabla `Uniqueproducts`
+                    unique_product = Uniqueproducts.objects.filter(
+                        superid=superid, state=0
+                    ).select_related('product').first()
+
+                    if not unique_product:
+                        return JsonResponse({
+                            'title': 'SuperID no válido',
+                            'icon': 'error',
+                            'message': f'El SuperID {superid} no está disponible para el SKU {sku}.'
+                        }, status=404)
+
+                    # Mover el producto al sector "Despachados"
+                    sector_despachados = Sectoroffice.objects.get_or_create(
+                        zone="DESP",
+                        defaults={
+                            'idoffice': 0,
+                            'iduserresponsible': 0,
+                            'floor': 0,
+                            'section': 0,
+                            'namesector': "Despachados",
+                            'state': 1,
+                        }
+                    )[0]
+
+                    unique_product.location = sector_despachados.idsectoroffice
+                    unique_product.state = 1  # Marcado como despachado
                     unique_product.locationname = "Despachado"
+                    unique_product.datelastinventory = timezone.now()
                     unique_product.save()
 
-                    print(f"Producto {superid} actualizado: {unique_product}")
+                    print(f"SuperID {superid} procesado y despachado.")
 
-            print("Despacho completado con éxito.")
-            return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
+                # Verificar si todos los productos de la factura están completos
+                all_products_complete = InvoiceProduct.objects.filter(invoice=invoice, is_complete=False).count() == 0
+                if all_products_complete:
+                    invoice.dispatched = True
+                    invoice.save()
+                    print(f"Factura {n_document} marcada como despachada.")
+
+            return JsonResponse({
+                'title': 'SuperIDs procesados con éxito',
+                'icon': 'success',
+                'message': 'Todos los SuperIDs enviados fueron procesados correctamente.'
+            }, status=200)
 
         except Exception as e:
             print("Error durante el despacho:", str(e))
             return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
-    print("Método no permitido.")
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
-#BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
 
+#BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
+@csrf_exempt
+def complete_dispatch(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            n_document = data.get('nDocument')
+            type_document = data.get('typeDocument')
+
+            if not n_document or not type_document:
+                return JsonResponse({
+                    'title': 'Datos incompletos',
+                    'icon': 'error',
+                    'message': 'Faltan parámetros nDocument o typeDocument.'
+                }, status=400)
+
+            # Buscar la factura en la base de datos
+            invoice = Invoice.objects.filter(document_type=type_document, document_number=n_document).first()
+            if not invoice:
+                return JsonResponse({
+                    'title': 'Documento no encontrado',
+                    'icon': 'error',
+                    'message': 'El documento no existe en la base de datos.'
+                }, status=404)
+
+            # Verificar si ya está despachada
+            if invoice.dispatched:
+                return JsonResponse({
+                    'title': 'Documento ya despachado',
+                    'icon': 'info',
+                    'message': 'El documento ya fue marcado como despachado.'
+                }, status=200)
+
+            # Verificar si todos los productos están completos
+            incomplete_products = InvoiceProduct.objects.filter(invoice=invoice, is_complete=False).count()
+            if incomplete_products > 0:
+                return JsonResponse({
+                    'title': 'Despacho incompleto',
+                    'icon': 'error',
+                    'message': 'Hay productos pendientes de despacho.'
+                }, status=400)
+
+            # Marcar la factura como despachada
+            invoice.dispatched = True
+            invoice.save()
+
+            return JsonResponse({
+                'title': 'Despacho completado',
+                'icon': 'success',
+                'message': 'El documento fue marcado como despachado con éxito.'
+            }, status=200)
+
+        except Exception as e:
+            return JsonResponse({
+                'title': 'Error interno',
+                'icon': 'error',
+                'message': str(e)
+            }, status=500)
+
+    return JsonResponse({
+        'title': 'Método no permitido',
+        'icon': 'error',
+    }, status=405)
 
 @csrf_exempt
 def get_unique_document(request):
@@ -2918,67 +3066,182 @@ def get_unique_document(request):
     number = request.GET.get('number')
 
     if not type_document or not number:
-        print("Error: Faltan parámetros de tipo de documento o número")
         return JsonResponse({'error': 'Faltan parámetros de tipo de documento o número'}, status=400)
 
-    # Construir la URL inicial para obtener el ID del documento
+    # Verificar si la factura ya existe en la base de datos
+    invoice = Invoice.objects.filter(document_type=type_document, document_number=number).first()
+    if invoice:
+        if invoice.dispatched:
+            return JsonResponse({'message': 'El documento ya fue completamente despachado.', 'products': []}, status=200)
+
+        # Obtener los productos asociados al documento
+        products = [
+            {
+                'sku': product.product_sku,
+                'total_quantity': product.total_quantity,
+                'dispatched_quantity': product.dispatched_quantity,
+                'is_complete': product.is_complete,
+            }
+            for product in invoice.invoiceproduct_set.all()
+        ]
+        return JsonResponse({'message': 'El documento existe, pero no está completamente despachado.', 'products': products}, status=200)
+
+    # Si no existe, obtener los datos desde Bsale
     url_costs = f"{BSALE_API_URL}/documents/costs.json?codesii={type_document}&number={number}"
     headers = {
         'access_token': BSALE_API_TOKEN,
         'Content-Type': 'application/json'
     }
 
-    print(f"Construyendo URL para obtener ID del documento: {url_costs}")
-
     try:
-        # Realizar la solicitud para obtener la información básica del documento
         response = requests.get(url_costs, headers=headers)
-        print(f"Respuesta de la API para obtener ID del documento: {response.status_code} - {response.text}")
-
-        if response.status_code == 401:
-            print("Error de autenticación: Verifica tu token o permisos de acceso")
-            return JsonResponse({'error': 'Error de autenticación: Verifica tu token o permisos de acceso'}, status=401)
-
         if response.status_code != 200:
-            print(f"Error al obtener el ID del documento: {response.status_code}")
-            return JsonResponse({'error': 'Error al obtener el ID del documento'}, status=response.status_code)
+            return JsonResponse({'error': 'Error al obtener los datos del documento desde Bsale.'}, status=500)
 
-        # Obtener el ID del documento desde la respuesta
         info = response.json()
         document_id = info.get('id')
         if not document_id:
-            print("Error: No se encontró el ID del documento en la respuesta")
-            return JsonResponse({'error': 'No se encontró el ID del documento'}, status=404)
+            return JsonResponse({'error': 'El documento no existe en Bsale.'}, status=404)
 
-        print(f"ID del documento obtenido: {document_id}")
+        # Crear el registro de la factura
+        invoice = Invoice.objects.create(
+            document_type=type_document,
+            document_number=number,
+            dispatched=False
+        )
 
-        # Extraer los detalles de los productos y consultar el nombre en el modelo Products
+        # Procesar los productos del documento
+        cost_details = info.get('cost_detail', [])
+        if not cost_details:
+            return JsonResponse({'error': 'El documento no tiene productos asociados.'}, status=400)
+
         products = []
-        for detail in info.get('cost_detail', []):
+        for detail in cost_details:
             variant = detail.get('variant', {})
             shipping_detail = detail.get('shipping_detail', {})
 
             sku = variant.get('code')
-            # Consulta el producto por SKU
-            product = Products.objects.filter(sku=sku).first()
-            name = product.nameproduct if product else "Nombre no encontrado"
+            total_quantity = int(shipping_detail.get('quantity', 0))
 
-            product_data = {
-                'code': sku,
-                'name': name,
-                'description': variant.get('description'),
-                'quantity': shipping_detail.get('quantity'),
-                'totalAmount': shipping_detail.get('variantTotalCost')
-            }
-            print(f"Producto procesado: {product_data}")
-            products.append(product_data)
+            # Crear el producto asociado a la factura
+            invoice_product = InvoiceProduct.objects.create(
+                invoice=invoice,
+                product_sku=sku,
+                total_quantity=total_quantity,
+                dispatched_quantity=0,
+                is_complete=False
+            )
 
-        print("Devolviendo la información de los productos correctamente")
-        return JsonResponse(products, safe=False)
+            products.append({
+                'sku': sku,
+                'total_quantity': total_quantity,
+                'dispatched_quantity': 0,
+                'is_complete': False
+            })
 
-    except requests.RequestException as e:
-        print(f"Error en la comunicación con la API: {str(e)}")
-        return JsonResponse({'error': 'Error en la comunicación con la API', 'details': str(e)}, status=500)
+        return JsonResponse({'message': 'Documento creado y productos registrados correctamente.', 'products': products}, status=201)
+
+    except Exception as e:
+        return JsonResponse({'error': 'Error en la comunicación con la API.', 'details': str(e)}, status=500)
+
+    
+@csrf_exempt
+def fetch_invoice_products(request):
+    type_document = request.GET.get('type')
+    number = request.GET.get('number')
+
+    if not type_document or not number:
+        return JsonResponse({'error': 'Faltan parámetros de tipo de documento o número'}, status=400)
+
+    # Buscar el documento en el modelo
+    invoice = Invoice.objects.filter(document_type=type_document, document_number=number).first()
+
+    # Si no existe, consultar en Bsale y crearlo
+    if not invoice:
+        url_costs = f"{BSALE_API_URL}/documents/costs.json?codesii={type_document}&number={number}"
+        headers = {
+            'access_token': BSALE_API_TOKEN,
+            'Content-Type': 'application/json'
+        }
+
+        try:
+            response = requests.get(url_costs, headers=headers)
+            if response.status_code != 200:
+                return JsonResponse({'error': 'Error al obtener los datos del documento desde Bsale.'}, status=500)
+
+            info = response.json()
+
+            document_id = info.get('id')
+            if not document_id:
+                return JsonResponse({'error': 'El documento no existe en Bsale.'}, status=404)
+
+            # Crear el registro del documento
+            invoice = Invoice.objects.create(
+                document_type=type_document,
+                document_number=number,
+                dispatched=False
+            )
+
+            # Procesar los productos del documento
+            cost_details = info.get('cost_detail', [])
+            if not cost_details:
+                return JsonResponse({'error': 'El documento no tiene productos asociados.'}, status=400)
+
+            for detail in cost_details:
+                variant = detail.get('variant', {})
+                shipping_detail = detail.get('shipping_detail', {})
+
+                sku = variant.get('code')
+                total_quantity = int(shipping_detail.get('quantity', 0))
+
+                # Crear el producto asociado al documento
+                InvoiceProduct.objects.create(
+                    invoice=invoice,
+                    product_sku=sku,
+                    total_quantity=total_quantity,
+                    dispatched_quantity=0,
+                    is_complete=False
+                )
+
+        except Exception as e:
+            return JsonResponse({'error': 'Error en la comunicación con la API.', 'details': str(e)}, status=500)
+
+    # Obtener los productos asociados
+    invoice_products = InvoiceProduct.objects.filter(invoice=invoice)
+
+    # Formatear los datos para la respuesta
+    product_list = []
+    for product in invoice_products:
+        # Buscar el producto en el modelo `Products` para obtener el nombre y descripción
+        product_info = Products.objects.filter(sku=product.product_sku).first()
+        product_list.append({
+            'code': product.product_sku,
+            'name': product_info.nameproduct if product_info else 'Nombre no encontrado',
+            'description': product_info.prefixed if product_info else 'Descripción no encontrada',
+            'total_quantity': product.total_quantity,
+            'dispatched_quantity': product.dispatched_quantity,
+            'is_complete': product.is_complete,
+        })
+
+    return JsonResponse({'products': product_list}, status=200)
+
+@csrf_exempt
+def fetch_product_details(request):
+    sku = request.GET.get('sku')
+
+    if not sku:
+        return JsonResponse({'error': 'El parámetro SKU es obligatorio.'}, status=400)
+
+    product = Products.objects.filter(sku=sku).first()
+
+    if not product:
+        return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
+
+    return JsonResponse({
+        'name': product.nameproduct or 'Sin nombre',
+        'description': product.prefixed or 'Sin descripción',
+    }, status=200)
+
     
 @csrf_exempt
 def validate_superid(request):
