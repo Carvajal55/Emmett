@@ -363,7 +363,7 @@ def buscar_productosAPI(request):
         return JsonResponse({'products': [], 'total_pages': 1, 'current_page': 1}, status=200)
 
     # Bodegas válidas y sus nombres
-    bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1,11]
+    bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1,11,12]
     bodega_mapping = {bodega.idoffice: bodega.name for bodega in Bodega.objects.filter(idoffice__in=bodegas_validas_ids)}
 
     sector_mapping = get_sector_mapping(bodegas_validas_ids)
@@ -2313,13 +2313,12 @@ def reingresar_producto(request):
                     print(f"Se proporcionó número de documento: {n_document}. Solo se actualizará localmente.")
 
                 print(f"Actualizando localmente el producto con SuperID: {superid}")
-                unique_product.location = None
                 unique_product.state = 0
                 unique_product.observation = f"Reingreso: {n_document or 'Sin documento'} | Empresa: {company}"
                 unique_product.datelastinventory = now()
                 unique_product.ncompany = company
                 unique_product.locationname = "Reingresado"
-                unique_product.location=100020  # ID de la ubicación de Almacén cambiar a 100020, local debe ser crearo te va a tirar error
+                unique_product.location=100020  # ID de la ubicación de Almacén cambiar a 100020, local debe ser 100001
                 unique_product.save()
 
                 print(f"Producto {superid} actualizado localmente con éxito.")
