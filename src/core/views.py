@@ -2319,6 +2319,7 @@ def reingresar_producto(request):
                 unique_product.datelastinventory = now()
                 unique_product.ncompany = company
                 unique_product.locationname = "Reingresado"
+                unique_product.location=100018  # ID de la ubicación de Almacén cambiar a 100000 para local
                 unique_product.save()
 
                 print(f"Producto {superid} actualizado localmente con éxito.")
