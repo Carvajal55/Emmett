@@ -2256,6 +2256,7 @@ def reingresar_producto(request):
             superid = data.get("superid")
             cantidad = int(data.get("cantidad", 1))
             n_document = data.get("nDocument")  # Puede ser None
+            type_document = data.get("tyDoc")  # Puede ser None
             company = data.get("company", 1)  # Valor por defecto 1 para "company"
 
             print(f"SuperID: {superid}, Cantidad: {cantidad}, nDocument: {n_document}, Company: {company}")
@@ -2318,6 +2319,8 @@ def reingresar_producto(request):
                 unique_product.datelastinventory = now()
                 unique_product.ncompany = company
                 unique_product.locationname = "Reingresado"
+                unique_product.typedocincome = type_document
+                unique_product.ndocincome = n_document
                 unique_product.location=100020  # ID de la ubicación de Almacén cambiar a 100020, local debe ser 100001
                 unique_product.save()
 
