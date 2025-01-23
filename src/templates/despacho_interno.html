@@ -35,6 +35,13 @@
                 </select>
             </div>
             <div class="col-md-4">
+                <label for="cbTypeDocument">Tipo Documento</label>
+                <select id="cbTypeDocument" v-model="typeDocument" class="form-select">
+                    <option value="39">BOLETA</option>
+                    <option value="33">FACTURA</option>
+                </select>
+            </div>
+            <div class="col-md-4">
                 <label for="nDocument">Número de Documento (Opcional)</label>
                 <input id="nDocument" type="text" v-model="nDocument" class="form-control" placeholder="Ingrese el número del documento">
             </div>
@@ -97,7 +104,8 @@
         data: {
             company: 1,            // Compañía seleccionada
             nDocument: '',         // Número de documento
-            sid: '',               // SuperID ingresado
+            sid: '',    // SuperID ingresado
+            typeDocument:'39',           
             internalProducts: [], // Lista de productos despachados
             processingQueue: [],  // Cola de SuperIDs pendientes de procesar
             isProcessing: false,  // Estado del procesamiento
@@ -252,7 +260,8 @@
             async dispatchConsumption(product) {
                 const payload = {
                     nDocument: this.nDocument || null, // Puede ser null
-                    typeDocument: this.typeDocument || 0, // Predeterminado 0 si no está definido
+                    typeDocument: this.typeDocument || 0,
+                     // Predeterminado 0 si no está definido
                     company: this.company,
                     products: [
                         {
