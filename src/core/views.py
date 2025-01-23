@@ -3161,7 +3161,7 @@ def fetch_invoice_products(request):
 
     # Si no existe, consultar en Bsale y crearlo
     if not invoice:
-        url_costs = f"{BSALE_API_URL}/documents/costs.json?codesii={type_document}&number={number}&expand=details"
+        url_costs = f"{BSALE_API_URL}/documents.json?codesii={type_document}&number={number}"
         headers = {
             'access_token': BSALE_API_TOKEN,
             'Content-Type': 'application/json'
@@ -3174,7 +3174,12 @@ def fetch_invoice_products(request):
 
             info = response.json()
 
-            document_id = info.get('id')
+            items = info.get('items', [])
+            if not items:
+                return JsonResponse({'error': 'El documento no existe en Bsale.'}, status=404)
+
+            document_info = items[0]
+            document_id = document_info.get('id')
             if not document_id:
                 return JsonResponse({'error': 'El documento no existe en Bsale.'}, status=404)
 
@@ -3186,16 +3191,23 @@ def fetch_invoice_products(request):
             )
 
             # Procesar los productos del documento
-            cost_details = info.get('cost_detail', [])
+            details_url = document_info.get('details', {}).get('href')
+            if not details_url:
+                return JsonResponse({'error': 'El documento no tiene detalles de productos asociados.'}, status=400)
+
+            details_response = requests.get(details_url, headers=headers)
+            if details_response.status_code != 200:
+                return JsonResponse({'error': 'Error al obtener los detalles de los productos desde Bsale.'}, status=500)
+
+            details_info = details_response.json()
+            cost_details = details_info.get('items', [])
             if not cost_details:
                 return JsonResponse({'error': 'El documento no tiene productos asociados.'}, status=400)
 
             for detail in cost_details:
                 variant = detail.get('variant', {})
-                shipping_detail = detail.get('shipping_detail', {})
-
                 sku = variant.get('code')
-                total_quantity = int(shipping_detail.get('quantity', 0))
+                total_quantity = int(detail.get('quantity', 0))
 
                 # Crear el producto asociado al documento
                 InvoiceProduct.objects.create(
@@ -3227,7 +3239,6 @@ def fetch_invoice_products(request):
         })
 
     return JsonResponse({'products': product_list}, status=200)
-
 @csrf_exempt
 def fetch_product_details(request):
     sku = request.GET.get('sku')
