@@ -3161,7 +3161,7 @@ def fetch_invoice_products(request):
 
     # Si no existe, consultar en Bsale y crearlo
     if not invoice:
-        url_costs = f"{BSALE_API_URL}/documents/costs.json?codesii={type_document}&number={number}"
+        url_costs = f"{BSALE_API_URL}/documents/costs.json?codesii={type_document}&number={number}&expand=details"
         headers = {
             'access_token': BSALE_API_TOKEN,
             'Content-Type': 'application/json'
