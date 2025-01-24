@@ -2850,26 +2850,51 @@ def dispatch_consumption_interno(request):
 def force_complete_product(request):
     if request.method == "POST":
         try:
+            # Parsear datos del request
             data = json.loads(request.body)
             n_document = data.get('nDocument')
             type_document = data.get('typeDocument')
             sku = data.get('sku')
 
-            if not sku:
-                return JsonResponse({'error': 'SKU es obligatorio.'}, status=400)
+            # Validar datos obligatorios
+            if not n_document or not type_document or not sku:
+                return JsonResponse({'error': 'Faltan datos obligatorios: documento, tipo de documento o SKU.'}, status=400)
 
-            # Verificar si el producto tiene detalles asociados
-            product_details = Products.objects.filter(sku=sku).first()
-            if product_details:
-                return JsonResponse({
-                    'error': f'El producto {sku} ya tiene detalles asociados y no puede ser forzado.'
-                }, status=400)
+            # Verificar si el documento existe
+            invoice = Invoice.objects.filter(document_type=type_document, document_number=n_document).first()
+            if not invoice:
+                return JsonResponse({'error': 'Documento no encontrado.'}, status=404)
 
-            # Lógica para marcar el producto como completo
-            # (Implementar la lógica específica aquí)
-            return JsonResponse({'message': f'El producto {sku} se ha marcado como completo.', 'icon': 'success'})
+            # Verificar si el producto pertenece al documento
+            invoice_product = InvoiceProduct.objects.filter(invoice=invoice, product_sku=sku).first()
+            if not invoice_product:
+                return JsonResponse({'error': f'El producto con SKU {sku} no está asociado al documento.'}, status=404)
+
+            # Verificar si el producto ya está completo
+            if invoice_product.is_complete:
+                return JsonResponse({'error': f'El producto con SKU {sku} ya está completo.'}, status=400)
+
+            # Marcar el producto como completo
+            invoice_product.dispatched_quantity = invoice_product.total_quantity
+            invoice_product.is_complete = True
+            invoice_product.save()
+
+            # Verificar si todos los productos están completos para actualizar el documento
+            all_products_complete = InvoiceProduct.objects.filter(invoice=invoice, is_complete=False).count() == 0
+            if all_products_complete:
+                invoice.dispatched = True
+                invoice.save()
+
+            return JsonResponse({
+                'message': f'El producto {sku} se ha marcado como completo.',
+                'icon': 'success',
+                'document_complete': all_products_complete  # Indica si el documento está completamente despachado
+            })
+
         except Exception as e:
+            # Manejar errores inesperados
             return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
+
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 @csrf_exempt
@@ -2926,6 +2951,14 @@ def dispatch_consumption(request):
                             'icon': 'error',
                             'message': f'El producto con SKU {sku} no está asociado al documento.'
                         }, status=404)
+
+                    # Validar si ya se alcanzó la cantidad total permitida
+                    if invoice_product.dispatched_quantity >= invoice_product.total_quantity:
+                        return JsonResponse({
+                            'title': 'Cantidad excedida',
+                            'icon': 'error',
+                            'message': f'La cantidad máxima permitida para el SKU {sku} ya fue despachada.'
+                        }, status=400)
 
                     # Validar si el SuperID ya fue procesado
                     if InvoiceProductSuperID.objects.filter(product=invoice_product, superid=superid).exists():
@@ -2998,6 +3031,7 @@ def dispatch_consumption(request):
             return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
+
 
 #BSALE_API_TOKEN = "1b7908fa44b56ba04a3459db5bb6e9b12bb9fadc"  # Coloca tu token de autenticación
 @csrf_exempt

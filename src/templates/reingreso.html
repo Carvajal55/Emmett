@@ -10,7 +10,7 @@
     <div class="row mt-4">
         <div class="col-md-4">
             <label for="superid">SuperID</label>
-            <input id="superid" v-model="form.superid" type="text" class="form-control" placeholder="Ingrese el SuperID" autofocus>
+            <input id="superid" v-model="form.superid" @keyup.enter="reingresarProducto" type="text" class="form-control" placeholder="Ingrese el SuperID" autofocus>
         </div>
         <div class="col-md-4">
             <label for="cbTypeDocument">Tipo Documento</label>
@@ -28,7 +28,7 @@
 
     <div class="row mt-4">
         <div class="col-md-12 text-center">
-            <button @click="reingresarProducto" class="btn btn-primary">Reingresar Producto</button>
+            <button @click="reingresarProducto" class="btn btn-primary">Reingresar Producto ELIMINAR</button>
         </div>
     </div>
 

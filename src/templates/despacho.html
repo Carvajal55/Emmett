@@ -79,12 +79,7 @@
         </tbody>
     </table>
 
-    <!-- Botón para completar el despacho -->
-    <div class="mt-4">
-        <button class="btn btn-success" @click="completeDispatch" :disabled="!allProductsComplete">
-            Marcar Documento como Despachado
-        </button>
-    </div>
+   
 </div>
 {% endblock %}
 
@@ -110,6 +105,14 @@
         watch: {
             allProductsComplete(value) {
                 if (value && this.dispatchReady) {
+                    Swal.fire({
+                        title: '¡Despacho completo!',
+                        text: 'Todos los productos han sido despachados y la boleta está lista.',
+                        icon: 'success',
+                        confirmButtonText: 'Aceptar'
+                    });
+
+                    // Intentar completar el despacho
                     this.completeDispatch();
                 }
             },
@@ -122,16 +125,15 @@
                         if (response.data.urlPublicView) {
                             window.open(response.data.urlPublicView, '_blank');
                         } else {
+                            this.playSound('error');
                             Swal.fire('Error', 'No se encontró un enlace para la boleta.', 'error');
                         }
                     })
                     .catch(error => {
                         Swal.fire('Error', 'No se pudo obtener los detalles del documento.', 'error');
+                        this.playSound('error');
                         console.error(error);
                     });
-            },
-            viewBoleta(url) {
-                window.open(url, '_blank'); // Abre la boleta en una nueva pestaña
             },
             validateAndLinkSuperid() {
                 if (!this.sid) return;
@@ -150,10 +152,23 @@
                         const product = this.products.find(product => product.code === sku);
 
                         if (product) {
+                            // Validar que no se exceda la cantidad permitida
+                            if (product.quantityScanned >= product.quantity) {
+                                playSound('errorSound');
+                                Swal.fire('Error', 'La cantidad despachada ya alcanzó el máximo permitido para este producto.', 'error');
+                                return;
+                            }
+
+                            // Verificar si el SuperID ya está vinculado
                             if (!product.superids.includes(superid)) {
                                 product.superids.push(superid);
                                 product.quantityScanned++;
-                                this.playSound('successSound'); // Sonido de éxito
+                                product.is_complete = product.quantityScanned >= product.quantity;
+
+                                this.playSound('successSound');
+
+                                // Despachar el producto después de vincular el superid
+                                this.dispatchSuperid(superid, sku);
                             } else {
                                 Swal.fire('Error', 'El SuperID ya está vinculado a este producto.', 'error');
                             }
@@ -278,13 +293,16 @@
                 };
 
                 try {
+                    console.log('Enviando datos al backend:', payload);
+
                     const response = await axios.post('/api/dispatch-consumption/', payload);
+
+                    console.log('Respuesta del backend:', response.data);
+
                     if (response.data.icon === 'success') {
-                        this.playSound('success');
-                        Swal.fire('Éxito', `SuperID ${superid} despachado correctamente.`, 'success');
+                        this.playSound('successSound');
                     } else {
                         this.playSound('error');
-                        Swal.fire('Error', response.data.message || 'Error al despachar.', 'error');
                     }
                 } catch (error) {
                     console.error('Error al despachar:', error);
@@ -296,46 +314,62 @@
             async forceComplete(index) {
                 const product = this.products[index];
 
-                // Verificar si el producto ya tiene detalles (si fue encontrado)
-                if (product.name && product.description) {
-                    Swal.fire('Error', 'Este producto ya tiene detalles asociados y no se puede forzar.', 'error');
+                // Verificar si el producto ya está completo
+                if (product.is_complete) {
+                    Swal.fire('Información', `El producto con SKU ${product.code} ya está completo.`, 'info');
                     return;
                 }
 
-                product.quantityScanned = product.quantity;
-                product.is_complete = true;
-
                 try {
+                    // Enviar solicitud al backend
                     const response = await axios.post('/api/force-complete-product/', {
                         nDocument: this.nDocument,
                         typeDocument: this.typeDocument,
-                        sku: product.code,
+                        sku: product.code, // SKU del producto
                     });
 
                     if (response.data.icon === 'success') {
-                        this.playSound('success');
-                        Swal.fire('Éxito', `Producto ${product.code} marcado como completo.`, 'success');
+                        // Actualizar estado del producto en el frontend
+                        product.quantityScanned = product.quantity;
+                        product.is_complete = true;
+
+                        // Verificar si el documento está completo
+                        if (response.data.document_complete) {
+                            Swal.fire('Éxito', 'Todos los productos de la boleta están completos.', 'success');
+                        } else {
+                            Swal.fire('Éxito', `Producto ${product.code} marcado como completo.`, 'success');
+                        }
+
+                        this.playSound('successSound');
                     } else {
                         this.playSound('error');
-                        Swal.fire('Error', response.data.message || 'Error al marcar como completo.', 'error');
+                        Swal.fire('Error', response.data.error || 'Error al forzar el despacho.', 'error');
                     }
                 } catch (error) {
-                    console.error('Error al forzar el producto:', error);
+                    console.error('Error al forzar el despacho:', error);
                     this.playSound('error');
-                    Swal.fire('Error', 'No se pudo marcar el producto como completo.', 'error');
+                    Swal.fire('Error', 'No se pudo procesar la solicitud para forzar el despacho.', 'error');
                 }
             },
 
             async completeDispatch() {
                 try {
+                    // Verificar si todos los productos están completos antes de enviar
+                    if (!this.allProductsComplete) {
+                        Swal.fire('Error', 'No todos los productos están despachados.', 'error');
+                        this.playSound('error');
+                        return;
+                    }
+
                     const response = await axios.post('/api/complete-dispatch/', {
                         nDocument: this.nDocument,
-                        typeDocument: this.typeDocument
+                        typeDocument: this.typeDocument,
+                        company: this.company,
                     });
 
                     if (response.data.icon === 'success') {
-                        this.playSound('success');
-                        Swal.fire('Éxito', 'El documento fue marcado como despachado.', 'success');
+                        this.playSound('successSound');
+                        Swal.fire('Éxito', 'El documento fue marcado como completamente despachado.', 'success');
                     } else {
                         this.playSound('error');
                         Swal.fire('Error', response.data.message || 'Error al completar el despacho.', 'error');
