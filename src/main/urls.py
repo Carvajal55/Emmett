@@ -116,6 +116,7 @@ urlpatterns = [
    path('api/details-document/', core_views.details_document, name='details_document'),
    path('api/generate-dynamic-key/', core_views.generate_dynamic_key, name='generate_dynamic_key'),
    path('api/validate-access-key/', core_views.validate_dynamic_key, name='validate_dynamic_key'),
+   path('api/get-document/<int:document_number>/', core_views.get_bsale_document, name='get_document'),
    #path('api/dispatch-product/', core_views.dispatch_product, name='dispatch_product'),
    path('api/dispatch-consumption/', core_views.dispatch_consumption, name='dispatch_consumption'),
    path('api/complete-dispatch/', core_views.complete_dispatch, name='complete_dispatch'),

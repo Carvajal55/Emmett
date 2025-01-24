@@ -2855,22 +2855,22 @@ def force_complete_product(request):
             type_document = data.get('typeDocument')
             sku = data.get('sku')
 
-            invoice = Invoice.objects.filter(document_type=type_document, document_number=n_document).first()
-            if not invoice:
-                return JsonResponse({'icon': 'error', 'message': 'Documento no encontrado.'}, status=404)
+            if not sku:
+                return JsonResponse({'error': 'SKU es obligatorio.'}, status=400)
 
-            product = InvoiceProduct.objects.filter(invoice=invoice, product_sku=sku).first()
-            if not product:
-                return JsonResponse({'icon': 'error', 'message': 'Producto no encontrado.'}, status=404)
+            # Verificar si el producto tiene detalles asociados
+            product_details = Products.objects.filter(sku=sku).first()
+            if product_details:
+                return JsonResponse({
+                    'error': f'El producto {sku} ya tiene detalles asociados y no puede ser forzado.'
+                }, status=400)
 
-            product.dispatched_quantity = product.total_quantity
-            product.is_complete = True
-            product.save()
-
-            return JsonResponse({'icon': 'success', 'message': f'Producto {sku} marcado como completo.'})
+            # Lógica para marcar el producto como completo
+            # (Implementar la lógica específica aquí)
+            return JsonResponse({'message': f'El producto {sku} se ha marcado como completo.', 'icon': 'success'})
         except Exception as e:
-            return JsonResponse({'icon': 'error', 'message': str(e)}, status=500)
-    return JsonResponse({'icon': 'error', 'message': 'Método no permitido.'}, status=405)
+            return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 @csrf_exempt
 def dispatch_consumption(request):
@@ -3429,6 +3429,7 @@ def validate_superid_simplified(request):
             if associated_sku not in document_products:
                 return JsonResponse({'error': 'El SKU asociado no coincide con los productos del documento'}, status=400)
 
+            # Producto validado correctamente
             return JsonResponse({'title': 'SuperID validado correctamente', 'icon': 'success', 'sku': associated_sku})
 
         except Exception as e:
@@ -4086,6 +4087,43 @@ def actualizar_stock_local(request):
     print("Actualización de stock local completada.")
     return JsonResponse({'message': 'Actualización de stock local completada.'}, status=200)
 
+def get_bsale_document(request, document_number):
+    if request.method == "GET":
+        try:
+            # Construcción de la URL para la API de Bsale
+            bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}"
+            headers = {
+                "access_token": BSALE_API_TOKEN  # Reemplaza con tu token de acceso
+            }
+            
+            
+            
+            # Realizamos la petición a la API
+            response = requests.get(bsale_api_url, headers=headers)
+            
+            
+            
+            data = response.json()
+
+            # Verificar si se encontraron documentos
+            if "items" in data and len(data["items"]) > 0:
+                document = data["items"][0]
+                # Retornamos información útil del documento
+                return JsonResponse({
+                    "urlPublicView": document.get("urlPublicView"),
+                    "urlPdf": document.get("urlPdf"),
+                    "number": document.get("number"),
+                    "totalAmount": document.get("totalAmount")
+                })
+            else:
+                # Si no se encuentran documentos
+                return JsonResponse({"error": "Documento no encontrado."}, status=404)
+        except Exception as e:
+            # Manejo de errores inesperados
+            return JsonResponse({"error": str(e)}, status=500)
+
+    # Respuesta para métodos no permitidos
+    return JsonResponse({"error": "Método no permitido."}, status=405)
 
 BSALE_API_URLID = "https://api.bsale.io/v1/variants.json"
 

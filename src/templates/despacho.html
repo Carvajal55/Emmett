@@ -36,6 +36,9 @@
         <label for="sidProduct">SuperID</label>
         <input id="sidProduct" type="text" v-model="sid" @keyup.enter="validateAndLinkSuperid" class="form-control">
     </div>
+    <button @click="fetchDocumentDetails(nDocument)" class="btn btn-primary mt-2">
+        Ver Boleta
+    </button>
 
     <!-- Tabla de productos -->
     <table class="table mt-4">
@@ -50,18 +53,25 @@
             </tr>
         </thead>
         <tbody>
-            <tr v-for="(product, index) in products" :key="index" :class="getProductRowClass(product)">
+            <tr 
+                v-for="(product, index) in products" 
+                :key="index" 
+                :class="getProductRowClass(product)"
+            >
                 <td>
                     <ul>
                         <li v-for="(superid, idx) in product.superids" :key="idx">[[ superid ]]</li>
                     </ul>
                 </td>
                 <td>[[ product.code ]]</td>
-                <td>[[ product.name ]]</td>
-                <td>[[ product.description ]]</td>
+                <td>[[ product.name || 'Sin detalles' ]]</td>
+                <td>[[ product.description || 'Sin detalles' ]]</td>
                 <td>[[ product.quantityScanned ]] / [[ product.quantity ]]</td>
                 <td>
-                    <button class="btn btn-warning btn-sm" @click="forceComplete(index)">
+                    <button 
+                        v-if="!product.name && !product.description" 
+                        class="btn btn-warning btn-sm" 
+                        @click="forceComplete(index)">
                         Forzar Completo
                     </button>
                 </td>
@@ -105,6 +115,24 @@
             },
         },
         methods: {
+            fetchDocumentDetails(nDocument) {
+                axios
+                    .get(`/api/get-document/${nDocument}/`)
+                    .then(response => {
+                        if (response.data.urlPublicView) {
+                            window.open(response.data.urlPublicView, '_blank');
+                        } else {
+                            Swal.fire('Error', 'No se encontró un enlace para la boleta.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'No se pudo obtener los detalles del documento.', 'error');
+                        console.error(error);
+                    });
+            },
+            viewBoleta(url) {
+                window.open(url, '_blank'); // Abre la boleta en una nueva pestaña
+            },
             validateAndLinkSuperid() {
                 if (!this.sid) return;
 
@@ -144,10 +172,18 @@
             },
             fetchProductDetails(sku) {
                 return axios.get('/api/fetch-product-details/', { params: { sku } })
-                    .then(response => response.data)
+                    .then(response => {
+                        if (response.data.error) {
+                            // Producto no encontrado
+                            return { name: null, description: null };
+                        } else {
+                            // Producto encontrado
+                            return response.data;
+                        }
+                    })
                     .catch(error => {
                         console.error(`Error al obtener detalles del producto para SKU ${sku}:`, error);
-                        return { name: 'Desconocido', description: 'Desconocido' };
+                        return { name: null, description: null };
                     });
             },
 
@@ -259,10 +295,16 @@
             
             async forceComplete(index) {
                 const product = this.products[index];
+
+                // Verificar si el producto ya tiene detalles (si fue encontrado)
+                if (product.name && product.description) {
+                    Swal.fire('Error', 'Este producto ya tiene detalles asociados y no se puede forzar.', 'error');
+                    return;
+                }
+
                 product.quantityScanned = product.quantity;
                 product.is_complete = true;
 
-                // Actualizar el estado del producto en el backend
                 try {
                     const response = await axios.post('/api/force-complete-product/', {
                         nDocument: this.nDocument,
@@ -311,8 +353,14 @@
             },
 
             getProductRowClass(product) {
-                return product.quantityScanned === product.quantity ? 'table-success' : 'table-danger';
-            },
+                if (product.quantityScanned === product.quantity) {
+                    return 'table-success'; // Verde: Producto completo
+                } else if (!product.name && !product.description) {
+                    return 'table-warning'; // Amarillo: Producto sin detalles (puede ser forzado)
+                } else {
+                    return 'table-danger'; // Rojo: Producto incompleto pero con detalles
+                }
+            }
         },
     });
 </script>
