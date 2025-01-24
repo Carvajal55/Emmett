@@ -125,7 +125,7 @@ urlpatterns = [
    path('api/consult-bsale-document/', core_views.get_unique_document, name='get_unique_document'),
    path('api/fetch-product-details/', core_views.fetch_product_details, name='fetch_product_details'),
    path('api/fetch-invoice-products/', core_views.fetch_invoice_products, name='fetch_invoice_products'),
-   path('api/validate-superid/', core_views.validate_superid_simplified, name='validate_superid'),
+   path('api/validate-superid/', core_views.validate_superid, name='validate_superid'),
    path('api/validate-superid-interno/', core_views.validate_superid_simplified_interno, name='validate_superid'),
 
 

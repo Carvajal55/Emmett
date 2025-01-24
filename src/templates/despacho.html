@@ -105,6 +105,43 @@
             },
         },
         methods: {
+            validateAndLinkSuperid() {
+                if (!this.sid) return;
+
+                const superid = this.sid.trim();
+                this.sid = ''; // Limpiar el input
+
+                axios.post('/api/validate-superid/', {
+                    sid: superid,
+                    document_products: this.products.map(product => product.code) // Lista de SKUs del documento
+                }).then(response => {
+                    if (response.data.icon === 'success') {
+                        const sku = response.data.sku;
+
+                        // Buscar el producto asociado en la lista de productos del documento
+                        const product = this.products.find(product => product.code === sku);
+
+                        if (product) {
+                            if (!product.superids.includes(superid)) {
+                                product.superids.push(superid);
+                                product.quantityScanned++;
+                                this.playSound('successSound'); // Sonido de éxito
+                            } else {
+                                Swal.fire('Error', 'El SuperID ya está vinculado a este producto.', 'error');
+                            }
+                        } else {
+                            Swal.fire('Error', 'Producto no encontrado en la lista del documento.', 'error');
+                        }
+                    } else {
+                        this.playSound('errorSound'); // Sonido de error
+                        Swal.fire('Error', response.data.error || 'Error al validar el SuperID.', 'error');
+                    }
+                }).catch(error => {
+                    console.error('Error al validar el SuperID:', error);
+                    this.playSound('errorSound');
+                    Swal.fire('Error', 'No se pudo validar el SuperID.', 'error');
+                });
+            },
             fetchProductDetails(sku) {
                 return axios.get('/api/fetch-product-details/', { params: { sku } })
                     .then(response => response.data)
@@ -146,40 +183,62 @@
                 });
             },
 
-            validateAndLinkSuperid() {
-                if (!this.sid) return;
+            async validateSuperid(superid) {
+                try {
+                    const skuList = this.products.map(product => product.code); // Lista de SKUs del frontend
 
-                const superid = this.sid.trim();
-                this.sid = ''; // Limpiar el campo
+                    console.log('Payload enviado al backend:', { superid, sku_list: skuList });
 
-                // Validar si el SuperID ya fue agregado
-                const product = this.products.find(product => 
-                    product.quantityScanned < product.quantity &&
-                    !product.superids.includes(superid)
-                );
+                    const validateResponse = await axios.post('/api/validate-superid/', { superid, sku_list: skuList });
+                    if (validateResponse.status !== 200) {
+                        this.playSound('error');
+                        Swal.fire('Error', validateResponse.data.error || 'Error al validar el SuperID.', 'error');
+                        return;
+                    }
 
-                if (!product) {
+                    const { sku } = validateResponse.data;
+
+                    // Buscar el producto en la lista de productos del frontend
+                    const product = this.products.find(product => product.code === sku);
+
+                    if (!product) {
+                        this.playSound('error');
+                        Swal.fire('Error', 'El SKU del SuperID no está en la lista de productos.', 'error');
+                        return;
+                    }
+
+                    // Verificar que el SuperID no haya sido agregado previamente
+                    if (product.superids.includes(superid)) {
+                        this.playSound('error');
+                        Swal.fire('Error', 'El SuperID ya ha sido agregado.', 'error');
+                        return;
+                    }
+
+                    // Asociar el SuperID al producto
+                    product.superids.push(superid);
+                    product.quantityScanned++;
+
+                    // Marcar el producto como completo si se ha escaneado la cantidad necesaria
+                    if (product.quantityScanned >= product.quantity) {
+                        product.is_complete = true;
+                    }
+
+                    // Realizar el despacho
+                    this.dispatchSuperid(superid, sku);
+                } catch (error) {
+                    console.error('Error al validar el SuperID:', error);
                     this.playSound('error');
-                    Swal.fire('Error', 'No se puede asociar este SuperID. Verifica el SKU o cantidad.', 'error');
-                    return;
+                    Swal.fire('Error', 'No se pudo validar el SuperID.', 'error');
                 }
-
-                // Asociar el SuperID al producto
-                product.superids.push(superid);
-                product.quantityScanned++;
-
-                // Realizar el despacho
-                this.dispatchSuperid(superid, product.code);
             },
+
 
             async dispatchSuperid(superid, sku) {
                 const payload = {
                     nDocument: this.nDocument,
                     typeDocument: this.typeDocument,
                     company: this.company,
-                    products: [
-                        { superid, sku }
-                    ]
+                    products: [{ superid, sku }]
                 };
 
                 try {

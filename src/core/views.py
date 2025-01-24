@@ -3261,40 +3261,34 @@ def fetch_product_details(request):
 def validate_superid(request):
     if request.method == "POST":
         try:
-            # Intenta decodificar el cuerpo de la solicitud como JSON
-            data = json.loads(request.body.decode('utf-8'))
-            superid = data.get('superid')
+            body = json.loads(request.body)
+            sid = body.get('sid')
+            document_products = set(body.get('document_products', []))  # Lista de SKUs enviados desde el frontend
 
-            if not superid:
-                return JsonResponse({"error": "Missing superid"}, status=400)
+            if not sid:
+                return JsonResponse({'error': 'El SuperID es obligatorio'}, status=400)
 
-            # Buscar el superid en la tabla Uniqueproducts
-            unique_product = Uniqueproducts.objects.filter(superid=superid).first()
+            # Buscar el producto único por SuperID
+            unique_product = Uniqueproducts.objects.filter(superid=sid).select_related('product').only('superid', 'product__sku').first()
 
             if not unique_product:
-                return JsonResponse({"error": "Superid not found"}, status=404)
+                return JsonResponse({'error': 'SuperID no encontrado'}, status=404)
 
-            # Verificar que el producto asociado al superid tenga un SKU válido
-            associated_product = unique_product.product  # Relación ForeignKey con Products
+            # Obtener el SKU del producto asociado
+            associated_sku = unique_product.product.sku if unique_product.product else None
+            if not associated_sku:
+                return JsonResponse({'error': 'Producto asociado no tiene un SKU válido'}, status=400)
 
-            if not associated_product or not associated_product.sku:
-                return JsonResponse({"error": "No SKU associated with this superid"}, status=404)
+            # Validar si el SKU está en la lista de productos del documento
+            if associated_sku not in document_products:
+                return JsonResponse({'error': 'El SKU asociado no coincide con los productos del documento'}, status=400)
 
-            # Respuesta exitosa con los datos necesarios
-            return JsonResponse({
-                "message": "Superid validated successfully",
-                "superid": superid,
-                "sku": associated_product.sku,
-                "description": associated_product.nameproduct,
-                "quantity": unique_product.correlative
-            }, status=200)
+            return JsonResponse({'title': 'SuperID validado correctamente', 'icon': 'success', 'sku': associated_sku})
 
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON payload"}, status=400)
         except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+            return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
 
-    return JsonResponse({"error": "Only POST method is allowed"}, status=405)
+    return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
 
 @csrf_exempt
 def validate_superid_cached(request):
