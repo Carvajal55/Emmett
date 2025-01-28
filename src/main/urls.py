@@ -121,6 +121,7 @@ urlpatterns = [
    path('api/dispatch-consumption/', core_views.dispatch_consumption, name='dispatch_consumption'),
    path('api/complete-dispatch/', core_views.complete_dispatch, name='complete_dispatch'),
    path('api/dispatch-consumption-interno/', core_views.dispatch_consumption_interno, name='dispatch_consumption'),
+   path('api/force-complete-product-with-superid/', core_views.force_complete_product_with_superid, name='force-complete-product-with-superid'),
    path('api/force-complete-product/', core_views.force_complete_product, name='force_complete_product'),
 
    path('api/consult-bsale-document/', core_views.get_unique_document, name='get_unique_document'),

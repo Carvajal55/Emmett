@@ -2845,6 +2845,92 @@ def dispatch_consumption_interno(request):
     print("Método no permitido.")
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
 
+@csrf_exempt
+def force_complete_product_with_superid(request):
+    if request.method == "POST":
+        try:
+            # Parsear los datos de la solicitud
+            data = json.loads(request.body)
+            superid = data.get("superid")  # Puede ser None si no se proporciona
+            n_document = data.get("nDocument")
+            type_document = data.get("typeDocument")
+            sku = data.get("sku")
+
+            # Validar datos obligatorios
+            if not n_document or not type_document or not sku:
+                return JsonResponse({
+                    "icon": "error",
+                    "error": "Los campos nDocument, typeDocument y sku son obligatorios."
+                }, status=400)
+
+            # Buscar el documento (Invoice)
+            invoice = Invoice.objects.filter(document_type=type_document, document_number=n_document).first()
+            if not invoice:
+                return JsonResponse({
+                    "icon": "error",
+                    "error": f"El documento con número {n_document} no existe."
+                }, status=404)
+
+            # Buscar el producto asociado al documento
+            invoice_product = InvoiceProduct.objects.filter(invoice=invoice, product_sku=sku).first()
+            if not invoice_product:
+                return JsonResponse({
+                    "icon": "error",
+                    "error": f"El producto con SKU {sku} no está asociado al documento."
+                }, status=404)
+
+            # Lógica con o sin SuperID
+            with transaction.atomic():
+                if superid:  # Si se proporciona un SuperID
+                    # Verificar si ya está procesado
+                    if InvoiceProductSuperID.objects.filter(product=invoice_product, superid=superid).exists():
+                        return JsonResponse({
+                            "icon": "error",
+                            "error": f"El SuperID {superid} ya está asociado al producto con SKU {sku}."
+                        }, status=400)
+
+                    # Buscar el SuperID en Uniqueproducts
+                    unique_product = Uniqueproducts.objects.filter(superid=superid, state=0).first()
+                    if not unique_product:
+                        return JsonResponse({
+                            "icon": "error",
+                            "error": f"El SuperID {superid} no existe o ya fue despachado."
+                        }, status=404)
+
+                    # Asociar el SuperID al producto
+                    InvoiceProductSuperID.objects.create(
+                        product=invoice_product,
+                        superid=superid,
+                        dispatched=True
+                    )
+
+                    # Actualizar el estado del SuperID en Uniqueproducts
+                    unique_product.state = 1  # Marcado como despachado
+                    unique_product.datelastinventory = timezone.now()
+                    unique_product.save()
+                else:  # Sin SuperID
+                    print(f"Forzando despacho del producto con SKU {sku} sin SuperID.")
+
+                # Actualizar cantidades despachadas en el InvoiceProduct
+                invoice_product.dispatched_quantity += 1
+                invoice_product.is_complete = invoice_product.dispatched_quantity >= invoice_product.total_quantity
+                invoice_product.save()
+
+            # Verificar si el documento está completo
+            all_products_complete = not InvoiceProduct.objects.filter(invoice=invoice, is_complete=False).exists()
+            if all_products_complete:
+                invoice.dispatched = True
+                invoice.save()
+
+            # Mensaje dinámico
+            message = f"El producto con SKU {sku} fue despachado {'y asociado al SuperID ' + superid if superid else 'sin SuperID'} correctamente."
+            return JsonResponse({"icon": "success", "message": message})
+
+        except Exception as e:
+            print(f"Error al procesar el SuperID {superid}: {str(e)}")
+            return JsonResponse({"icon": "error", "error": str(e)}, status=500)
+
+    return JsonResponse({"icon": "error", "error": "Método no permitido."}, status=405)
 
 @csrf_exempt
 def force_complete_product(request):
@@ -3063,7 +3149,7 @@ def complete_dispatch(request):
                 return JsonResponse({
                     'title': 'Documento ya despachado',
                     'icon': 'info',
-                    'message': 'El documento ya fue marcado como despachado.'
+                    'message': f'El documento ya fue marcado como despachado. Es una {invoice.get_document_type_display()}.'
                 }, status=200)
 
             # Verificar si todos los productos están completos
@@ -3072,17 +3158,29 @@ def complete_dispatch(request):
                 return JsonResponse({
                     'title': 'Despacho incompleto',
                     'icon': 'error',
-                    'message': 'Hay productos pendientes de despacho.'
+                    'message': f'Hay productos pendientes de despacho. El documento es una {invoice.get_document_type_display()}.'
                 }, status=400)
 
-            # Marcar la factura como despachada
+            # Marcar la factura como despachada con validación de `document_type`
+            if invoice.document_type == 0:  # Boleta
+                print(f"Marcando como despachado: Boleta - Documento {n_document}")
+            elif invoice.document_type == 1:  # Factura
+                print(f"Marcando como despachado: Factura - Documento {n_document}")
+            else:
+                print(f"Tipo de documento desconocido para {n_document}. Documento no despachado.")
+
+            # Marcar el documento como despachado
             invoice.dispatched = True
             invoice.save()
+
+            # Confirmar que el `document_type` se guardó correctamente
+            saved_invoice = Invoice.objects.get(id=invoice.id)
+            print(f"El documento {saved_invoice.document_number} fue guardado como {saved_invoice.get_document_type_display()}.")
 
             return JsonResponse({
                 'title': 'Despacho completado',
                 'icon': 'success',
-                'message': 'El documento fue marcado como despachado con éxito.'
+                'message': f'El documento fue marcado como despachado con éxito. Es una {saved_invoice.get_document_type_display()}.'
             }, status=200)
 
         except Exception as e:
@@ -3207,7 +3305,6 @@ def fetch_invoice_products(request):
                 return JsonResponse({'error': 'Error al obtener los datos del documento desde Bsale.'}, status=500)
 
             info = response.json()
-
             items = info.get('items', [])
             if not items:
                 return JsonResponse({'error': 'El documento no existe en Bsale.'}, status=404)
@@ -3240,17 +3337,54 @@ def fetch_invoice_products(request):
 
             for detail in cost_details:
                 variant = detail.get('variant', {})
-                sku = variant.get('code')
+                sku = variant.get('code', '')  # Asegurar que el SKU sea un string
                 total_quantity = int(detail.get('quantity', 0))
 
-                # Crear el producto asociado al documento
-                InvoiceProduct.objects.create(
-                    invoice=invoice,
-                    product_sku=sku,
-                    total_quantity=total_quantity,
-                    dispatched_quantity=0,
-                    is_complete=False
-                )
+                # Verificar si el producto es un pack
+                if "pack" in sku.lower():  # Validar que el SKU contiene "pack" sin importar mayúsculas/minúsculas
+                    # Consultar detalles de la variante
+                    variant_response = requests.get(variant.get('href'), headers=headers)
+                    if variant_response.status_code != 200:
+                        continue  # Saltar si no se puede obtener la variante
+
+                    variant_info = variant_response.json()
+                    product_url = variant_info.get('product', {}).get('href')
+
+                    # Consultar detalles del producto
+                    product_response = requests.get(product_url, headers=headers)
+                    if product_response.status_code != 200:
+                        continue  # Saltar si no se puede obtener el producto
+
+                    product_info = product_response.json()
+                    pack_details = product_info.get('pack_details', [])
+
+                    # Crear registros para cada componente del pack
+                    for pack_item in pack_details:
+                        component_quantity = int(pack_item.get('quantity', 1))
+                        component_variant_id = pack_item.get('variant', {}).get('id')
+
+                        # Buscar el componente en el modelo Products
+                        product = Products.objects.filter(iderp=component_variant_id).first()
+                        if not product:
+                            continue  # Saltar si no se encuentra el producto en la base local
+
+                        InvoiceProduct.objects.create(
+                            invoice=invoice,
+                            product_sku=product.sku,
+                            total_quantity=component_quantity * total_quantity,
+                            dispatched_quantity=0,
+                            is_complete=False
+                        )
+
+                else:
+                    # Crear el producto asociado al documento
+                    InvoiceProduct.objects.create(
+                        invoice=invoice,
+                        product_sku=sku,
+                        total_quantity=total_quantity,
+                        dispatched_quantity=0,
+                        is_complete=False
+                    )
 
         except Exception as e:
             return JsonResponse({'error': 'Error en la comunicación con la API.', 'details': str(e)}, status=500)
@@ -3273,6 +3407,8 @@ def fetch_invoice_products(request):
         })
 
     return JsonResponse({'products': product_list}, status=200)
+
+
 @csrf_exempt
 def fetch_product_details(request):
     sku = request.GET.get('sku')

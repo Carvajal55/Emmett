@@ -68,12 +68,18 @@
                 <td>[[ product.description || 'Sin detalles' ]]</td>
                 <td>[[ product.quantityScanned ]] / [[ product.quantity ]]</td>
                 <td>
-                    <button 
-                        v-if="!product.name && !product.description" 
-                        class="btn btn-warning btn-sm" 
-                        @click="forceComplete(index)">
-                        Forzar Completo
-                    </button>
+                    <div v-if="!product.name && !product.description">
+                        <input 
+                            type="text" 
+                            v-model="product.forceSuperid" 
+                            class="form-control mb-2" 
+                            placeholder="Ingresa SuperID">
+                        <button 
+                            class="btn btn-warning btn-sm" 
+                            @click="forceCompleteWithSuperid(index)">
+                            Forzar Completo
+                        </button>
+                    </div>
                 </td>
             </tr>
         </tbody>
@@ -118,6 +124,40 @@
             },
         },
         methods: {
+            async forceCompleteWithSuperid(index) {
+                const product = this.products[index];
+                const superid = product.forceSuperid ? product.forceSuperid.trim() : null;
+
+                console.log("Enviando datos al backend:", {
+                    nDocument: this.nDocument,
+                    typeDocument: this.typeDocument,
+                    sku: product.code,
+                    superid: superid
+                });
+
+                try {
+                    const response = await axios.post('/api/force-complete-product-with-superid/', {
+                        nDocument: this.nDocument,
+                        typeDocument: this.typeDocument,
+                        sku: product.code,
+                        superid: superid,
+                    });
+
+                    console.log("Respuesta del backend:", response.data);
+
+                    if (response.data.icon === 'success') {
+                        Swal.fire('Éxito', `Producto ${product.code} despachado correctamente.`, 'success');
+                        product.quantityScanned = product.quantity;
+                        product.is_complete = true;
+                        if (superid) product.superids.push(superid);
+                    } else {
+                        Swal.fire('Error', response.data.error || 'Error al forzar el despacho.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error al forzar el despacho:', error);
+                    Swal.fire('Error', 'No se pudo procesar el despacho.', 'error');
+                }
+            },
             fetchDocumentDetails(nDocument) {
                 axios
                     .get(`/api/get-document/${nDocument}/`)
