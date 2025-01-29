@@ -2247,105 +2247,92 @@ import requests
 
 @csrf_exempt
 def reingresar_producto(request):
-    if request.method == "POST":
+    if request.method != "POST":
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    try:
+        print("Datos recibidos en la solicitud (raw body):", request.body)
+        data = json.loads(request.body)
+
+        superid = data.get("superid")
+        cantidad = data.get("cantidad", 1)
+        n_document = data.get("nDocument", None)  # Ahora puede ser None si viene vacío
+        type_document = data.get("tyDoc")
+        company = data.get("company", 1)
+
+        if not superid:
+            return JsonResponse({'error': 'El SuperID es obligatorio.'}, status=400)
+
         try:
-            print("Datos recibidos en la solicitud (raw body):", request.body)
-            data = json.loads(request.body)
-            print("Datos parseados (JSON):", data)
+            cantidad = int(cantidad)
+            if cantidad <= 0:
+                raise ValueError("La cantidad debe ser mayor a 0.")
+        except ValueError:
+            return JsonResponse({'error': 'Cantidad inválida, debe ser un número positivo.'}, status=400)
 
-            superid = data.get("superid")
-            cantidad = int(data.get("cantidad", 1))
-            n_document = data.get("nDocument")  # Puede ser None
-            type_document = data.get("tyDoc")  # Puede ser None
-            company = data.get("company", 1)  # Valor por defecto 1 para "company"
+        with transaction.atomic():
+            unique_product = Uniqueproducts.objects.filter(superid=superid, state=1).select_related('product').first()
 
-            print(f"SuperID: {superid}, Cantidad: {cantidad}, nDocument: {n_document}, Company: {company}")
-
-            if not superid:
-                print("Error: El SuperID es obligatorio.")
+            if not unique_product:
                 return JsonResponse({
-                    'error': 'El SuperID es obligatorio.'
-                }, status=400)
+                    'error': f"El SuperID {superid} no se encuentra registrado como despachado."
+                }, status=404)
 
-            with transaction.atomic():
-                print(f"Buscando el producto único con SuperID: {superid} y estado '1'")
-                unique_product = Uniqueproducts.objects.filter(superid=superid, state=1).select_related('product').first()
-
-                if not unique_product:
-                    print(f"Error: El SuperID {superid} no se encuentra registrado como despachado.")
+            if not n_document:
+                if not unique_product.product.iderp:
                     return JsonResponse({
-                        'error': f"El SuperID {superid} no se encuentra registrado como despachado."
-                    }, status=404)
+                        'error': f"El producto con SuperID {superid} no tiene un ID válido en Bsale."
+                    }, status=400)
 
-                print(f"Producto encontrado: {unique_product.product.sku} - {unique_product.product.nameproduct}")
-
-                if not n_document:
-                    print("No se proporcionó número de documento. Se realizará la actualización en Bsale.")
-                    if not unique_product.product.iderp:
-                        print(f"Error: El producto con SuperID {superid} no tiene un ID válido en Bsale.")
-                        return JsonResponse({
-                            'error': f"El producto con SuperID {superid} no tiene un ID válido en Bsale."
-                        }, status=400)
-
-                    data_bsale = {
-                        "note": f"Reingreso interno desde empresa {company}",
-                        "officeId": 1,
-                        "details": [{"quantity": cantidad, "variantId": unique_product.product.iderp}]
-                    }
-                    headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-                    print("Datos enviados a Bsale:", data_bsale)
-
-                    try:
-                        response = requests.post(
-                            "https://api.bsale.io/v1/stocks/receptions.json", headers=headers, json=data_bsale
-                        )
-                        print(f"Respuesta de Bsale: {response.status_code} - {response.text}")
-
-                        if response.status_code not in [200, 201]:
-                            raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
-                        else:
-                            print("Actualización en Bsale completada con éxito.")
-
-                    except Exception as e:
-                        print(f"Error al conectar con Bsale: {str(e)}")
-                        raise Exception(f"Error en Bsale: {str(e)}")
-
-                else:
-                    print(f"Se proporcionó número de documento: {n_document}. Solo se actualizará localmente.")
-
-                print(f"Actualizando localmente el producto con SuperID: {superid}")
-                unique_product.state = 0
-                unique_product.observation = f"Reingreso: {n_document or 'Sin documento'} | Empresa: {company}"
-                unique_product.datelastinventory = now()
-                unique_product.ncompany = company
-                unique_product.locationname = "Reingresado"
-                unique_product.typedocincome = type_document
-                unique_product.ndocincome = n_document
-                unique_product.location=100020  # ID de la ubicación de Almacén cambiar a 100020, local debe ser 100001
-                unique_product.save()
-
-                print(f"Producto {superid} actualizado localmente con éxito.")
-
-                producto_reingresado = {
-                    'superid': unique_product.superid,
-                    'sku': unique_product.product.sku,
-                    'name': unique_product.product.nameproduct,
-                    'location': unique_product.locationname,
-                    'dateadd': unique_product.datelastinventory.strftime('%Y-%m-%d %H:%M:%S')
+                data_bsale = {
+                    "note": f"Reingreso interno desde empresa {company}",
+                    "officeId": 1,
+                    "details": [{"quantity": cantidad, "variantId": unique_product.product.iderp}]
                 }
+                headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-            print(f"Proceso de reingreso completado para el SuperID {superid}.")
-            return JsonResponse({
-                'message': f"El producto con SuperID {superid} fue reingresado correctamente.",
-                'producto': producto_reingresado
-            }, status=200)
+                try:
+                    response = requests.post(
+                        "https://api.bsale.io/v1/stocks/receptions.json",
+                        headers=headers, json=data_bsale, timeout=10
+                    )
 
-        except Exception as e:
-            print("Error durante el reingreso del producto:", str(e))
-            return JsonResponse({'error': f"Error en el reingreso: {str(e)}"}, status=500)
+                    if response.status_code not in [200, 201]:
+                        return JsonResponse({'error': f"Error en Bsale: {response.text}"}, status=response.status_code)
 
-    print("Método no permitido.")
-    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+                except requests.exceptions.RequestException as e:
+                    return JsonResponse({'error': f"Error al conectar con Bsale: {str(e)}"}, status=500)
+
+            # ✅ Manejo de n_document vacío o no numérico
+            unique_product.ndocincome = int(n_document) if str(n_document).isdigit() else None
+
+            # ✅ Actualización local
+            unique_product.state = 0
+            unique_product.observation = f"Reingreso: {n_document or 'Sin documento'} | Empresa: {company}"
+            unique_product.datelastinventory = now()
+            unique_product.ncompany = company
+            unique_product.locationname = "Reingresado"
+            unique_product.typedocincome = type_document
+            unique_product.location = 100020  # ID de almacén para reingreso
+            unique_product.save()
+
+            producto_reingresado = {
+                'superid': unique_product.superid,
+                'sku': unique_product.product.sku,
+                'name': unique_product.product.nameproduct,
+                'location': unique_product.locationname,
+                'dateadd': unique_product.datelastinventory.strftime('%Y-%m-%d %H:%M:%S')
+            }
+
+        return JsonResponse({
+            'message': f"El producto con SuperID {superid} fue reingresado correctamente.",
+            'producto': producto_reingresado
+        }, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Formato de JSON inválido.'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f"Error en el reingreso: {str(e)}"}, status=500)
 
     
 @csrf_exempt
