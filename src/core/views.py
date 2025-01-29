@@ -4004,111 +4004,258 @@ CHUNK_SIZE = 50  # Número de elementos por solicitud
 from django.http import StreamingHttpResponse
 import time
 import logging
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
-# Variable global para almacenar el progreso
-progreso_comparacion = {"avance": 0, "estado": "iniciado", "archivo": None}
+from django.core.cache import cache
+
+def obtener_stock_bsale(sku):
+    """
+    Consulta en Bsale el stock de un SKU específico.
+    """
+    headers = {"access_token": BSALE_API_TOKEN}
+    response = requests.get(f"{BSALE_API_URL}/stocks.json?code={sku}", headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data and "items" in data and data["items"]:
+            return data["items"][0]["quantity"]
+    return None
+
+def send_progress_to_cache(progreso, total):
+    progress_percent = int((progreso / total) * 100)
+    mensaje = f"Procesando {progreso}/{total} productos..."
+    
+    print(f"📊 Progreso: {progress_percent}% - {mensaje}")  # ✅ Verificar en terminal
+
+    cache.set("stock_progress", {
+        "progress": progress_percent,
+        "message": mensaje
+    }, timeout=600)
 
 @csrf_exempt
-def comparar_stock_bsale(request):
-    global progreso_comparacion
-    try:
-        print("Iniciando comparación de stock...")
-        progreso_comparacion = {"avance": 0, "estado": "procesando", "archivo": None}
+def ajustar_stock_bsale(request):
+    """
+    API que compara el stock local con el de Bsale y ajusta los productos.
+    """
+    if request.method != "POST":
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-        total_productos_locales = 0
-        productos_comparados = 0
-        productos_con_diferencia_stock = []
-        processed_iderps = set()
+    productos_ajustados = []
+    productos = Products.objects.all()[:10]  # Solo 10 productos para pruebas
+    total_productos = len(productos)
 
-        # Obtener productos locales con stock de Uniqueproducts (state=0)
-        productos_locales = (
-            Products.objects.annotate(
-                stock_unique=Count('unique_products', filter=Q(unique_products__state=0))
-            ).values('sku', 'iderp', 'stock_unique')
-        )
-        productos_local_dict = {producto['iderp']: producto for producto in productos_locales}
-        total_productos_locales = len(productos_local_dict)
-        print(f"Productos locales obtenidos: {total_productos_locales}")
+    if total_productos == 0:
+        return JsonResponse({"message": "No hay productos para ajustar."}, status=200)
 
-        iderp_locales = set(productos_local_dict.keys())
-        if not iderp_locales:
-            progreso_comparacion = {"avance": 100, "estado": "completado", "archivo": None}
-            return JsonResponse({"message": "No hay productos locales para comparar."}, status=200)
+    for i, producto in enumerate(productos, 1):
+        sku = producto.sku
+        stock_local = Uniqueproducts.objects.filter(product=producto, state=1).count()
+        stock_bsale = obtener_stock_bsale(sku)
 
-        # Procesar datos de Bsale
-        next_url = f'{BSALE_API_URL}/stocks.json'
-        total_bsale_items = 0
-        while next_url:
-            response = requests.get(next_url, headers={'access_token': BSALE_API_TOKEN})
-            if response.status_code != 200:
-                progreso_comparacion = {"avance": 100, "estado": "error", "archivo": None}
-                return JsonResponse({
-                    "message": f"Error al obtener datos de Bsale: {response.status_code}",
-                }, status=response.status_code)
+        if stock_bsale is None:
+            print(f"❌ No se pudo obtener stock en Bsale para SKU {sku}")
+            continue  
 
-            data = response.json()
-            items = data.get('items', [])
-            total_bsale_items += len(items)
+        diferencia = stock_local - stock_bsale
+        if diferencia == 0:
+            print(f"✅ Stock correcto para SKU {sku}, no se requiere ajuste.")
+            continue  
 
-            for item in items:
-                variant = item.get('variant')
-                if not variant:
-                    continue
-                iderp = variant.get('id')
-                bsale_stock = item.get('quantity', 0) or 0
+        ajuste_realizado = None  
+        data_bsale = {}
+        endpoint = ""
 
-                if iderp in iderp_locales and iderp not in processed_iderps:
-                    processed_iderps.add(iderp)
-                    productos_comparados += 1
-                    producto_local = productos_local_dict[iderp]
+        if diferencia > 0:
+            data_bsale = {
+                "document": "Ajuste de Stock",
+                "officeId": 1,
+                "documentNumber": now().strftime("%Y%m%d%H%M%S"),
+                "note": f"Ajuste automático para SKU {sku}",
+                "details": [
+                    {
+                        "quantity": diferencia,
+                        "code": sku,
+                        "cost": producto.lastcost or 0  
+                    }
+                ]
+            }
+            endpoint = f"{BSALE_API_URL}/stocks/receptions.json"
+            ajuste_realizado = "Stock aumentado en Bsale"
 
-                    current_stock_local = producto_local['stock_unique'] or 0
-                    diferencia_stock = bsale_stock - current_stock_local
+        elif diferencia < 0:
+            data_bsale = {
+                "note": f"Ajuste de stock en Bsale para SKU {sku}",
+                "officeId": 1,
+                "details": [
+                    {
+                        "quantity": abs(diferencia),  
+                        "variantId": producto.iderp
+                    }
+                ]
+            }
+            endpoint = f"{BSALE_API_URL}/stocks/consumptions.json"
+            ajuste_realizado = "Stock reducido en Bsale"
 
-                    if diferencia_stock != 0:
-                        productos_con_diferencia_stock.append({
-                            "sku": producto_local['sku'],
-                            "stock_local": current_stock_local,
-                            "stock_bsale": bsale_stock,
-                            "diferencia": diferencia_stock
-                        })
+        headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+        response = requests.post(endpoint, headers=headers, json=data_bsale)
 
-                # Actualizar el progreso
-                progreso_comparacion["avance"] = (productos_comparados / total_productos_locales) * 100
-                print(f"Progreso: {progreso_comparacion['avance']:.2f}%")
+        if response.status_code in [200, 201]:
+            productos_ajustados.append({
+                "sku": sku,
+                "stock_bsale": stock_bsale,
+                "stock_local": stock_local,
+                "ajuste": diferencia,
+                "accion": ajuste_realizado
+            })
+            print(f"✅ {ajuste_realizado} para SKU {sku}")
+        else:
+            print(f"❌ Error al actualizar SKU {sku}: {response.text}")
 
-            next_url = data.get('next', None)
+    # Guardar los productos ajustados en caché para descargar en Excel
+    if productos_ajustados:
+        cache.set("reporte_stock", productos_ajustados, timeout=600)
+        print(f"✅ Datos guardados en caché: {productos_ajustados}")
+    else:
+        print("⚠ No hay productos ajustados, no se guardará caché.")
 
-        # Crear archivo Excel en la carpeta `static/exports`
-        static_exports_path = os.path.join(settings.BASE_DIR, 'static', 'exports')
-        os.makedirs(static_exports_path, exist_ok=True)  # Crear la carpeta si no existe
-        excel_file = os.path.join(static_exports_path, 'diferencias_stock.xlsx')
+    return JsonResponse({
+        "message": "Ajuste de stock completado",
+        "productos_ajustados": productos_ajustados
+    })
 
-        # Guardar el archivo
-        df = pd.DataFrame(productos_con_diferencia_stock)
-        df.to_excel(excel_file, index=False)
-        print(f"Archivo Excel generado: {excel_file}")
+def descargar_reporte_stock(request):
+    """
+    Genera y devuelve un archivo Excel con los productos ajustados en Bsale.
+    """
+    productos_ajustados = cache.get("reporte_stock", [])
 
-        # Actualizar el progreso final
-        progreso_comparacion = {
-            "avance": 100,
-            "estado": "completado",
-            "archivo": f'/static/exports/diferencias_stock.xlsx'
-        }
+    print(f"📊 Datos en caché antes de descargar: {productos_ajustados}")
 
-        return JsonResponse({"message": "Proceso completado."}, status=200)
+    if not productos_ajustados:
+        return JsonResponse({"error": "No hay datos disponibles para descargar."}, status=400)
 
-    except Exception as e:
-        progreso_comparacion = {"avance": 100, "estado": "error", "archivo": None}
-        print(f"Error inesperado: {str(e)}")
-        return JsonResponse({"error": str(e)}, status=500)
+    # Crear un DataFrame con los datos
+    df = pd.DataFrame(productos_ajustados)
+
+    # Crear un archivo en memoria
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Ajuste de Stock")
+
+    output.seek(0)
+    
+    # Responder con un archivo Excel
+    response = HttpResponse(output.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = "attachment; filename=reporte_ajuste_stock.xlsx"
+    
+    return response
 
 
-def obtener_progreso(request):
-    global progreso_comparacion
-    return JsonResponse(progreso_comparacion)
+
+# # Variable global para almacenar el progreso
+# progreso_comparacion = {"avance": 0, "estado": "iniciado", "archivo": None}
+
+# @csrf_exempt
+# def comparar_stock_bsale(request):
+#     global progreso_comparacion
+#     try:
+#         print("Iniciando comparación de stock...")
+#         progreso_comparacion = {"avance": 0, "estado": "procesando", "archivo": None}
+
+#         total_productos_locales = 0
+#         productos_comparados = 0
+#         productos_con_diferencia_stock = []
+#         processed_iderps = set()
+
+#         # Obtener productos locales con stock de Uniqueproducts (state=0)
+#         productos_locales = (
+#             Products.objects.annotate(
+#                 stock_unique=Count('unique_products', filter=Q(unique_products__state=0))
+#             ).values('sku', 'iderp', 'stock_unique')
+#         )
+#         productos_local_dict = {producto['iderp']: producto for producto in productos_locales}
+#         total_productos_locales = len(productos_local_dict)
+#         print(f"Productos locales obtenidos: {total_productos_locales}")
+
+#         iderp_locales = set(productos_local_dict.keys())
+#         if not iderp_locales:
+#             progreso_comparacion = {"avance": 100, "estado": "completado", "archivo": None}
+#             return JsonResponse({"message": "No hay productos locales para comparar."}, status=200)
+
+#         # Procesar datos de Bsale
+#         next_url = f'{BSALE_API_URL}/stocks.json'
+#         total_bsale_items = 0
+#         while next_url:
+#             response = requests.get(next_url, headers={'access_token': BSALE_API_TOKEN})
+#             if response.status_code != 200:
+#                 progreso_comparacion = {"avance": 100, "estado": "error", "archivo": None}
+#                 return JsonResponse({
+#                     "message": f"Error al obtener datos de Bsale: {response.status_code}",
+#                 }, status=response.status_code)
+
+#             data = response.json()
+#             items = data.get('items', [])
+#             total_bsale_items += len(items)
+
+#             for item in items:
+#                 variant = item.get('variant')
+#                 if not variant:
+#                     continue
+#                 iderp = variant.get('id')
+#                 bsale_stock = item.get('quantity', 0) or 0
+
+#                 if iderp in iderp_locales and iderp not in processed_iderps:
+#                     processed_iderps.add(iderp)
+#                     productos_comparados += 1
+#                     producto_local = productos_local_dict[iderp]
+
+#                     current_stock_local = producto_local['stock_unique'] or 0
+#                     diferencia_stock = bsale_stock - current_stock_local
+
+#                     if diferencia_stock != 0:
+#                         productos_con_diferencia_stock.append({
+#                             "sku": producto_local['sku'],
+#                             "stock_local": current_stock_local,
+#                             "stock_bsale": bsale_stock,
+#                             "diferencia": diferencia_stock
+#                         })
+
+#                 # Actualizar el progreso
+#                 progreso_comparacion["avance"] = (productos_comparados / total_productos_locales) * 100
+#                 print(f"Progreso: {progreso_comparacion['avance']:.2f}%")
+
+#             next_url = data.get('next', None)
+
+#         # Crear archivo Excel en la carpeta `static/exports`
+#         static_exports_path = os.path.join(settings.BASE_DIR, 'static', 'exports')
+#         os.makedirs(static_exports_path, exist_ok=True)  # Crear la carpeta si no existe
+#         excel_file = os.path.join(static_exports_path, 'diferencias_stock.xlsx')
+
+#         # Guardar el archivo
+#         df = pd.DataFrame(productos_con_diferencia_stock)
+#         df.to_excel(excel_file, index=False)
+#         print(f"Archivo Excel generado: {excel_file}")
+
+#         # Actualizar el progreso final
+#         progreso_comparacion = {
+#             "avance": 100,
+#             "estado": "completado",
+#             "archivo": f'/static/exports/diferencias_stock.xlsx'
+#         }
+
+#         return JsonResponse({"message": "Proceso completado."}, status=200)
+
+#     except Exception as e:
+#         progreso_comparacion = {"avance": 100, "estado": "error", "archivo": None}
+#         print(f"Error inesperado: {str(e)}")
+#         return JsonResponse({"error": str(e)}, status=500)
+
+
+# def obtener_progreso(request):
+#     global progreso_comparacion
+#     return JsonResponse(progreso_comparacion)
 
     
 

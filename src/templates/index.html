@@ -3,219 +3,81 @@
 
 {% block css %}
 <style>
-    #chat-iframe {
-        position: fixed;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        height: 100%;
-        border: none;
-        box-shadow: -2px -2px 5px rgba(0, 0, 0, 0.2);
-        background-color: red;
+    .progress-bar {
+        transition: width 0.5s ease-in-out;
     }
 </style>
 <link rel="stylesheet" href="{% static 'libs/owl.carousel/dist/assets/owl.carousel.min.css' %}">
 {% endblock css %}
-<!-- Your existing content here -->
 
 {% block content %}
 <div id="app" class="container mt-5">
     <div class="row">
+        <!-- Comparación de Stock con Bsale -->
         <div class="col-md-6 mb-4">
             <div class="card h-100">
-                <div class="card-header" style="background-color: #003399; color: white;">
-                    <h6 class="mb-0" style="color: white;">Comparar Stock con Bsale</h6>
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">Comparar Stock con Bsale</h6>
                 </div>
                 <div class="card-body">
-                    <!-- Botón para iniciar la comparación -->
                     <button @click="iniciarComparacion" class="btn btn-primary mt-3" :disabled="loading">
                         [[ loading ? 'Comparando...' : 'Comparar Stock en Bsale' ]]
                     </button>
-        
-                    <!-- Barra de progreso -->
+
+                    <!-- Barra de Progreso -->
                     <div v-if="loading" class="mt-4">
+                       
                         <h6>Progreso de la Comparación</h6>
                         <div class="progress">
                             <div 
-                                class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                id="progressBar"
+                                class="progress-bar progress-bar-striped progress-bar-animated bg-success"
                                 role="progressbar"
-                                :style="{ width: progress + '%' }"
-                                :aria-valuenow="progress"
+                                style="width: 0%;"
+                                aria-valuenow="0"
                                 aria-valuemin="0"
                                 aria-valuemax="100">
                                 [[ progress ]]%
                             </div>
                         </div>
-                        <p class="text-center mt-2">[[ progressMessage ]]</p>
+                      
+                        
+                        <p id="progressText" class="text-center mt-2">[[ progressMessage ]]</p>
                     </div>
-        
-                    <!-- Resultados de la comparación -->
-                    <div v-if="comparacionResultado.length > 0" class="mt-4">
-                        <h6>Resumen de la Comparación:</h6>
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>SKU</th>
-                                    <th>Stock Local</th>
-                                    <th>Stock Bsale</th>
-                                    <th>Diferencia</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="producto in comparacionResultado" :key="producto.sku">
-                                    <td>[[ producto.sku ]]</td>
-                                    <td>[[ producto.stock_local ]]</td>
-                                    <td>[[ producto.stock_bsale ]]</td>
-                                    <td>[[ producto.diferencia ]]</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-        
-                    <!-- Mensaje de estado si no hay resultados -->
-                    <div v-else-if="!loading && comparacionResultado.length === 0" class="mt-4">
-                        <p class="text-muted">No se han encontrado diferencias en el stock.</p>
+
+                    <div v-else-if="!loading" class="mt-4 text-muted">
+                        <p>No se han encontrado diferencias en el stock.</p>
                     </div>
                 </div>
             </div>
         </div>
-        <!-- Card para mostrar el Rol del Usuario -->
+
+        <!-- Gestión de Respaldo de Productos -->
         <div class="col-md-6 mb-4">
             <div class="card h-100">
-                <div class="card-header" style="background-color: #003399; color: white;">
-                    <h6 class="mb-0" style="color: white;">Rol de Usuario</h6>
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0">Gestión de Unique Products</h6>
                 </div>
                 <div class="card-body">
-                    {% if request.user.usuario.rol == 'ADMIN' %}
-                    <div>
-                        <button @click="generateDynamicKey" class="btn btn-warning mt-3">Generar Clave de
-                            Acceso</button>
-                        <p class="mt-2" v-if="generatedKey">Clave Generada: <span>[[ generatedKey ]]</span> (Expira en 5
-                            minutos)</p>
-                    </div>
-                    {% endif %}
-                    <p class="mt-2">ROL: {{ request.user.usuario.rol }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header" style="background-color: #003399; color: white;">
-                    <h6 class="mb-0" style="color: white;">Próximamente</h6>
-                </div>
-                <div class="card-body">
-                    <p class="mb-0">Estaremos añadiendo gráficos y estadísticas para visualizar mejor la información
-                        relevante.</p>
-                    <p class="mb-0">Probar Etiquetas</p>
-
-                </div>
-            </div>
-        </div>
-
-        <!-- Card de Bienvenida o Pantalla de Inicio -->
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header" style="background-color: #003399; color: white;">
-                    <h6 class="mb-0" style="color: white;">Pantalla Inicio</h6>
-                </div>
-                <div class="card-body">
-                    <p class="mb-0">Bienvenido a la plataforma. Explora las distintas secciones y funciones disponibles
-                        según tu rol.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card para Anuncio de Gráficos Próximos -->
-
-
-        <!-- Card para Información de Contacto -->
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header" style="background-color: #003399; color: white;">
-                    <h6 class="mb-0" style="color: white;">Contacto</h6>
-                </div>
-                <div class="card-body">
-                    <p class="mb-0">Para cualquier duda o comentario, contáctanos en <a
-                            href="mailto:carvajal.emmett@gmail.com" style="color: blue;">carvajal.emmett@gmail.com</a>.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <!-- Encabezado de la tarjeta -->
-                <div class="card-header" style="background-color: #003399; color: white;">
-                    <h6 class="mb-0" style="color: aliceblue;">Gestión de Unique Products NO TOCAR</h6>
-                </div>
-        
-                <!-- Cuerpo principal -->
-                <div class="card-body">
-                    <!-- Botones de respaldo -->
                     <button @click="hacerRespaldo" class="btn btn-primary mt-3">Hacer Respaldo</button>
                     <button @click="descargarBackup" class="btn btn-primary mt-3">Descargar Respaldo</button>
-                    <button @click="descargarBackupExcel" class="btn btn-primary mt-3">Descargar Respaldo Excel</button>
-        
-                    <!-- Cargar respaldo -->
-                    <div class="card-header mt-4" >
-                        <h6 class="mb-0">Cargar Respaldo</h6>
+                    <button @click="descargarBackupExcel" class="btn btn-primary mt-3">Descargar Excel</button>
+
+                    <div class="mt-4">
+                        <h6>Cargar Respaldo</h6>
+                        <input type="file" @change="handleFileUpload" accept="application/json" class="form-control">
+                        <button @click="cargarRespaldo" class="btn btn-warning mt-3">Cargar Respaldo</button>
                     </div>
-                    <div class="card-body">
-                        <input 
-                            type="file" 
-                            id="fileInput" 
-                            @change="uploadFile" 
-                            accept="application/json"
-                            class="form-control"
-                        />
-                        <button @click="cargarRespaldo" class="btn btn-warning mt-3">Cargar Respaldo de Productos Únicos</button>
+
+                    <div class="mt-4">
+                        <h6>Cargar Productos</h6>
+                        <input type="file" @change="handleFileUpload" class="form-control">
+                        <button @click="uploadProductsFile" class="btn btn-success mt-3">Cargar Productos</button>
                     </div>
-        
-                    <hr>
-        
-                    <!-- Cargar nueva data -->
-                    <h6>Cargar Nueva Data</h6>
-                    <input 
-                        type="file" 
-                        id="fileInput" 
-                        @change="uploadFile" 
-                        class="form-control"
-                    />
-                    <button @click="cargarNuevaData" class="btn btn-success mt-3">Cargar Data</button>
-        
-                    <hr>
-        
-                    <!-- Cargar productos -->
-                    <h6>Cargar Productos</h6>
-                    <input 
-                        type="file" 
-                        @change="handleFileUpload" 
-                        class="form-control"
-                    />
-                    <button @click="uploadProductsFile" class="btn btn-primary mt-3">Cargar Productos</button>
                 </div>
             </div>
         </div>
-        <!-- <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header" style="background-color: #003399; color: white;">
-                <h6 class="mb-0" style="color: white;">Carga masiva</h6>
-            </div>
-            <div class="card-body">
-                <input type="file" id="fileInput" @change="uploadFile">
-                    <select v-model="modelType">
-                        <option value="brand">Marcas</option>
-                        <option value="category">Categorías</option>
-                    </select>
-                    <button @click="uploadCSV">Subir Archivo</button>
-            </div>
-        </div> -->
     </div>
-
-
-
-</div>
-</div>
 </div>
 
 {% endblock content %}
@@ -231,298 +93,26 @@
         delimiters: ['[[', ']]'],
         data: {
             file: null,
-            modelType: 'brand',
-            dynamicKey: '',
-            generatedKey: '',
-            cantidad_de_mensajes: 0,
-            cantidad_de_mensajes_whatsapp: 0,
-            cantidad_de_mensajes_text: 0,
-            llaves: null,
-            valores: null,
-            ejecutivos: [],
-            fecha_select: "{{meses.0}}",
-            comparacionResultado: [], // Almacena los resultados de la comparación
-            progress: 0,             // Progreso de la comparación en porcentaje
-            loading: false
-        },
-        mounted() {
+            progress: 0,
+            loading: false,
+            progressMessage: "Esperando inicio...",
+            comparacionResultado: []
         },
         methods: {
-            descargarBackupExcel() {
-                const url = '/api/generar-excel-stock/';
-                axios({
-                    url: url,
-                    method: 'GET',
-                    responseType: 'blob', // Asegura que el archivo se maneje como binario
-                })
-                    .then(response => {
-                        // Crear un enlace para descargar el archivo
-                        const url = window.URL.createObjectURL(new Blob([response.data]));
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.setAttribute('download', 'stock_bodegas.xlsx'); // Nombre del archivo
-                        document.body.appendChild(link);
-                        link.click();
-                        link.remove();
-                    })
-                    .catch(error => {
-                        console.error('Error al descargar el respaldo:', error);
-                    });
-            },
-            async uploadProductsFile() {
-                if (!this.file) {
-                    Swal.fire('Advertencia', 'Debe seleccionar un archivo JSON.', 'warning');
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('file', this.file);
-
-                try {
-                    const response = await axios.post('/api/bulk-upload-products/', formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' },
-                    });
-
-                    if (response.data.status === 'success') {
-                        Swal.fire('Éxito', response.data.message, 'success');
-                        if (response.data.duplicates.length > 0) {
-                            console.warn("SKUs duplicados:", response.data.duplicates);
-                            alert(`SKUs duplicados: ${response.data.duplicates.join(', ')}`);
-                        }
-                    } else {
-                        Swal.fire('Error', response.data.message, 'error');
-                    }
-                } catch (error) {
-                    Swal.fire('Error', 'Error al cargar el archivo.', 'error');
-                    console.error(error);
-                }
-            },
             handleFileUpload(event) {
                 this.file = event.target.files[0];
             },
-            async hacerRespaldo() {
-                try {
-                    const response = await axios.get('/api/backup-unique-products/');
-                    if (response.data.status === 'success') {
-                        Swal.fire('Éxito', response.data.message, 'success');
-                    } else {
-                        Swal.fire('Error', response.data.message, 'error');
-                    }
-                } catch (error) {
-                    Swal.fire('Error', 'Ocurrió un problema al realizar el respaldo.', 'error');
-                    console.error(error);
-                }
-            },
-
-            uploadFile(event) {
-                this.file = event.target.files[0]; // Captura el archivo cargado
-            },
-            async cargarRespaldo() {
-                if (!this.file) {
-                    Swal.fire('Advertencia', 'Debe seleccionar un archivo JSON.', 'warning');
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('file', this.file);
-
-                try {
-                    const response = await axios.post('/api/restore-unique-products/', formData, {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                        },
-                    });
-
-                    if (response.data.status === 'success') {
-                        const missingProducts = response.data.missing_products || [];
-                        Swal.fire(
-                            'Éxito',
-                            `Se han restaurado ${response.data.message}.<br> 
-                     Productos faltantes: ${missingProducts.length > 0 ? missingProducts.join(', ') : 'Ninguno'}`,
-                            'success'
-                        );
-                    } else {
-                        Swal.fire('Error', response.data.message, 'error');
-                    }
-                } catch (error) {
-                    console.error('Error al cargar el respaldo:', error);
-                    Swal.fire('Error', 'No se pudo cargar el respaldo.', 'error');
-                }
-            },
-            async descargarBackup() {
-                try {
-                    // Realizar la solicitud GET a la API
-                    const response = await axios.get('/api/backup-unique-products/', {
-                        responseType: 'blob' // Importante: Esto asegura que se maneje como archivo binario
-                    });
-
-                    // Crear un enlace para descargar el archivo
-                    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/json' }));
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', 'uniqueproducts_backup.json'); // Nombre del archivo
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link); // Limpieza del DOM
-
-                    Swal.fire('Éxito', 'Respaldo descargado correctamente.', 'success');
-                } catch (error) {
-                    console.error('Error al descargar el respaldo:', error);
-                    Swal.fire('Error', 'No se pudo descargar el respaldo.', 'error');
-                }
-            },
-
-            async cargarNuevaData() {
-                if (!this.file) {
-                    Swal.fire('Advertencia', 'Debe seleccionar un archivo antes de cargar.', 'warning');
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('file', this.file);
-
-                try {
-                    const response = await axios.post('/api/load-new-unique-products/', formData, {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                        },
-                    });
-
-                    if (response.data.status === 'success') {
-                        Swal.fire(
-                            'Éxito',
-                            `Se han cargado ${response.data.message}. 
-                    SKUs faltantes: ${response.data.missing_skus.join(', ')}`,
-                            'success'
-                        );
-                    } else {
-                        Swal.fire('Error', response.data.message, 'error');
-                    }
-                } catch (error) {
-                    Swal.fire('Error', 'Ocurrió un problema al cargar los datos.', 'error');
-                    console.error(error);
-                }
-            },
-
-            uploadFile(event) {
-                this.file = event.target.files[0];
-            },
-            imprimirTabla() {
-                const tablaHTML = `
-                <html>
-                    <head>
-                        <title>Comparación de Stock</title>
-                        <style>
-                            table {
-                                width: 100%;
-                                border-collapse: collapse;
-                            }
-                            th, td {
-                                border: 1px solid black;
-                                padding: 8px;
-                                text-align: center;
-                            }
-                            th {
-                                background-color: #f2f2f2;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <h3>Resumen de la Comparación</h3>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>SKU</th>
-                                    <th>Stock Local</th>
-                                    <th>Stock Bsale</th>
-                                    <th>Diferencia</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${this.comparacionResultado.map(producto => `
-                                    <tr>
-                                        <td>${producto.sku}</td>
-                                        <td>${producto.stock_local}</td>
-                                        <td>${producto.stock_bsale}</td>
-                                        <td>${producto.diferencia}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </body>
-                </html>
-            `;
-
-                const nuevaVentana = window.open("", "_blank");
-                nuevaVentana.document.write(tablaHTML);
-                nuevaVentana.document.close();
-                nuevaVentana.print();
-                nuevaVentana.close();
-            },
-            uploadFile(event) {
-                this.file = event.target.files[0];
-            },
-            async uploadCSV() {
-                if (!this.file) {
-                    alert("Debe seleccionar un archivo.");
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('file', this.file);
-
-                try {
-                    const response = await axios.post(`/api/bulk-upload/${this.modelType}/`, formData, {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                        },
-                    });
-                    alert(`Se han creado ${response.data.created} registros. Errores: ${response.data.errors}`);
-                } catch (error) {
-                    console.error('Error al subir el archivo:', error);
-                    alert("Error al procesar el archivo.");
-                }
-            },
+           
             iniciarComparacion() {
                 this.loading = true;
-                this.progress = 0;
+                this.progressMessage = "Iniciando comparación...";
 
-                axios.get('/api/comparar-stock-bsale/')
-                    .then(() => {
-                        const progresoInterval = setInterval(() => {
-                            axios.get('/api/obtener-progreso/')
-                                .then(response => {
-                                    const data = response.data;
-                                    this.progress = data.avance;
-
-                                    if (data.estado === 'completado') {
-                                        clearInterval(progresoInterval);
-                                        this.loading = false;
-
-                                        if (data.archivo) {
-                                            Swal.fire({
-                                                title: '¡Éxito!',
-                                                text: 'La comparación se completó correctamente.',
-                                                icon: 'success',
-                                                confirmButtonText: 'Descargar Excel'
-                                            }).then(() => {
-                                                window.location.href = data.archivo; // Descargar el archivo
-                                            });
-                                        }
-                                    }
-
-                                    if (data.estado === 'error') {
-                                        clearInterval(progresoInterval);
-                                        this.loading = false;
-                                        Swal.fire('Error', 'Ocurrió un error durante la comparación.', 'error');
-                                    }
-                                })
-                                .catch(error => {
-                                    console.error('Error obteniendo el progreso:', error);
-                                    clearInterval(progresoInterval);
-                                    this.loading = false;
-                                });
-                        }, 1000);
+                axios.post('/api/ajustar_stock_bsale/')
+                    .then(response => {
+                        console.log("📊 Resultado:", response.data);
+                        this.comparacionResultado = response.data.productos_ajustados;
+                        this.loading = false;
+                        
                     })
                     .catch(error => {
                         Swal.fire('Error', 'Ocurrió un error al iniciar la comparación.', 'error');
@@ -530,70 +120,76 @@
                         this.loading = false;
                     });
             },
-            generateDynamicKey() {
-                axios.post('/api/generate-dynamic-key/')
+
+            checkProgress() {
+                axios.get("/api/progreso_stock/")
                     .then(response => {
-                        this.generatedKey = response.data.key;  // Almacena la clave generada en generatedKey
-                        console.log("Generated Key:", this.generatedKey);  // Confirma en la consola
+                        console.log("📊 Recibiendo progreso:", response.data);
+                        
+                        this.progress = response.data.progress;
+                        this.progressMessage = response.data.logs.join("\n");  // Mostrar logs como texto
+                        
+                        if (this.progress < 100) {
+                            setTimeout(() => this.checkProgress(), 2000);
+                        } else {
+                            this.loading = false;
+                            Swal.fire({
+                                title: '¡Completado!',
+                                text: 'La comparación de stock ha finalizado.',
+                                icon: 'success',
+                                confirmButtonText: 'Descargar Reporte',
+                            }).then(() => {
+                                window.location.href = '/api/descargar-reporte-stock/';
+                            });
+                        }
                     })
                     .catch(error => {
-                        Swal.fire('Error', 'No se pudo generar la clave de acceso.', 'error');
-                        console.error(error);
+                        console.error("❌ Error obteniendo el progreso:", error);
+                        this.loading = false;
                     });
             },
 
-
-            getCookie(name) {
-                let cookieValue = null;
-                if (document.cookie && document.cookie !== '') {
-                    const cookies = document.cookie.split(';');
-                    for (let i = 0; i < cookies.length; i++) {
-                        const cookie = cookies[i].trim();
-                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                            break;
-                        }
-                    }
+            obtenerLogs() {
+                axios.get("/api/logs_stock/")
+                    .then(response => {
+                        this.logs = response.data.logs;
+                    })
+                    .catch(error => {
+                        console.error("❌ Error obteniendo logs:", error);
+                    });
+            },
+            hacerRespaldo() {
+                axios.get('/api/backup-unique-products/')
+                    .then(response => {
+                        Swal.fire('Éxito', response.data.message, 'success');
+                    })
+                    .catch(error => {
+                        Swal.fire('Error', 'Ocurrió un problema al realizar el respaldo.', 'error');
+                        console.error(error);
+                    });
+            },
+            descargarBackup() {
+                window.location.href = '/api/backup-unique-products/';
+            },
+            descargarBackupExcel() {
+                window.location.href = '/api/generar-excel-stock/';
+            },
+            async uploadProductsFile() {
+                if (!this.file) {
+                    Swal.fire('Advertencia', 'Debe seleccionar un archivo JSON.', 'warning');
+                    return;
                 }
-                return cookieValue;
-            },
+                const formData = new FormData();
+                formData.append('file', this.file);
 
-            createChartOptions(llaves, valores) {
-                return {
-                    series: [{ name: "Cantidad de conversaciones", data: valores }],
-                    chart: { toolbar: { show: false }, type: "bar", height: 320, stacked: true },
-                    colors: ["var(--bs-secondary)"],
-                    plotOptions: { bar: { horizontal: false, barHeight: "60%", columnWidth: "20%", borderRadius: [6] } },
-                    dataLabels: { enabled: false },
-                    xaxis: { categories: llaves },
-                    yaxis: { tickAmount: 4 },
-                    tooltip: { theme: "dark" },
-                };
-            },
-
-            createBreakupChart() {
-                return {
-                    color: "#adb5bd",
-                    series: [38, 40, 25],
-                    labels: ["2022", "2021", "2020"],
-                    chart: { width: 180, type: "donut" },
-                    colors: ["var(--bs-primary)", "#ecf2ff", "#F9F9FD"],
-                    responsive: [{ breakpoint: 991, options: { chart: { width: 120 } } }],
-                    tooltip: { theme: "dark", fillSeriesColor: false },
-                };
-            },
-
-            createEarningChart() {
-                return {
-                    chart: { id: "sparkline3", type: "area", height: 60, sparkline: { enabled: true } },
-                    series: [{ name: "Earnings", data: [25, 66, 20, 40, 12, 58, 20] }],
-                    stroke: { curve: "smooth", width: 2 },
-                    fill: { type: "gradient", opacity: 0.5 },
-                    markers: { size: 0 },
-                    tooltip: { theme: "dark", fixed: { enabled: true, position: "right" } },
-                };
+                try {
+                    const response = await axios.post('/api/bulk-upload-products/', formData);
+                    Swal.fire('Éxito', response.data.message, 'success');
+                } catch (error) {
+                    Swal.fire('Error', 'Error al cargar el archivo.', 'error');
+                }
             }
-        },
-    })
+        }
+    });
 </script>
 {% endblock js %}

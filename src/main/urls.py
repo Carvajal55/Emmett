@@ -129,10 +129,12 @@ urlpatterns = [
    path('api/fetch-invoice-products/', core_views.fetch_invoice_products, name='fetch_invoice_products'),
    path('api/validate-superid/', core_views.validate_superid, name='validate_superid'),
    path('api/validate-superid-interno/', core_views.validate_superid_simplified_interno, name='validate_superid'),
+   path("api/ajustar_stock_bsale/", core_views.ajustar_stock_bsale, name="ajustar_stock_bsale"),
+   path("api/descargar-reporte-stock/", core_views.descargar_reporte_stock, name="descargar_reporte_stock"),
 
 
-   path('api/comparar-stock-bsale/', core_views.comparar_stock_bsale, name='comparar_stock_bsale'),
-   path('api/obtener-progreso/', core_views.obtener_progreso, name='obtener_progreso'),
+#    path('api/comparar-stock-bsale/', core_views.comparar_stock_bsale, name='comparar_stock_bsale'),
+#    path('api/obtener-progreso/', core_views.obtener_progreso, name='obtener_progreso'),
 
 
    path('api/actualizar-stock-local/', core_views.actualizar_stock_local, name='actualizar_stock_local'),

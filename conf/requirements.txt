@@ -55,5 +55,7 @@ qrcode[pil]
 python-dotenv
 reportlab
 XlsxWriter
+channels
+channels-redis
 
 
