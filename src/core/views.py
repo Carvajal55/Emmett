@@ -4178,6 +4178,17 @@ def ajustar_stock_bsale(request):
         "archivo": "/api/descargar-reporte-stock/"
     })
 
+def descargar_reporte_stock(request):
+    """
+    Permite descargar el archivo Excel generado en la API de ajuste de stock.
+    """
+    excel_file_path = os.path.join(settings.BASE_DIR, 'static', 'exports', 'ajuste_stock.xlsx')
+
+    if os.path.exists(excel_file_path):
+        return FileResponse(open(excel_file_path, 'rb'), as_attachment=True, filename="ajuste_stock.xlsx")
+    else:
+        return HttpResponseNotFound("El archivo no está disponible.")
+
 
 
 # # Variable global para almacenar el progreso
