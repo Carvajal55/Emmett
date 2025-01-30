@@ -5028,15 +5028,17 @@ def restore_unique_products_view(request):
         Uniqueproducts.objects.all().delete()
         print("✅ Registros eliminados correctamente.")
 
-        # Obtener SKUs únicos del JSON para buscar los productos en una sola consulta
+        # Obtener SKUs únicos del JSON
         skus = {record.get("product_id") for record in unique_products if record.get("product_id")}
-        existing_products = Products.objects.in_bulk(skus, field_name='sku')
+
+        # 🔍 Obtener todos los productos en una sola consulta y convertir en diccionario
+        existing_products = {product.sku: product for product in Products.objects.filter(sku__in=skus)}
 
         print(f"🔍 Productos encontrados en la BD: {len(existing_products)} / {len(skus)}")
 
         # Preparar inserción masiva
         restored_products = []
-        missing_products = []  # SKUs no encontrados en BD
+        missing_products = []
         BATCH_SIZE = 500  # Ajustable según rendimiento
 
         print("⚙️ Iniciando restauración de registros...")
@@ -5049,6 +5051,7 @@ def restore_unique_products_view(request):
                 continue
 
             try:
+                # Convertir timestamp a fecha válida
                 datelastinventory = record.get("datelastinventory")
                 datelastinventory = datetime.fromtimestamp(int(datelastinventory) / 1000) if datelastinventory else None
 
