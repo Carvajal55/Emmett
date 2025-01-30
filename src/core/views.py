@@ -4034,6 +4034,8 @@ def send_progress_to_cache(progreso, total):
         "message": mensaje
     }, timeout=600)
 
+from django.http import JsonResponse, FileResponse
+
 @csrf_exempt
 def ajustar_stock_bsale(request):
     """
@@ -4043,7 +4045,7 @@ def ajustar_stock_bsale(request):
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
     productos_ajustados = []
-    productos = Products.objects.all()[:10]  # Solo 10 productos para pruebas
+    productos = Products.objects.all()  # Solo 10 productos para pruebas [:35]
     total_productos = len(productos)
 
     if total_productos == 0:
@@ -4113,44 +4115,28 @@ def ajustar_stock_bsale(request):
         else:
             print(f"❌ Error al actualizar SKU {sku}: {response.text}")
 
-    # Guardar los productos ajustados en caché para descargar en Excel
-    if productos_ajustados:
-        cache.set("reporte_stock", productos_ajustados, timeout=600)
-        print(f"✅ Datos guardados en caché: {productos_ajustados}")
-    else:
-        print("⚠ No hay productos ajustados, no se guardará caché.")
+    static_exports_path = os.path.join(settings.BASE_DIR, 'static', 'exports')
+    os.makedirs(static_exports_path, exist_ok=True)
+    excel_file = os.path.join(static_exports_path, 'ajuste_stock.xlsx')
+
+    # Guardar los datos en un archivo Excel
+    df = pd.DataFrame(productos_ajustados)
+    df.to_excel(excel_file, index=False)
 
     return JsonResponse({
         "message": "Ajuste de stock completado",
-        "productos_ajustados": productos_ajustados
+        "productos_ajustados": productos_ajustados,
+        "archivo": "/api/descargar-reporte-stock/"
     })
 
+
 def descargar_reporte_stock(request):
-    """
-    Genera y devuelve un archivo Excel con los productos ajustados en Bsale.
-    """
-    productos_ajustados = cache.get("reporte_stock", [])
-
-    print(f"📊 Datos en caché antes de descargar: {productos_ajustados}")
-
-    if not productos_ajustados:
-        return JsonResponse({"error": "No hay datos disponibles para descargar."}, status=400)
-
-    # Crear un DataFrame con los datos
-    df = pd.DataFrame(productos_ajustados)
-
-    # Crear un archivo en memoria
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Ajuste de Stock")
-
-    output.seek(0)
-    
-    # Responder con un archivo Excel
-    response = HttpResponse(output.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response["Content-Disposition"] = "attachment; filename=reporte_ajuste_stock.xlsx"
-    
-    return response
+    """ Devuelve el archivo Excel como descarga directa """
+    file_path = os.path.join(settings.BASE_DIR, 'static', 'exports', 'ajuste_stock.xlsx')
+    if os.path.exists(file_path):
+        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename="ajuste_stock.xlsx")
+    else:
+        return JsonResponse({"error": "Archivo no encontrado"}, status=404)
 
 
 

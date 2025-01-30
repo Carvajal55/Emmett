@@ -26,7 +26,6 @@
 
                     <!-- Barra de Progreso -->
                     <div v-if="loading" class="mt-4">
-                       
                         <h6>Progreso de la Comparación</h6>
                         <div class="progress">
                             <div 
@@ -40,10 +39,13 @@
                                 [[ progress ]]%
                             </div>
                         </div>
-                      
-                        
                         <p id="progressText" class="text-center mt-2">[[ progressMessage ]]</p>
                     </div>
+
+                    <!-- Botón para descargar el reporte de ajuste -->
+                    <a v-if="archivoExcel" :href="archivoExcel" download="ajuste_stock.xlsx" class="btn btn-success mt-3">
+                        📥 Descargar Reporte
+                    </a>
 
                     <div v-else-if="!loading" class="mt-4 text-muted">
                         <p>No se han encontrado diferencias en el stock.</p>
@@ -96,7 +98,8 @@
             progress: 0,
             loading: false,
             progressMessage: "Esperando inicio...",
-            comparacionResultado: []
+            comparacionResultado: [],
+            archivoExcel: null,  // Ruta del archivo Excel
         },
         methods: {
             handleFileUpload(event) {
@@ -111,8 +114,21 @@
                     .then(response => {
                         console.log("📊 Resultado:", response.data);
                         this.comparacionResultado = response.data.productos_ajustados;
+
+                        if (response.data.archivo) {
+                            // Redirigir automáticamente para descargar el archivo
+                            setTimeout(() => {
+                                window.location.href = response.data.archivo;
+                            }, 500);
+                        }
+
                         this.loading = false;
-                        
+                        Swal.fire({
+                            title: '¡Comparación Finalizada!',
+                            text: 'El reporte de ajustes se descargará automáticamente.',
+                            icon: 'success',
+                            confirmButtonText: 'Aceptar'
+                        });
                     })
                     .catch(error => {
                         Swal.fire('Error', 'Ocurrió un error al iniciar la comparación.', 'error');
@@ -125,10 +141,9 @@
                 axios.get("/api/progreso_stock/")
                     .then(response => {
                         console.log("📊 Recibiendo progreso:", response.data);
-                        
                         this.progress = response.data.progress;
-                        this.progressMessage = response.data.logs.join("\n");  // Mostrar logs como texto
-                        
+                        this.progressMessage = response.data.logs.join("\n");  
+
                         if (this.progress < 100) {
                             setTimeout(() => this.checkProgress(), 2000);
                         } else {
@@ -139,7 +154,7 @@
                                 icon: 'success',
                                 confirmButtonText: 'Descargar Reporte',
                             }).then(() => {
-                                window.location.href = '/api/descargar-reporte-stock/';
+                                window.location.href = this.archivoExcel;
                             });
                         }
                     })
@@ -149,15 +164,6 @@
                     });
             },
 
-            obtenerLogs() {
-                axios.get("/api/logs_stock/")
-                    .then(response => {
-                        this.logs = response.data.logs;
-                    })
-                    .catch(error => {
-                        console.error("❌ Error obteniendo logs:", error);
-                    });
-            },
             hacerRespaldo() {
                 axios.get('/api/backup-unique-products/')
                     .then(response => {
@@ -168,12 +174,15 @@
                         console.error(error);
                     });
             },
+
             descargarBackup() {
                 window.location.href = '/api/backup-unique-products/';
             },
+
             descargarBackupExcel() {
                 window.location.href = '/api/generar-excel-stock/';
             },
+
             async uploadProductsFile() {
                 if (!this.file) {
                     Swal.fire('Advertencia', 'Debe seleccionar un archivo JSON.', 'warning');
