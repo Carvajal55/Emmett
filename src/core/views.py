@@ -4084,7 +4084,7 @@ def ajustar_stock_bsale(request):
 
     # 🔍 Obtener productos con stock_local de forma eficiente
     productos = Products.objects.annotate(
-        stock_local=Count('uniqueproducts', filter=Q(uniqueproducts__state=1), distinct=True)
+        stock_local=Count('unique_products', filter=Q(unique_products__state=1), distinct=True)
     ).values("sku", "iderp", "stock_local", "lastcost").order_by('id')[:BATCH_SIZE]
 
     productos = list(productos)  # 🔥 Convertir a lista para iterar más rápido
