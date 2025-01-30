@@ -4037,37 +4037,45 @@ def send_progress_to_cache(progreso, total):
 from django.http import JsonResponse, FileResponse
 from concurrent.futures import ThreadPoolExecutor
 
-BATCH_SIZE = 50  # Lote de productos a procesar por batch
-THREADS = 5  # Número de hilos para paralelizar solicitudes a Bsale
+BATCH_SIZE = 50  # 🔥 Tamaño del lote de productos a procesar
+THREADS = 5  # 🔥 Número de hilos para paralelizar requests a Bsale
+BSALE_API_URL = "https://api.bsale.io/v1"
+BSALE_API_TOKEN = "TU_ACCESS_TOKEN"
 
 def obtener_stock_bsale_parallel(skus):
     """
-    Obtiene el stock de varios SKUs en Bsale en paralelo para mejorar el rendimiento.
+    🔥 Obtiene el stock de varios SKUs en Bsale en paralelo para mejorar el rendimiento.
     """
     stock_data = {}
 
     def fetch_stock(sku):
         try:
-            response = requests.get(f"{BSALE_API_URL}/stocks.json?sku={sku}", headers={"access_token": BSALE_API_TOKEN})
+            response = requests.get(
+                f"{BSALE_API_URL}/stocks.json?sku={sku}",
+                headers={"access_token": BSALE_API_TOKEN},
+                timeout=5  # ⏳ Timeout de 5s para evitar bloqueos
+            )
             if response.status_code == 200:
                 data = response.json()
                 stock_data[sku] = data.get("quantity", 0)
             else:
                 stock_data[sku] = None
+        except requests.exceptions.Timeout:
+            print(f"⏳ Timeout en Bsale para SKU {sku}")
+            stock_data[sku] = None
         except Exception as e:
             stock_data[sku] = None
-            print(f"❌ Error al obtener stock de Bsale para {sku}: {e}")
+            print(f"❌ Error en Bsale para {sku}: {e}")
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=THREADS) as executor:
         executor.map(fetch_stock, skus)
 
     return stock_data
 
-
 @csrf_exempt
 def ajustar_stock_bsale(request):
     """
-    API optimizada que compara el stock local con el de Bsale y ajusta los productos.
+    🔥 API optimizada que compara el stock local con el de Bsale y ajusta los productos.
     """
     if request.method != "POST":
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
@@ -4076,11 +4084,10 @@ def ajustar_stock_bsale(request):
 
     # 🔍 Obtener productos con stock_local de forma eficiente
     productos = Products.objects.annotate(
-    stock_local=Count('unique_products', filter=Q(unique_products__state=1))
-    ).values("sku", "iderp", "stock_local", "lastcost").order_by('id')[:50]  # 🔥 Limita a 50 productos
-    
+        stock_local=Count('uniqueproducts', filter=Q(uniqueproducts__state=1), distinct=True)
+    ).values("sku", "iderp", "stock_local", "lastcost").order_by('id')[:BATCH_SIZE]
 
-    productos = list(productos)  # Convertir a lista para iterar más rápido
+    productos = list(productos)  # 🔥 Convertir a lista para iterar más rápido
     total_productos = len(productos)
 
     if total_productos == 0:
@@ -4148,7 +4155,12 @@ def ajustar_stock_bsale(request):
 
         # 🔥 Enviar solicitud a Bsale en paralelo
         try:
-            response = requests.post(endpoint, headers={"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}, json=data_bsale)
+            response = requests.post(
+                endpoint,
+                headers={"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"},
+                json=data_bsale,
+                timeout=5  # ⏳ Timeout de 5 segundos
+            )
             if response.status_code in [200, 201]:
                 productos_ajustados.append({
                     "sku": sku,
@@ -4181,9 +4193,10 @@ def ajustar_stock_bsale(request):
         "archivo": "/api/descargar-reporte-stock/"
     })
 
+@csrf_exempt
 def descargar_reporte_stock(request):
     """
-    Permite descargar el archivo Excel generado en la API de ajuste de stock.
+    📥 Permite descargar el archivo Excel generado en la API de ajuste de stock.
     """
     excel_file_path = os.path.join(settings.BASE_DIR, 'static', 'exports', 'ajuste_stock.xlsx')
 
