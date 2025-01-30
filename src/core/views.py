@@ -4035,30 +4035,33 @@ def send_progress_to_cache(progreso, total):
     }, timeout=600)
 
 from django.http import JsonResponse, FileResponse
+from concurrent.futures import ThreadPoolExecutor
 
 BATCH_SIZE = 50  # Lote de productos a procesar por batch
 THREADS = 5  # Número de hilos para paralelizar solicitudes a Bsale
 
-def obtener_stock_bsale_parallel(sku_list):
+def obtener_stock_bsale_parallel(skus):
     """
-    Obtiene el stock en Bsale para múltiples SKUs en paralelo.
+    Obtiene el stock de varios SKUs en Bsale en paralelo para mejorar el rendimiento.
     """
+    stock_data = {}
+
     def fetch_stock(sku):
         try:
-            response = requests.get(f"{BSALE_API_URL}/stocks.json?code={sku}", headers={"access_token": BSALE_API_TOKEN})
+            response = requests.get(f"{BSALE_API_URL}/stocks.json?sku={sku}", headers={"access_token": BSALE_API_TOKEN})
             if response.status_code == 200:
                 data = response.json()
-                return {sku: data.get('quantity', 0)}
+                stock_data[sku] = data.get("quantity", 0)
+            else:
+                stock_data[sku] = None
         except Exception as e:
+            stock_data[sku] = None
             print(f"❌ Error al obtener stock de Bsale para {sku}: {e}")
-        return {sku: None}
 
-    stock_bsale = {}
-    with ThreadPoolExecutor(max_workers=THREADS) as executor:
-        results = executor.map(fetch_stock, sku_list)
-        for result in results:
-            stock_bsale.update(result)
-    return stock_bsale
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        executor.map(fetch_stock, skus)
+
+    return stock_data
 
 
 @csrf_exempt
