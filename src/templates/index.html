@@ -65,10 +65,19 @@
                     <button @click="descargarBackup" class="btn btn-primary mt-3">Descargar Respaldo</button>
                     <button @click="descargarBackupExcel" class="btn btn-primary mt-3">Descargar Excel</button>
 
-                    <div class="mt-4">
-                        <h6>Cargar Respaldo</h6>
-                        <input type="file" @change="handleFileUpload" accept="application/json" class="form-control">
-                        <button @click="cargarRespaldo" class="btn btn-warning mt-3">Cargar Respaldo</button>
+                   <!-- Cargar respaldo -->
+                    <div class="card-header mt-4">
+                        <h6 class="mb-0">Cargar Respaldo</h6>
+                    </div>
+                    <div class="card-body">
+                        <input 
+                            type="file" 
+                            id="fileInput" 
+                            @change="handleFileUpload" 
+                            accept="application/json"
+                            class="form-control"
+                        />
+                        <button @click="cargarRespaldo" class="btn btn-warning mt-3">Cargar Respaldo de Productos Únicos</button>
                     </div>
 
                     <div class="mt-4">
@@ -102,6 +111,39 @@
             archivoExcel: null,  // Ruta del archivo Excel
         },
         methods: {
+            async cargarRespaldo() {
+                if (!this.file) {
+                    Swal.fire('Advertencia', 'Debe seleccionar un archivo JSON.', 'warning');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', this.file);
+
+                try {
+                    const response = await axios.post('/api/restore-unique-products/', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                        },
+                    });
+
+                    if (response.data.status === 'success') {
+                        const missingProducts = response.data.missing_products || [];
+                        Swal.fire(
+                            'Éxito',
+                            `Se han restaurado correctamente.<br>
+                            Productos faltantes: ${missingProducts.length > 0 ? missingProducts.join(', ') : 'Ninguno'}`,
+                            'success'
+                        );
+                    } else {
+                        Swal.fire('Error', response.data.message, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error al cargar el respaldo:', error);
+                    Swal.fire('Error', 'No se pudo cargar el respaldo.', 'error');
+                }
+            },
+
             handleFileUpload(event) {
                 this.file = event.target.files[0];
             },
