@@ -4073,7 +4073,7 @@ def ajustar_stock_bsale(request):
 
     # 🔍 Obtener productos con stock_local de forma eficiente
     productos = Products.objects.annotate(
-        stock_local=Count('uniqueproducts', filter=Q(uniqueproducts__state=1))
+    stock_local=Count('unique_products', filter=Q(unique_products__state=1))
     ).values("sku", "iderp", "stock_local", "lastcost").order_by('id')[:50]  # 🔥 Limita a 50 productos
     
 
