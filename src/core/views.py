@@ -4035,175 +4035,165 @@ def send_progress_to_cache(progreso, total):
     }, timeout=600)
 
 from django.http import JsonResponse, FileResponse
-from concurrent.futures import ThreadPoolExecutor
 
-BATCH_SIZE = 50  # 🔥 Tamaño del lote de productos a procesar
-THREADS = 5  # 🔥 Número de hilos para paralelizar requests a Bsale
-BSALE_API_URL = "https://api.bsale.io/v1"
-BSALE_API_TOKEN = "TU_ACCESS_TOKEN"
+# Mantiene una sesión de requests para mejorar el rendimiento
+session = requests.Session()
 
-def obtener_stock_bsale_parallel(skus):
-    """
-    🔥 Obtiene el stock de varios SKUs en Bsale en paralelo para mejorar el rendimiento.
-    """
-    stock_data = {}
+def obtener_stock_bsale(sku):
+    """Obtiene el stock disponible de la oficina principal (id: 1) desde Bsale."""
+    url = f"{BSALE_API_URL}/stocks.json?code={sku}"
+    headers = {"access_token": BSALE_API_TOKEN}
 
-    def fetch_stock(sku):
-        try:
-            response = requests.get(
-                f"{BSALE_API_URL}/stocks.json?sku={sku}",
-                headers={"access_token": BSALE_API_TOKEN},
-                timeout=5  # ⏳ Timeout de 5s para evitar bloqueos
-            )
-            if response.status_code == 200:
-                data = response.json()
-                stock_data[sku] = data.get("quantity", 0)
-            else:
-                stock_data[sku] = None
-        except requests.exceptions.Timeout:
-            print(f"⏳ Timeout en Bsale para SKU {sku}")
-            stock_data[sku] = None
-        except Exception as e:
-            stock_data[sku] = None
-            print(f"❌ Error en Bsale para {sku}: {e}")
+    response = session.get(url, headers=headers)
+    if response.status_code != 200:
+        print(f"❌ Error al obtener stock de Bsale para SKU {sku}: {response.text}")
+        return None
 
-    with ThreadPoolExecutor(max_workers=THREADS) as executor:
-        executor.map(fetch_stock, skus)
+    stock_data = response.json()
 
-    return stock_data
+    # Obtener el stock solo del primer item (índice 0) dentro de "items"
+    if "items" in stock_data and len(stock_data["items"]) > 0:
+        stock_bsale = stock_data["items"][0]["quantityAvailable"]  # 🔥 Aquí obtenemos solo el primer elemento
+        print(f"🔍 Stock en Bsale para SKU {sku}: {stock_bsale}")  # Log de depuración
+        return int(stock_bsale)  # Convertimos a entero
+
+    return 0  # Si no hay stock disponible, devolvemos 0
+
+
+def obtener_stock_local(producto_id):
+    """ Calcula el stock local excluyendo sectores no válidos. """
+    excluded_sector_ids = Sectoroffice.objects.filter(
+        Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
+    ).values_list('idsectoroffice', flat=True)
+
+    producto = Products.objects.prefetch_related(
+        Prefetch(
+            'unique_products',
+            queryset=Uniqueproducts.objects.exclude(location__in=excluded_sector_ids).only('location')
+        )
+    ).only('id').get(id=producto_id)
+
+    return producto.unique_products.count()
 
 @csrf_exempt
 def ajustar_stock_bsale(request):
-    """
-    🔥 API optimizada que compara el stock local con el de Bsale y ajusta los productos.
-    """
+    """API que ajusta el stock en Bsale basándose en el stock local."""
     if request.method != "POST":
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    print("📌 Iniciando ajuste de stock con Bsale...")
-
-    # 🔍 Obtener productos con stock_local de forma eficiente
-    productos = Products.objects.annotate(
-        stock_local=Count('unique_products', filter=Q(unique_products__state=1), distinct=True)
-    ).values("sku", "iderp", "stock_local", "lastcost").order_by('id')[:BATCH_SIZE]
-
-    productos = list(productos)  # 🔥 Convertir a lista para iterar más rápido
+    productos = list(Products.objects.values_list("id", "sku", "lastcost", "iderp")[:45])
     total_productos = len(productos)
 
     if total_productos == 0:
         return JsonResponse({"message": "No hay productos para ajustar."}, status=200)
 
-    print(f"🔍 Total de productos a procesar: {total_productos}")
-
-    # 🔥 Obtener stock de Bsale en paralelo
-    skus = [p["sku"] for p in productos]
-    stock_bsale_dict = obtener_stock_bsale_parallel(skus)
-
+    productos_procesados = 0
     productos_ajustados = []
-    procesados = 0  # Contador de productos procesados
+    productos_totales = []
 
-    for producto in productos:
-        sku = producto["sku"]
-        stock_local = producto["stock_local"]
-        stock_bsale = stock_bsale_dict.get(sku, None)
-
-        procesados += 1  # Incrementar el contador
+    for producto_id, sku, lastcost, iderp in productos:
+        stock_local = obtener_stock_local(producto_id)  # Stock real en nuestro sistema
+        stock_bsale = obtener_stock_bsale(sku)  # Stock real en Bsale (del primer "items")
 
         if stock_bsale is None:
-            print(f"[{procesados}/{total_productos}] ❌ No se pudo obtener stock en Bsale para SKU {sku}")
-            continue  
+            print(f"❌ No se pudo obtener stock en Bsale para SKU {sku}")
+            continue
 
+        # 🔥 AHORA ajustamos correctamente: Si Bsale tiene 6347 y local tiene 205, restamos stock en Bsale
         diferencia = stock_local - stock_bsale
-        if diferencia == 0:
-            print(f"[{procesados}/{total_productos}] ✅ Stock correcto para SKU {sku}, no se requiere ajuste.")
-            continue  
 
-        ajuste_realizado = None  
+        ajuste_realizado = None
         data_bsale = {}
         endpoint = ""
 
-        if diferencia > 0:
-            data_bsale = {
-                "document": "Ajuste de Stock",
-                "officeId": 1,
-                "documentNumber": datetime.now().strftime("%Y%m%d%H%M%S"),
-                "note": f"Ajuste automático para SKU {sku}",
-                "details": [
-                    {
-                        "quantity": diferencia,
-                        "code": sku,
-                        "cost": producto["lastcost"] or 0  
-                    }
-                ]
-            }
-            endpoint = f"{BSALE_API_URL}/stocks/receptions.json"
-            ajuste_realizado = "Stock aumentado en Bsale"
-
-        elif diferencia < 0:
+        if diferencia < 0:  # 🔥 Si el stock en Bsale es mayor, reducimos
             data_bsale = {
                 "note": f"Ajuste de stock en Bsale para SKU {sku}",
-                "officeId": 1,
+                "officeId": 1,  # Ajustamos solo la oficina principal
                 "details": [
                     {
-                        "quantity": abs(diferencia),  
-                        "variantId": producto["iderp"]
+                        "quantity": abs(diferencia),  # 🔥 Cantidad a reducir
+                        "variantId": iderp
                     }
                 ]
             }
             endpoint = f"{BSALE_API_URL}/stocks/consumptions.json"
             ajuste_realizado = "Stock reducido en Bsale"
 
-        # 🔥 Enviar solicitud a Bsale en paralelo
-        try:
-            response = requests.post(
-                endpoint,
-                headers={"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"},
-                json=data_bsale,
-                timeout=5  # ⏳ Timeout de 5 segundos
-            )
+        elif diferencia > 0:  # 🔥 Si el stock en Bsale es menor, aumentamos
+            data_bsale = {
+                "document": "Ajuste de Stock",
+                "officeId": 1,
+                "documentNumber": now().strftime("%Y%m%d%H%M%S"),
+                "note": f"Ajuste automático para SKU {sku}",
+                "details": [
+                    {
+                        "quantity": diferencia,  # 🔥 Cantidad a aumentar
+                        "code": sku,
+                        "cost": lastcost or 0  
+                    }
+                ]
+            }
+            endpoint = f"{BSALE_API_URL}/stocks/receptions.json"
+            ajuste_realizado = "Stock aumentado en Bsale"
+
+        if diferencia != 0:
+            headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+            response = session.post(endpoint, headers=headers, json=data_bsale)
+
             if response.status_code in [200, 201]:
-                productos_ajustados.append({
+                producto_json = {
                     "sku": sku,
                     "stock_bsale": stock_bsale,
                     "stock_local": stock_local,
-                    "ajuste": diferencia,
+                    "diferencia": diferencia,
                     "accion": ajuste_realizado
-                })
-                print(f"[{procesados}/{total_productos}] ✅ {ajuste_realizado} para SKU {sku}")
+                }
+                productos_ajustados.append(producto_json)
+                print(json.dumps(producto_json, indent=4))  # 🖨️ Muestra el JSON bonito en la consola
             else:
-                print(f"[{procesados}/{total_productos}] ❌ Error al actualizar SKU {sku}: {response.text}")
-        except Exception as e:
-            print(f"[{procesados}/{total_productos}] ❌ Error en la solicitud a Bsale para {sku}: {e}")
+                print(f"❌ Error al actualizar SKU {sku}: {response.text}")
 
-    # 🔥 Guardar en un archivo Excel optimizado
+        # Registrar todos los productos, incluso si no se ajustaron
+        producto_json_total = {
+            "sku": sku,
+            "stock_bsale": stock_bsale,
+            "stock_local": stock_local,
+            "diferencia": diferencia,
+            "accion": ajuste_realizado if diferencia != 0 else "Stock correcto, no requiere ajuste"
+        }
+        productos_totales.append(producto_json_total)
+
+        productos_procesados += 1
+        print(f"🔄 Progreso: {productos_procesados}/{total_productos} ({(productos_procesados / total_productos) * 100:.2f}%)")
+
+    # Guardar en Excel
     static_exports_path = os.path.join(settings.BASE_DIR, 'static', 'exports')
     os.makedirs(static_exports_path, exist_ok=True)
     excel_file = os.path.join(static_exports_path, 'ajuste_stock.xlsx')
 
-    if productos_ajustados:
-        df = pd.DataFrame(productos_ajustados)
-        df.to_excel(excel_file, index=False)
-        print(f"📂 Archivo generado: {excel_file}")
-
-    print(f"✅ Ajuste de stock completado. Total productos procesados: {procesados}/{total_productos}")
+    df = pd.DataFrame(productos_totales)  # Guardamos todos los productos
+    df.to_excel(excel_file, index=False)
 
     return JsonResponse({
         "message": "Ajuste de stock completado",
-        "productos_ajustados": productos_ajustados,
+        "productos_ajustados": productos_ajustados,  # Solo los ajustados
+        "productos_totales": productos_totales,  # Todos los productos procesados
+        "productos_procesados": productos_procesados,
+        "total_productos": total_productos,
         "archivo": "/api/descargar-reporte-stock/"
     })
 
-@csrf_exempt
-def descargar_reporte_stock(request):
-    """
-    📥 Permite descargar el archivo Excel generado en la API de ajuste de stock.
-    """
-    excel_file_path = os.path.join(settings.BASE_DIR, 'static', 'exports', 'ajuste_stock.xlsx')
 
-    if os.path.exists(excel_file_path):
-        return FileResponse(open(excel_file_path, 'rb'), as_attachment=True, filename="ajuste_stock.xlsx")
+
+
+def descargar_reporte_stock(request):
+    """ Devuelve el archivo Excel como descarga directa """
+    file_path = os.path.join(settings.BASE_DIR, 'static', 'exports', 'ajuste_stock.xlsx')
+    if os.path.exists(file_path):
+        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename="ajuste_stock.xlsx")
     else:
-        return HttpResponseNotFound("El archivo no está disponible.")
+        return JsonResponse({"error": "Archivo no encontrado"}, status=404)
 
 
 
