@@ -5063,89 +5063,87 @@ def normalize_keys(data):
     else:
         return data
 
+from concurrent.futures import ThreadPoolExecutor
+
+def normalize_keys(data):
+    if isinstance(data, list):
+        return [{k.lower(): v for k, v in item.items()} for item in data]
+    return {k.lower(): v for k, v in data.items()}
+
 @csrf_exempt
 def restore_unique_products_view(request):
     try:
         if request.method != 'POST':
-            return JsonResponse({"status": "error", "message": "Método no permitido."}, status=405)
+            return JsonResponse({"status": "error", "message": "Método no permitido."})
 
-        # Obtener el archivo cargado desde el request
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
-            return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."}, status=400)
+            return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
 
-        print("📂 Leyendo el archivo de respaldo...")
+        print("Leyendo el archivo de respaldo...")
         file_content = uploaded_file.read().decode('utf-8')
-        unique_products = json.loads(file_content)
+        unique_products = normalize_keys(json.loads(file_content))
+        print(f"Archivo leído y normalizado. Total de registros: {len(unique_products)}")
 
-        print(f"📌 Archivo leído. Total de registros a procesar: {len(unique_products)}")
-
-        # 🔥 Eliminar todos los registros antiguos antes de insertar
-        print("⚠️ Eliminando registros existentes en Uniqueproducts...")
+        print("Eliminando registros existentes...")
         Uniqueproducts.objects.all().delete()
-        print("✅ Registros eliminados correctamente.")
+        print("Registros eliminados correctamente.")
 
-        # Obtener SKUs únicos del JSON
-        skus = {record.get("product_id") for record in unique_products if record.get("product_id")}
-
-        # 🔍 Obtener todos los productos en una sola consulta y convertir en diccionario
-        existing_products = {product.sku: product for product in Products.objects.filter(sku__in=skus)}
-
-        print(f"🔍 Productos encontrados en la BD: {len(existing_products)} / {len(skus)}")
-
-        # Preparar inserción masiva
         restored_products = []
         missing_products = []
-        BATCH_SIZE = 500  # Ajustable según rendimiento
+        BATCH_SIZE = 1000
 
-        print("⚙️ Iniciando restauración de registros...")
-        for record in unique_products:
-            sku = record.get("product_id")
-            product = existing_products.get(sku)
+        print("Obteniendo productos existentes...")
+        skus = {record["product_id"] for record in unique_products if "product_id" in record}
+        existing_products = {p.sku: p for p in Products.objects.filter(sku__in=skus)}
 
-            if not product:
-                missing_products.append({"sku": sku, "reason": "Producto no encontrado"})
-                continue
+        print("Iniciando la restauración de registros...")
+        with transaction.atomic():
+            for record in tqdm(unique_products, desc="Restaurando registros", unit="registro"):
+                sku = record.get("product_id")
+                if sku not in existing_products:
+                    missing_products.append({"sku": sku, "reason": "Producto no existe"})
+                    continue
 
-            try:
-                # Convertir timestamp a fecha válida
                 datelastinventory = record.get("datelastinventory")
-                datelastinventory = datetime.fromtimestamp(int(datelastinventory) / 1000) if datelastinventory else None
+                if datelastinventory:
+                    try:
+                        datelastinventory = datetime.fromtimestamp(int(datelastinventory) / 1000)
+                    except (ValueError, TypeError):
+                        datelastinventory = None
 
-                restored_products.append(Uniqueproducts(
-                    product=product,
-                    superid=record.get("superid"),
-                    correlative=record.get("correlative"),
-                    printlabel=record.get("printlabel"),
-                    state=record.get("state"),
-                    cost=record.get("cost"),
-                    soldvalue=record.get("solvalue"),
-                    datelastinventory=datelastinventory,
-                    observation=record.get("observation"),
-                    location=record.get("location"),
-                    typedocincome=record.get("typedocincome"),
-                    ndocincome=record.get("ndocincome"),
-                    typedocout=record.get("typedocout"),
-                    ndocout=record.get("ndocout"),
-                    dateadd=record.get("dateadd"),
-                    iddocumentincome=record.get("iddocumentincome"),
-                    ncompany=record.get("ncompany"),
-                ))
+                restored_products.append(
+                    Uniqueproducts(
+                        product=existing_products[sku],
+                        superid=record.get("superid"),
+                        correlative=record.get("correlative"),
+                        printlabel=record.get("printlabel"),
+                        state=record.get("state"),
+                        cost=record.get("cost"),
+                        soldvalue=record.get("solvalue"),
+                        datelastinventory=datelastinventory,
+                        observation=record.get("observation"),
+                        location=record.get("location"),
+                        typedocincome=record.get("typedocincome"),
+                        ndocincome=record.get("ndocincome"),
+                        typedocout=record.get("typedocout"),
+                        ndocout=record.get("ndocout"),
+                        dateadd=record.get("dateadd"),
+                        iddocumentincome=record.get("iddocumentincome"),
+                        ncompany=record.get("ncompany"),
+                    )
+                )
 
-                # Inserción en lotes
                 if len(restored_products) >= BATCH_SIZE:
                     Uniqueproducts.objects.bulk_create(restored_products, batch_size=BATCH_SIZE)
                     restored_products = []
+                    print(f"Lote de {BATCH_SIZE} registros insertado...")
 
-            except Exception as e:
-                missing_products.append({"sku": sku, "reason": f"Error inesperado: {e}"})
+            if restored_products:
+                Uniqueproducts.objects.bulk_create(restored_products, batch_size=BATCH_SIZE)
+                print(f"Último lote de {len(restored_products)} registros insertado.")
 
-        # Insertar registros restantes
-        if restored_products:
-            Uniqueproducts.objects.bulk_create(restored_products, batch_size=BATCH_SIZE)
-
-        print("✅ Restauración completada.")
-
+        print("Restauración completada.")
         return JsonResponse({
             "status": "success",
             "message": f"Se han restaurado {len(unique_products) - len(missing_products)} registros.",
@@ -5153,8 +5151,10 @@ def restore_unique_products_view(request):
         })
 
     except Exception as e:
-        print(f"❌ Error durante la restauración: {e}")
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        print(f"Error durante la restauración: {e}")
+        return JsonResponse({"status": "error", "message": str(e)})
+
+
 
 #Revisar carga masiva base de datos
 import pandas as pd
