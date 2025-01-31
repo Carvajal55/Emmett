@@ -10,3 +10,4 @@ src/inventario.json
 mediafiles/
 Emmett_clean/
 src/uniqueproducts_backup.json
+src/*.json
