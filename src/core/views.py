@@ -2832,6 +2832,25 @@ def dispatch_consumption_interno(request):
     print("Método no permitido.")
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
 
+def descontar_stock_bsale(sku, cantidad):
+    """ Descuenta stock en Bsale utilizando la API """
+    url = f"{BSALE_API_URL}/stocks/consumptions.json"
+    headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+
+    data = {
+        "note": f"Despacho automático para SKU {sku}",
+        "officeId": 1,  # Ajustamos en la oficina principal
+        "details": [{"quantity": cantidad, "code": sku}]
+    }
+
+    response = session.post(url, headers=headers, json=data)
+    if response.status_code in [200, 201]:
+        print(f"✅ Stock de {cantidad} unidades descontado en Bsale para SKU {sku}")
+        return True
+    else:
+        print(f"❌ Error al descontar stock en Bsale para SKU {sku}: {response.text}")
+        return False
+
 @csrf_exempt
 def force_complete_product_with_superid(request):
     if request.method == "POST":
@@ -2895,6 +2914,14 @@ def force_complete_product_with_superid(request):
                     unique_product.state = 1  # Marcado como despachado
                     unique_product.datelastinventory = timezone.now()
                     unique_product.save()
+
+                    # 🔥 Descontar de Bsale
+                    descuento_exitoso = descontar_stock_bsale(sku, 1)
+                    if not descuento_exitoso:
+                        return JsonResponse({
+                            "icon": "error",
+                            "error": f"No se pudo descontar stock en Bsale para SKU {sku}."
+                        }, status=500)
                 else:  # Sin SuperID
                     print(f"Forzando despacho del producto con SKU {sku} sin SuperID.")
 
