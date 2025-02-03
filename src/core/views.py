@@ -363,13 +363,13 @@ def buscar_productosAPI(request):
         return JsonResponse({'products': [], 'total_pages': 1, 'current_page': 1}, status=200)
 
     # Bodegas válidas y sus nombres
-    bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1,11,12]
+    bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1, 11, 12]
     bodega_mapping = {bodega.idoffice: bodega.name for bodega in Bodega.objects.filter(idoffice__in=bodegas_validas_ids)}
 
     sector_mapping = get_sector_mapping(bodegas_validas_ids)
 
-    # Buscar por superid
-    unique_product = Uniqueproducts.objects.filter(superid=query).select_related('product').first()
+    # 🔍 Buscar por SuperID en Uniqueproducts
+    unique_product = Uniqueproducts.objects.filter(superid=query, state=0).select_related('product').first()
     if unique_product and unique_product.product:
         product = unique_product.product
 
@@ -381,9 +381,9 @@ def buscar_productosAPI(request):
             'description': sector.description if sector else 'Sin información',
         }
 
-        # Calcular el stock total incluyendo productos sin ubicación
+        # 🔥 Filtrar solo los Uniqueproducts con `state=0`
         stock_total = Uniqueproducts.objects.filter(
-            Q(product=product) & ( Q(location__in=sector_mapping.keys()))
+            Q(product=product) & Q(state=0) & Q(location__in=sector_mapping.keys())
         ).count()
 
         return JsonResponse({
@@ -400,7 +400,7 @@ def buscar_productosAPI(request):
             'current_page': 1,
         }, status=200)
 
-    # Buscar por SKU o nombre
+    # 🔍 Buscar por SKU o nombre del producto
     productos_qs = Products.objects.filter(
         Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
     ).only('id', 'sku', 'nameproduct', 'lastprice')
@@ -411,9 +411,9 @@ def buscar_productosAPI(request):
 
     productos_data = []
     for producto in productos_page:
-        # Calcular el stock total incluyendo productos sin ubicación
+        # 🔥 Filtrar solo los Uniqueproducts con `state=0`
         stock_total = Uniqueproducts.objects.filter(
-            Q(product=producto) & (Q(location__in=sector_mapping.keys()))
+            Q(product=producto) & Q(state=0) & Q(location__in=sector_mapping.keys())
         ).count()
 
         productos_data.append({
