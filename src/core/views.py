@@ -4082,6 +4082,7 @@ from django.http import JsonResponse, FileResponse
 # Mantiene una sesión de requests para mejorar el rendimiento
 session = requests.Session()
 
+
 # 🔥 Función para obtener el stock local en una sola consulta
 def obtener_stock_local_bulk():
     excluded_sector_ids = Sectoroffice.objects.filter(
@@ -4099,25 +4100,28 @@ def obtener_stock_local_bulk():
     return stock_local_dict  # Diccionario con product_id -> stock_local
 
 
-# 🔥 Función para obtener stock de Bsale **con consultas en paralelo**
+# 🔥 Función para obtener stock de Bsale con consultas en paralelo
 def obtener_stock_bsale_bulk(skus):
     stock_bsale_dict = {}
 
     def fetch_stock(sku):
-        """ Obtiene el stock para un SKU específico. """
+        """ Obtiene el stock para un SKU específico y lo imprime. """
         try:
             headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
             response = session.get(f"{BSALE_API_URL}/stocks.json?code={sku}&expand=variant", headers=headers)
 
             if response.status_code == 200:
-                stocks = response.json().get("items", [])
+                stock_data = response.json()
+                print(f"\n📊 Stock de Bsale para SKU {sku}:")
+
+                stocks = stock_data.get("items", [])
                 if stocks:
                     stock_bsale_dict[sku] = stocks[0].get("quantityAvailable", 0)  # 🔥 Usamos el primer resultado
         except Exception as e:
-            print(f"Error obteniendo stock de Bsale para SKU {sku}: {e}")
+            print(f"❌ Error obteniendo stock de Bsale para SKU {sku}: {e}")
 
     # 🔥 Ejecutamos las solicitudes en paralelo
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         executor.map(fetch_stock, skus)
 
     return stock_bsale_dict  # Diccionario con sku -> stock_bsale
@@ -4125,11 +4129,11 @@ def obtener_stock_bsale_bulk(skus):
 
 @csrf_exempt
 def ajustar_stock_bsale(request):
-    """API optimizada para ajustar el stock en Bsale correctamente."""
+    """API optimizada para ajustar el stock en Bsale correctamente en solo 10 productos."""
     if request.method != "POST":
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    # 🔥 Obtener todos los productos en una sola consulta
+    # 🔥 Obtener solo 10 productos
     productos = list(Products.objects.values_list("id", "sku", "lastcost", "iderp"))
     total_productos = len(productos)
     if total_productos == 0:
@@ -4147,10 +4151,15 @@ def ajustar_stock_bsale(request):
     productos_procesados = 0
     ajustes_bsale = []  # Lista para enviar múltiples ajustes en una sola llamada a Bsale
 
-    print("🚀 Iniciando ajuste de stock...")
+    print("🚀 Iniciando ajuste de stock para 10 productos...")
     for producto_id, sku, lastcost, iderp in tqdm(productos, desc="🔄 Progreso", unit="producto"):
         stock_local = stock_local_dict.get(producto_id, 0)
         stock_bsale = stock_bsale_dict.get(sku, 0)  # 🔥 Ahora sí trae el stock correcto
+
+        # 🔥 Imprimir los valores actuales antes de hacer ajustes
+        print(f"\n📌 SKU: {sku}")
+        print(f"   🏢 Stock en Bsale: {stock_bsale}")
+        print(f"   🏠 Stock Local: {stock_local}")
 
         if stock_bsale == stock_local:
             ajuste_realizado = "Stock correcto, no requiere ajuste"
@@ -4214,15 +4223,7 @@ def ajustar_stock_bsale(request):
         except Exception as e:
             print(f"❌ Error al ajustar stock de SKU {sku}: {e}")
 
-    # 🔥 Guardar en Excel
-    static_exports_path = os.path.join(settings.BASE_DIR, 'static', 'exports')
-    os.makedirs(static_exports_path, exist_ok=True)
-    excel_file = os.path.join(static_exports_path, 'ajuste_stock.xlsx')
-
-    df = pd.DataFrame(productos_totales)
-    df.to_excel(excel_file, index=False)
-
-    print("✅ Ajuste de stock completado.")
+    print("✅ Ajuste de stock completado para los 10 productos.")
 
     return JsonResponse({
         "message": "Ajuste de stock completado",
