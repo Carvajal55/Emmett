@@ -4082,8 +4082,8 @@ from django.http import JsonResponse, FileResponse
 # Mantiene una sesión de requests para mejorar el rendimiento
 session = requests.Session()
 
+# 🔥 Función para obtener el stock local en una sola consulta
 def obtener_stock_local_bulk():
-    """ Obtiene el stock local de todos los productos en un solo query. """
     excluded_sector_ids = Sectoroffice.objects.filter(
         Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
     ).values_list('idsectoroffice', flat=True)
@@ -4098,28 +4098,34 @@ def obtener_stock_local_bulk():
 
     return stock_local_dict  # Diccionario con product_id -> stock_local
 
+
+# 🔥 Función para obtener stock de Bsale **con consultas en paralelo**
 def obtener_stock_bsale_bulk(skus):
-    """ Obtiene el stock en Bsale de una lista de SKUs en un solo request. """
     stock_bsale_dict = {}
 
-    try:
-        headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-        response = session.get(f"{BSALE_API_URL}/stocks.json?expand=variant", headers=headers)
+    def fetch_stock(sku):
+        """ Obtiene el stock para un SKU específico. """
+        try:
+            headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+            response = session.get(f"{BSALE_API_URL}/stocks.json?code={sku}&expand=variant", headers=headers)
 
-        if response.status_code == 200:
-            stocks = response.json().get("items", [])
-            for stock in stocks:
-                sku = stock["variant"].get("code")
-                if sku in skus:
-                    stock_bsale_dict[sku] = stock.get("quantityAvailable", 0)
-    except Exception as e:
-        print(f"Error obteniendo stock de Bsale: {e}")
+            if response.status_code == 200:
+                stocks = response.json().get("items", [])
+                if stocks:
+                    stock_bsale_dict[sku] = stocks[0].get("quantityAvailable", 0)  # 🔥 Usamos el primer resultado
+        except Exception as e:
+            print(f"Error obteniendo stock de Bsale para SKU {sku}: {e}")
+
+    # 🔥 Ejecutamos las solicitudes en paralelo
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        executor.map(fetch_stock, skus)
 
     return stock_bsale_dict  # Diccionario con sku -> stock_bsale
 
+
 @csrf_exempt
 def ajustar_stock_bsale(request):
-    """API optimizada para ajustar el stock en Bsale más rápido con progreso en consola."""
+    """API optimizada para ajustar el stock en Bsale correctamente."""
     if request.method != "POST":
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
@@ -4132,45 +4138,46 @@ def ajustar_stock_bsale(request):
     # 🔥 Obtener stock local en una sola consulta
     stock_local_dict = obtener_stock_local_bulk()
 
-    # 🔥 Obtener stock en Bsale en una sola consulta
+    # 🔥 Obtener stock en Bsale en paralelo
     skus = [p[1] for p in productos]
     stock_bsale_dict = obtener_stock_bsale_bulk(skus)
 
     productos_ajustados = []
     productos_totales = []
     productos_procesados = 0
-
     ajustes_bsale = []  # Lista para enviar múltiples ajustes en una sola llamada a Bsale
 
     print("🚀 Iniciando ajuste de stock...")
     for producto_id, sku, lastcost, iderp in tqdm(productos, desc="🔄 Progreso", unit="producto"):
         stock_local = stock_local_dict.get(producto_id, 0)
-        stock_bsale = stock_bsale_dict.get(sku, 0)
+        stock_bsale = stock_bsale_dict.get(sku, 0)  # 🔥 Ahora sí trae el stock correcto
 
-        diferencia = stock_local - stock_bsale
-        ajuste_realizado = None
-        data_bsale = None
+        if stock_bsale == stock_local:
+            ajuste_realizado = "Stock correcto, no requiere ajuste"
+            diferencia = 0
+        else:
+            diferencia = stock_local - stock_bsale
+            if diferencia < 0:  # 🔥 Si Bsale tiene más stock, restar
+                cantidad_ajuste = abs(diferencia)
+                data_bsale = {
+                    "note": f"Ajuste de stock en Bsale para SKU {sku}",
+                    "officeId": 1,
+                    "details": [{"quantity": cantidad_ajuste, "variantId": iderp}]
+                }
+                ajuste_realizado = "Stock reducido en Bsale"
 
-        if diferencia < 0:  # Reducir stock en Bsale
-            data_bsale = {
-                "note": f"Ajuste de stock en Bsale para SKU {sku}",
-                "officeId": 1,
-                "details": [{"quantity": abs(diferencia), "variantId": iderp}]
-            }
-            ajuste_realizado = "Stock reducido en Bsale"
+            elif diferencia > 0:  # 🔥 Si Bsale tiene menos stock, aumentar
+                cantidad_ajuste = diferencia
+                data_bsale = {
+                    "document": "Ajuste de Stock",
+                    "officeId": 1,
+                    "documentNumber": datetime.now().strftime("%Y%m%d%H%M%S"),
+                    "note": f"Ajuste automático para SKU {sku}",
+                    "details": [{"quantity": cantidad_ajuste, "code": sku, "cost": lastcost or 0}]
+                }
+                ajuste_realizado = "Stock aumentado en Bsale"
 
-        elif diferencia > 0:  # Aumentar stock en Bsale
-            data_bsale = {
-                "document": "Ajuste de Stock",
-                "officeId": 1,
-                "documentNumber": datetime.now().strftime("%Y%m%d%H%M%S"),
-                "note": f"Ajuste automático para SKU {sku}",
-                "details": [{"quantity": diferencia, "code": sku, "cost": lastcost or 0}]
-            }
-            ajuste_realizado = "Stock aumentado en Bsale"
-
-        if data_bsale:
-            ajustes_bsale.append((sku, data_bsale, ajuste_realizado, stock_local, stock_bsale, diferencia))
+            ajustes_bsale.append((sku, data_bsale, ajuste_realizado, stock_local, stock_bsale, cantidad_ajuste))
 
         # Registrar todos los productos
         productos_totales.append({
@@ -4178,7 +4185,7 @@ def ajustar_stock_bsale(request):
             "stock_bsale": stock_bsale,
             "stock_local": stock_local,
             "diferencia": diferencia,
-            "accion": ajuste_realizado if diferencia != 0 else "Stock correcto, no requiere ajuste"
+            "accion": ajuste_realizado
         })
 
         productos_procesados += 1
@@ -4186,9 +4193,9 @@ def ajustar_stock_bsale(request):
         print(f"🔄 {productos_procesados}/{total_productos} ({porcentaje:.2f}%) completado.")
 
     # 🔥 Enviar ajustes en paralelo
-    for sku, data_bsale, ajuste_realizado, stock_local, stock_bsale, diferencia in tqdm(ajustes_bsale, desc="📤 Enviando ajustes", unit="ajuste"):
+    for sku, data_bsale, ajuste_realizado, stock_local, stock_bsale, cantidad_ajuste in tqdm(ajustes_bsale, desc="📤 Enviando ajustes", unit="ajuste"):
         try:
-            endpoint = f"{BSALE_API_URL}/stocks/receptions.json" if diferencia > 0 else f"{BSALE_API_URL}/stocks/consumptions.json"
+            endpoint = f"{BSALE_API_URL}/stocks/receptions.json" if stock_local > stock_bsale else f"{BSALE_API_URL}/stocks/consumptions.json"
             headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
             response = session.post(endpoint, headers=headers, json=data_bsale)
 
@@ -4197,7 +4204,7 @@ def ajustar_stock_bsale(request):
                     "sku": sku,
                     "stock_bsale": stock_bsale,
                     "stock_local": stock_local,
-                    "diferencia": diferencia,
+                    "diferencia": cantidad_ajuste,
                     "accion": ajuste_realizado
                 }
                 productos_ajustados.append(producto_json)
