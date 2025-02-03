@@ -4109,7 +4109,7 @@ def obtener_stock_bsale(sku):
 
 
 def obtener_stock_local(producto_id):
-    """ Calcula el stock local excluyendo sectores no válidos. """
+    """ Calcula el stock local excluyendo sectores no válidos y considerando solo productos con state=0. """
     excluded_sector_ids = Sectoroffice.objects.filter(
         Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
     ).values_list('idsectoroffice', flat=True)
@@ -4117,7 +4117,7 @@ def obtener_stock_local(producto_id):
     producto = Products.objects.prefetch_related(
         Prefetch(
             'unique_products',
-            queryset=Uniqueproducts.objects.exclude(location__in=excluded_sector_ids).only('location')
+            queryset=Uniqueproducts.objects.filter(state=0).exclude(location__in=excluded_sector_ids).only('location')
         )
     ).only('id').get(id=producto_id)
 
