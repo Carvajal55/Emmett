@@ -4105,18 +4105,19 @@ def obtener_stock_bsale_bulk(skus):
     stock_bsale_dict = {}
 
     def fetch_stock(sku):
-        """ Obtiene el stock para un SKU específico y lo imprime. """
+        """ Obtiene el stock para un SKU específico y solo imprime `quantityAvailable`. """
         try:
             headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
             response = session.get(f"{BSALE_API_URL}/stocks.json?code={sku}&expand=variant", headers=headers)
 
             if response.status_code == 200:
-                stock_data = response.json()
-                print(f"\n📊 Stock de Bsale para SKU {sku}:")
-
-                stocks = stock_data.get("items", [])
+                stocks = response.json().get("items", [])
                 if stocks:
-                    stock_bsale_dict[sku] = stocks[0].get("quantityAvailable", 0)  # 🔥 Usamos el primer resultado
+                    stock_bsale = stocks[0].get("quantityAvailable", 0)  # 🔥 Usamos solo este valor
+                    stock_bsale_dict[sku] = stock_bsale
+
+                    # 🔥 Imprimir solo el stock obtenido
+                    print(f"📦 Stock en Bsale para SKU {sku}: {stock_bsale}")
         except Exception as e:
             print(f"❌ Error obteniendo stock de Bsale para SKU {sku}: {e}")
 
