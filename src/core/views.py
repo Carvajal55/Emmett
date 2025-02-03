@@ -3376,7 +3376,7 @@ def fetch_invoice_products(request):
                 total_quantity = int(detail.get('quantity', 0))
 
                 # Verificar si el producto es un pack
-                if "pack" in sku.lower():  # Validar que el SKU contiene "pack" sin importar mayúsculas/minúsculas
+                if "pack" in sku.lower():  # Validar que el SKU contiene "pack"
                     # Consultar detalles de la variante
                     variant_response = requests.get(variant.get('href'), headers=headers)
                     if variant_response.status_code != 200:
@@ -3441,7 +3441,11 @@ def fetch_invoice_products(request):
             'is_complete': product.is_complete,
         })
 
-    return JsonResponse({'products': product_list}, status=200)
+    # 🔥 Incluir si el invoice está `dispatched`
+    return JsonResponse({
+        'invoice_dispatched': invoice.dispatched,  # True o False
+        'products': product_list
+    }, status=200)
 
 
 @csrf_exempt

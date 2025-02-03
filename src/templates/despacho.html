@@ -6,6 +6,11 @@
     <audio id="successSound" src="{% static 'sounds/success.mp3' %}" preload="auto"></audio>
     <audio id="errorSound" src="{% static 'sounds/error.mp3' %}" preload="auto"></audio>
     <!-- Selección de compañía -->
+     <!-- Mensaje de Invoice Completo -->
+    <div v-if="invoiceComplete" class="alert alert-success">
+        <strong>¡El documento ha sido completamente despachado!</strong>
+    </div>
+
     <div class="mb-3">
         <label for="cbCompany">Compañía</label>
         <select id="cbCompany" v-model="company" class="form-select">
@@ -101,6 +106,7 @@
             sid: '',
             products: [],
             dispatchReady: false, // Control para evitar disparo automático de completeDispatch
+            invoiceComplete: false, // 🔥 Nuevo estado para mostrar si el documento está completo
         },
         computed: {
             allProductsComplete() {
@@ -244,11 +250,16 @@
 
             fetchDetails() {
                 this.products = [];
-                this.dispatchReady = false; // Resetea al cargar nuevos productos
+                this.dispatchReady = false;
+                this.invoiceComplete = false; // Reiniciar estado
+
                 axios.get('/api/fetch-invoice-products/', {
                     params: { number: this.nDocument, type: this.typeDocument }
                 }).then(async response => {
                     console.log('Productos obtenidos del modelo:', response.data.products);
+
+                    // 🔥 Guardar si el documento está completamente despachado
+                    this.invoiceComplete = response.data.invoice_dispatched;
 
                     // Mapear productos y obtener detalles adicionales
                     this.products = await Promise.all(response.data.products.map(async product => {
@@ -259,14 +270,12 @@
                             description: details.description,
                             quantity: product.total_quantity,
                             quantityScanned: product.dispatched_quantity,
-                            superids: [], // Si tienes superids relacionados
+                            superids: [],
                             is_complete: product.is_complete,
                         };
                     }));
 
-                    console.log('Productos procesados:', this.products); // Depuración
-
-                    // Habilitar despacho solo después de cargar los productos
+                    console.log('Productos procesados:', this.products);
                     this.dispatchReady = true;
                 }).catch(error => {
                     Swal.fire('Error', 'No se pudieron obtener los detalles del documento.', 'error');
@@ -427,12 +436,14 @@
             },
 
             getProductRowClass(product) {
-                if (product.quantityScanned === product.quantity) {
-                    return 'table-success'; // Verde: Producto completo
+                if (this.invoiceComplete) {
+                    return 'table-success'; // ✅ Si el invoice está completo, toda la tabla es verde
+                } else if (product.quantityScanned === product.quantity) {
+                    return 'table-success'; // Producto completo
                 } else if (!product.name && !product.description) {
-                    return 'table-warning'; // Amarillo: Producto sin detalles (puede ser forzado)
+                    return 'table-warning'; // Producto sin detalles
                 } else {
-                    return 'table-danger'; // Rojo: Producto incompleto pero con detalles
+                    return 'table-danger'; // Producto incompleto
                 }
             }
         },
