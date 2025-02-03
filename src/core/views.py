@@ -4101,35 +4101,68 @@ def obtener_stock_local_bulk():
     return stock_local_dict  # Diccionario con product_id -> stock_local
 
 
-# 🔥 Función para obtener stock de Bsale con validación adicional
-def obtener_stock_bsale_bulk(skus):
+# 🔥 Configuración
+MAX_RETRIES = 5  # Número máximo de intentos por SKU
+BACKOFF_FACTOR = 2  # Factor de espera exponencial
+MAX_WORKERS = 3  # 🔥 Reducimos la concurrencia para evitar bloqueos
+WAIT_TIME_BETWEEN_BATCHES = 5  # 🔥 Espera entre lotes
+
+def obtener_stock_bsale_bulk(skus, batch_size=50):
+    """
+    Obtiene el stock de Bsale en lotes con retries y backoff para evitar bloqueos.
+    
+    🔥 batch_size: Número de SKUs por lote (50 recomendado)
+    """
     stock_bsale_dict = {}
 
     def fetch_stock(sku):
-        """ Obtiene el stock para un SKU específico y lo imprime. """
-        try:
-            headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-            response = session.get(f"{BSALE_API_URL}/stocks.json?code={sku}&expand=variant", headers=headers)
+        """ Intenta obtener el stock de Bsale con reintentos en caso de error 429 """
+        attempt = 0
+        while attempt < MAX_RETRIES:
+            try:
+                headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+                response = requests.get(f"{BSALE_API_URL}/stocks.json?code={sku}&expand=variant", headers=headers)
 
-            if response.status_code == 200:
-                stocks = response.json().get("items", [])
-                if stocks:
-                    stock_bsale = stocks[0].get("quantityAvailable", 0)  # 🔥 Usamos solo este valor
-                    stock_bsale_dict[sku.strip().upper()] = stock_bsale  # 🔥 Limpiar clave (mayúsculas y sin espacios)
+                if response.status_code == 200:
+                    stocks = response.json().get("items", [])
+                    if stocks:
+                        stock_bsale = stocks[0].get("quantityAvailable", 0)
+                        stock_bsale_dict[sku.strip().upper()] = stock_bsale
+                        print(f"📦 Stock en Bsale para SKU {sku.strip().upper()}: {stock_bsale}")
+                    else:
+                        print(f"⚠️ No se encontró stock en Bsale para SKU {sku}")
+                    return  # Salir si la solicitud fue exitosa
 
-                    # 🔥 Imprimir solo el stock obtenido
-                    print(f"📦 Stock en Bsale para SKU {sku.strip().upper()}: {stock_bsale}")
-        except Exception as e:
-            print(f"❌ Error obteniendo stock de Bsale para SKU {sku}: {e}")
+                elif response.status_code == 429:  # 🔥 Demasiadas solicitudes
+                    wait_time = (BACKOFF_FACTOR ** attempt) + random.uniform(0, 1)
+                    print(f"⚠️ Too Many Requests (429) para SKU {sku}. Reintentando en {wait_time:.2f}s...")
+                    time.sleep(wait_time)
+                    attempt += 1
+                    continue
 
-    # 🔥 Ejecutamos las solicitudes en paralelo
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        executor.map(fetch_stock, skus)
+                else:
+                    print(f"❌ Error {response.status_code} en la API de Bsale para SKU {sku}")
+                    return  # Salir si hay otro error no manejado
 
-    # 🔥 Imprimir SKUs obtenidos de Bsale para depuración
-    print(f"\n🔍 SKUs obtenidos de Bsale: {list(stock_bsale_dict.keys())[:10]} ...")  # Solo mostramos los primeros 10
+            except Exception as e:
+                print(f"❌ Error obteniendo stock de Bsale para SKU {sku}: {e}")
+                return  # Salir en caso de error inesperado
 
-    return stock_bsale_dict  # Diccionario con sku -> stock_bsale
+    # 🔥 Procesamos en lotes
+    for i in range(0, len(skus), batch_size):
+        skus_batch = skus[i:i + batch_size]
+        print(f"🚀 Procesando lote {i // batch_size + 1} de {len(skus) // batch_size + 1}")
+
+        # 🔥 Reducimos concurrencia para evitar bloqueos (MAX_WORKERS=3)
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            executor.map(fetch_stock, skus_batch)
+
+        # 🔥 Esperar antes de procesar el siguiente lote
+        print(f"⏳ Esperando {WAIT_TIME_BETWEEN_BATCHES}s antes del siguiente lote...")
+        time.sleep(WAIT_TIME_BETWEEN_BATCHES)
+
+    print(f"\n🔍 SKUs obtenidos de Bsale: {list(stock_bsale_dict.keys())[:10]} ...")  
+    return stock_bsale_dict
 
 
 @csrf_exempt
