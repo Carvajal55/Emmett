@@ -2885,7 +2885,6 @@ def force_complete_product_with_superid(request):
                     "error": f"El producto con SKU {sku} no está asociado al documento."
                 }, status=404)
 
-            # Lógica con o sin SuperID
             with transaction.atomic():
                 if superid:  # Si se proporciona un SuperID
                     # Verificar si ya está procesado
@@ -2903,6 +2902,36 @@ def force_complete_product_with_superid(request):
                             "error": f"El SuperID {superid} no existe o ya fue despachado."
                         }, status=404)
 
+                    # 🔥 Obtener el iderp del producto asociado
+                    iderp = unique_product.product.iderp
+                    if not iderp:
+                        return JsonResponse({
+                            "icon": "error",
+                            "error": f"El producto asociado al SuperID {superid} no tiene un iderp en Bsale."
+                        }, status=400)
+
+                    # Descontar de Bsale
+                    data_bsale = {
+                        "note": f"Despacho automático para SKU {sku}",
+                        "officeId": 1,  # Ajustamos en la oficina principal
+                        "details": [{"quantity": 1, "variantId": iderp}]  # Utilizar iderp en lugar de SKU
+                    }
+                    headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+
+                    print("Datos enviados a Bsale:", data_bsale)
+                    response = requests.post(
+                        f"{BSALE_API_URL}/stocks/consumptions.json", headers=headers, json=data_bsale
+                    )
+
+                    print("Respuesta de Bsale:", response.status_code, response.text)
+
+                    if response.status_code not in [200, 201]:
+                        print(f"Error al descontar en Bsale para SuperID {superid}: {response.text}")
+                        return JsonResponse({
+                            "icon": "error",
+                            "error": f"No se pudo descontar stock en Bsale para SuperID {superid}: {response.text}"
+                        }, status=500)
+
                     # Asociar el SuperID al producto
                     InvoiceProductSuperID.objects.create(
                         product=invoice_product,
@@ -2914,14 +2943,6 @@ def force_complete_product_with_superid(request):
                     unique_product.state = 1  # Marcado como despachado
                     unique_product.datelastinventory = timezone.now()
                     unique_product.save()
-
-                    # 🔥 Descontar de Bsale
-                    descuento_exitoso = descontar_stock_bsale(sku, 1)
-                    if not descuento_exitoso:
-                        return JsonResponse({
-                            "icon": "error",
-                            "error": f"No se pudo descontar stock en Bsale para SKU {sku}."
-                        }, status=500)
                 else:  # Sin SuperID
                     print(f"Forzando despacho del producto con SKU {sku} sin SuperID.")
 
