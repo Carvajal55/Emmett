@@ -1196,12 +1196,43 @@ def create_supplier(request):
 from .models import Products, Brand
 from datetime import datetime
 
+# 🔥 Mapeo de prefijos para categorías
+def get_sku_prefix(categoria):
+    prefix_map = {
+        "audio": "AUD",
+        "electronica": "AUD",
+        "instrumentos": "MUS",
+        "estudio": "EST",
+        "iluminacion": "ILU",
+        "otros": "OTR"
+    }
+    return prefix_map.get(categoria, "OTR")  # Si no encuentra, usa 'OTR'
+
+# 🔥 Obtener el siguiente SKU de forma global
+def obtener_correlativo():
+    """ Busca el SKU más alto en la base de datos y genera el siguiente correlativo de forma global. """
+    # Buscar el SKU más alto en toda la base de datos sin importar la categoría
+    max_sku = Products.objects.aggregate(max_sku=Max('sku'))['max_sku']
+
+    if max_sku:
+        match = re.match(r'([A-Z]+)(\d+)', max_sku)  # Separamos prefijo y número
+        if match:
+            max_number = int(match.group(2))  # Convertimos la parte numérica
+            nuevo_numero = max_number + 1  # Incrementamos
+        else:
+            nuevo_numero = 1
+    else:
+        nuevo_numero = 1  # Si no hay productos, empezamos desde 1
+
+    # Formatear el nuevo número con ceros a la izquierda
+    return str(nuevo_numero).zfill(5)
+
 @csrf_exempt
 def crear_producto(request):
     if request.method == "POST":
         data = json.loads(request.body)
 
-        # Obtener datos del formulario enviados desde el frontend
+        # 🔥 Obtener datos del frontend
         nombre_producto = data.get("nombre")
         precio = data.get("precio", 0)
         marca = data.get("marca")
@@ -1219,17 +1250,15 @@ def crear_producto(request):
         if marca not in marcas_existentes:
             return JsonResponse({"error": f"La marca '{marca}' no existe. Selecciona una marca válida."}, status=400)
 
-        # Verificamos que la categoría esté definida
-        if not categoria:
-            return JsonResponse({"error": "La categoría es obligatoria para generar el SKU."}, status=400)
-
-        # Generar el SKU con el prefijo correspondiente y el correlativo
-        sku = obtener_correlativo(categoria)
+        # Generar el SKU con el prefijo correspondiente y el correlativo general
+        prefix = get_sku_prefix(categoria)
+        correlativo = obtener_correlativo()
+        sku = f"{prefix}{correlativo}"  # 🔥 Ahora el número es global
 
         # Generar el código de barras único
         bar_code = f"9999{get_random_string(8, '0123456789')}"
 
-        # Crear el JSON para la solicitud a Bsale (Producto Principal)
+        # 🔥 Crear JSON para la API de Bsale
         bsale_product_data = {
             "name": nombre_producto,
             "description": f"{nombre_producto} - {marca}",
@@ -1240,7 +1269,7 @@ def crear_producto(request):
             "width": largo,
             "depth": profundidad,
             "weight": peso,
-            "productTypeId": categoria_bs_id,  
+            "productTypeId": categoria_bs_id,
         }
 
         headers = {
@@ -1248,16 +1277,16 @@ def crear_producto(request):
             "access_token": BSALE_API_TOKEN
         }
 
-        # Crear el Producto en Bsale
+        # 🔥 Crear el Producto en Bsale
         response_product = requests.post(f"{BSALE_API_URL}/products.json", json=bsale_product_data, headers=headers)
 
         if response_product.status_code == 201:
             bsale_product = response_product.json()
 
-            # Crear un código único para la variante
+            # Crear código único para la variante
             variant_code = sku
 
-            # Crear la Variante en Bsale asociada al producto
+            # 🔥 Crear la Variante en Bsale asociada al producto
             bsale_variant_data = {
                 "productId": bsale_product["id"],
                 "description": sku,
@@ -1272,14 +1301,14 @@ def crear_producto(request):
             if response_variant.status_code == 201:
                 bsale_variant = response_variant.json()
 
-                # Guardar el producto en la base de datos local con el idERP como el ID de la variante
+                # 🔥 Guardar en la base de datos local
                 nuevo_producto = Products.objects.create(
                     sku=sku,
                     nameproduct=nombre_producto,
                     prefixed=alias,
                     brands=marca,
                     codebar=bar_code,
-                    iderp=bsale_variant["id"],  # ID de la variante en lugar del producto
+                    iderp=bsale_variant["id"],  # ID de la variante en Bsale
                     lastprice=precio,
                     codsupplier=proveedor_id,
                     createdate=datetime.now().date(),
@@ -1289,59 +1318,21 @@ def crear_producto(request):
                     peso=peso,
                 )
 
-                return JsonResponse({"message": "Producto y variante creados exitosamente", "product": nuevo_producto.sku, "variant_id": bsale_variant["id"]}, status=201)
+                return JsonResponse({
+                    "message": "Producto y variante creados exitosamente",
+                    "product": nuevo_producto.sku,
+                    "variant_id": bsale_variant["id"]
+                }, status=201)
             else:
-                return JsonResponse({"error": "Error al crear la variante en Bsale", "details": response_variant.json()}, status=400)
+                return JsonResponse({
+                    "error": "Error al crear la variante en Bsale",
+                    "details": response_variant.json()
+                }, status=400)
         else:
-            return JsonResponse({"error": "Error al crear el producto en Bsale", "details": response_product.json()}, status=400)
-
-  
-
-def get_sku_prefix(categoria):
-    prefix_map = {
-        "audio": "AUD",
-        "electronica": "AUD",
-        "instrumentos": "MUS",
-        "estudio": "EST",
-        "iluminacion": "ILU",
-        "otros": "OTR"
-    }
-    return prefix_map.get(categoria)
-
-import re
-
-# Función para obtener el siguiente número correlativo de SKU en una categoría
-def obtener_correlativo(categoria):
-    # Obtener el prefijo correspondiente a la categoría
-    prefix = get_sku_prefix(categoria)
-
-    # Obtener todos los productos de la base de datos
-    productos = Products.objects.all()
-
-    # Lista para almacenar los números correlativos de todos los SKUs que coincidan con el prefijo
-    numeros_sku = []
-
-    # Recorremos cada producto y extraemos el número correlativo del SKU solo si coincide con el prefijo
-    for producto in productos:
-        match = re.match(rf'({prefix})(\d+)', producto.sku)  # Separa el prefijo (3 letras) y el número
-        if match:
-            numero = int(match.group(2))  # Convertimos la parte numérica en un entero
-            numeros_sku.append(numero)
-
-    # Ordenamos la lista de números de mayor a menor
-    numeros_sku.sort(reverse=True)
-
-    # Imprimimos los 5 SKUs más altos para verificar
-    print("Los 5 SKUs más altos:", numeros_sku[:5])
-
-    # Si existen números, tomamos el más alto y le sumamos uno
-    if numeros_sku:
-        nuevo_numero = numeros_sku[0] + 1
-    else:
-        nuevo_numero = 1  # Si no hay productos en esta categoría, comenzamos desde 1
-
-    # Formatear el nuevo número correlativo con ceros a la izquierda y añadir el prefijo
-    return f"{prefix}{str(nuevo_numero).zfill(5)}"
+            return JsonResponse({
+                "error": "Error al crear el producto en Bsale",
+                "details": response_product.json()
+            }, status=400)
 
 @csrf_exempt
 def generar_json(request):
@@ -4091,105 +4082,113 @@ from django.http import JsonResponse, FileResponse
 # Mantiene una sesión de requests para mejorar el rendimiento
 session = requests.Session()
 
-def obtener_stock_bsale(sku):
-    """Obtiene el stock disponible de la oficina principal (id: 1) desde Bsale."""
-    url = f"{BSALE_API_URL}/stocks.json?code={sku}"
-    headers = {"access_token": BSALE_API_TOKEN}
-
-    response = session.get(url, headers=headers)
-    if response.status_code != 200:
-        print(f"❌ Error al obtener stock de Bsale para SKU {sku}: {response.text}")
-        return None
-
-    stock_data = response.json()
-
-    # Obtener el stock solo del primer item (índice 0) dentro de "items"
-    if "items" in stock_data and len(stock_data["items"]) > 0:
-        stock_bsale = stock_data["items"][0]["quantityAvailable"]  # 🔥 Aquí obtenemos solo el primer elemento
-        print(f"🔍 Stock en Bsale para SKU {sku}: {stock_bsale}")  # Log de depuración
-        return int(stock_bsale)  # Convertimos a entero
-
-    return 0  # Si no hay stock disponible, devolvemos 0
-
-
-def obtener_stock_local(producto_id):
-    """ Calcula el stock local excluyendo sectores no válidos y considerando solo productos con state=0. """
+def obtener_stock_local_bulk():
+    """ Obtiene el stock local de todos los productos en un solo query. """
     excluded_sector_ids = Sectoroffice.objects.filter(
         Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
     ).values_list('idsectoroffice', flat=True)
 
-    producto = Products.objects.prefetch_related(
-        Prefetch(
-            'unique_products',
-            queryset=Uniqueproducts.objects.filter(state=0).exclude(location__in=excluded_sector_ids).only('location')
-        )
-    ).only('id').get(id=producto_id)
+    productos_stock = Uniqueproducts.objects.filter(
+        state=0
+    ).exclude(location__in=excluded_sector_ids).values_list("product_id", flat=True)
 
-    return producto.unique_products.count()
+    stock_local_dict = {}
+    for producto_id in productos_stock:
+        stock_local_dict[producto_id] = stock_local_dict.get(producto_id, 0) + 1
+
+    return stock_local_dict  # Diccionario con product_id -> stock_local
+
+def obtener_stock_bsale_bulk(skus):
+    """ Obtiene el stock en Bsale de una lista de SKUs en un solo request. """
+    stock_bsale_dict = {}
+
+    try:
+        headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+        response = session.get(f"{BSALE_API_URL}/stocks.json?expand=variant", headers=headers)
+
+        if response.status_code == 200:
+            stocks = response.json().get("items", [])
+            for stock in stocks:
+                sku = stock["variant"].get("code")
+                if sku in skus:
+                    stock_bsale_dict[sku] = stock.get("quantityAvailable", 0)
+    except Exception as e:
+        print(f"Error obteniendo stock de Bsale: {e}")
+
+    return stock_bsale_dict  # Diccionario con sku -> stock_bsale
 
 @csrf_exempt
 def ajustar_stock_bsale(request):
-    """API que ajusta el stock en Bsale basándose en el stock local."""
+    """API optimizada para ajustar el stock en Bsale más rápido con progreso en consola."""
     if request.method != "POST":
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
+    # 🔥 Obtener todos los productos en una sola consulta
     productos = list(Products.objects.values_list("id", "sku", "lastcost", "iderp"))
     total_productos = len(productos)
-
     if total_productos == 0:
         return JsonResponse({"message": "No hay productos para ajustar."}, status=200)
 
-    productos_procesados = 0
+    # 🔥 Obtener stock local en una sola consulta
+    stock_local_dict = obtener_stock_local_bulk()
+
+    # 🔥 Obtener stock en Bsale en una sola consulta
+    skus = [p[1] for p in productos]
+    stock_bsale_dict = obtener_stock_bsale_bulk(skus)
+
     productos_ajustados = []
     productos_totales = []
+    productos_procesados = 0
 
-    for producto_id, sku, lastcost, iderp in productos:
-        stock_local = obtener_stock_local(producto_id)  # Stock real en nuestro sistema
-        stock_bsale = obtener_stock_bsale(sku)  # Stock real en Bsale (del primer "items")
+    ajustes_bsale = []  # Lista para enviar múltiples ajustes en una sola llamada a Bsale
 
-        if stock_bsale is None:
-            print(f"❌ No se pudo obtener stock en Bsale para SKU {sku}")
-            continue
+    print("🚀 Iniciando ajuste de stock...")
+    for producto_id, sku, lastcost, iderp in tqdm(productos, desc="🔄 Progreso", unit="producto"):
+        stock_local = stock_local_dict.get(producto_id, 0)
+        stock_bsale = stock_bsale_dict.get(sku, 0)
 
-        # 🔥 AHORA ajustamos correctamente: Si Bsale tiene 6347 y local tiene 205, restamos stock en Bsale
         diferencia = stock_local - stock_bsale
-
         ajuste_realizado = None
-        data_bsale = {}
-        endpoint = ""
+        data_bsale = None
 
-        if diferencia < 0:  # 🔥 Si el stock en Bsale es mayor, reducimos
+        if diferencia < 0:  # Reducir stock en Bsale
             data_bsale = {
                 "note": f"Ajuste de stock en Bsale para SKU {sku}",
-                "officeId": 1,  # Ajustamos solo la oficina principal
-                "details": [
-                    {
-                        "quantity": abs(diferencia),  # 🔥 Cantidad a reducir
-                        "variantId": iderp
-                    }
-                ]
+                "officeId": 1,
+                "details": [{"quantity": abs(diferencia), "variantId": iderp}]
             }
-            endpoint = f"{BSALE_API_URL}/stocks/consumptions.json"
             ajuste_realizado = "Stock reducido en Bsale"
 
-        elif diferencia > 0:  # 🔥 Si el stock en Bsale es menor, aumentamos
+        elif diferencia > 0:  # Aumentar stock en Bsale
             data_bsale = {
                 "document": "Ajuste de Stock",
                 "officeId": 1,
-                "documentNumber": now().strftime("%Y%m%d%H%M%S"),
+                "documentNumber": datetime.now().strftime("%Y%m%d%H%M%S"),
                 "note": f"Ajuste automático para SKU {sku}",
-                "details": [
-                    {
-                        "quantity": diferencia,  # 🔥 Cantidad a aumentar
-                        "code": sku,
-                        "cost": lastcost or 0  
-                    }
-                ]
+                "details": [{"quantity": diferencia, "code": sku, "cost": lastcost or 0}]
             }
-            endpoint = f"{BSALE_API_URL}/stocks/receptions.json"
             ajuste_realizado = "Stock aumentado en Bsale"
 
-        if diferencia != 0:
+        if data_bsale:
+            ajustes_bsale.append((sku, data_bsale, ajuste_realizado, stock_local, stock_bsale, diferencia))
+
+        # Registrar todos los productos
+        productos_totales.append({
+            "sku": sku,
+            "stock_bsale": stock_bsale,
+            "stock_local": stock_local,
+            "diferencia": diferencia,
+            "accion": ajuste_realizado if diferencia != 0 else "Stock correcto, no requiere ajuste"
+        })
+
+        productos_procesados += 1
+        porcentaje = (productos_procesados / total_productos) * 100
+        print(f"🔄 {productos_procesados}/{total_productos} ({porcentaje:.2f}%) completado.")
+
+    # 🔥 Enviar ajustes en paralelo
+    for sku, data_bsale, ajuste_realizado, stock_local, stock_bsale, diferencia in tqdm(ajustes_bsale, desc="📤 Enviando ajustes", unit="ajuste"):
+        try:
+            endpoint = f"{BSALE_API_URL}/stocks/receptions.json" if diferencia > 0 else f"{BSALE_API_URL}/stocks/consumptions.json"
             headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
             response = session.post(endpoint, headers=headers, json=data_bsale)
 
@@ -4202,35 +4201,26 @@ def ajustar_stock_bsale(request):
                     "accion": ajuste_realizado
                 }
                 productos_ajustados.append(producto_json)
-                print(json.dumps(producto_json, indent=4))  # 🖨️ Muestra el JSON bonito en la consola
+                print(json.dumps(producto_json, indent=4))
             else:
                 print(f"❌ Error al actualizar SKU {sku}: {response.text}")
+        except Exception as e:
+            print(f"❌ Error al ajustar stock de SKU {sku}: {e}")
 
-        # Registrar todos los productos, incluso si no se ajustaron
-        producto_json_total = {
-            "sku": sku,
-            "stock_bsale": stock_bsale,
-            "stock_local": stock_local,
-            "diferencia": diferencia,
-            "accion": ajuste_realizado if diferencia != 0 else "Stock correcto, no requiere ajuste"
-        }
-        productos_totales.append(producto_json_total)
-
-        productos_procesados += 1
-        print(f"🔄 Progreso: {productos_procesados}/{total_productos} ({(productos_procesados / total_productos) * 100:.2f}%)")
-
-    # Guardar en Excel
+    # 🔥 Guardar en Excel
     static_exports_path = os.path.join(settings.BASE_DIR, 'static', 'exports')
     os.makedirs(static_exports_path, exist_ok=True)
     excel_file = os.path.join(static_exports_path, 'ajuste_stock.xlsx')
 
-    df = pd.DataFrame(productos_totales)  # Guardamos todos los productos
+    df = pd.DataFrame(productos_totales)
     df.to_excel(excel_file, index=False)
+
+    print("✅ Ajuste de stock completado.")
 
     return JsonResponse({
         "message": "Ajuste de stock completado",
-        "productos_ajustados": productos_ajustados,  # Solo los ajustados
-        "productos_totales": productos_totales,  # Todos los productos procesados
+        "productos_ajustados": productos_ajustados,
+        "productos_totales": productos_totales,
         "productos_procesados": productos_procesados,
         "total_productos": total_productos,
         "archivo": "/api/descargar-reporte-stock/"
