@@ -4215,54 +4215,55 @@ def ajustar_stock_bsale(request):
     total_productos = len(productos)
 
     def ajustar_producto(producto):
-        """Ajusta el stock del producto en Bsale de manera eficiente."""
-        producto_id, sku, nameproduct, lastcost, iderp = producto
-        sku_clean = sku.strip().upper()
-        stock_local = stock_local_dict.get(producto_id, 0)
-        stock_bsale = stock_bsale_dict.get(sku_clean, 0)
-        diferencia = stock_local - stock_bsale
+            """Ajusta el stock del producto en Bsale asegurando que coincida con el stock local."""
+            producto_id, sku, nameproduct, lastcost, iderp = producto
+            sku_clean = sku.strip().upper()
+            stock_local = stock_local_dict.get(producto_id, 0)
+            stock_bsale = stock_bsale_dict.get(sku_clean, 0)
+            diferencia = stock_local - stock_bsale
 
-        if diferencia == 0:
-            return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
+            if diferencia == 0:
+                return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
 
-        cantidad_ajuste = abs(diferencia)
+            cantidad_ajuste = abs(diferencia)
 
-        if diferencia < 0:  # 🔥 Stock local es menor → Restar stock en Bsale
-            cantidad_ajuste = min(abs(diferencia), stock_bsale - stock_local)  # 🔥 Evita stock negativo
-            if cantidad_ajuste <= 0:
-                return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "No se realizó ajuste"}
+            if diferencia < 0:  # 🔥 Stock local es menor → Se fuerza el stock en Bsale al valor local
+                cantidad_ajuste = stock_bsale - stock_local  # 🔥 Se ajusta para igualar el stock local
 
-            data_bsale = {
-                "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
-                "officeId": BSALE_OFFICE_ID,
-                "details": [{"quantity": cantidad_ajuste, "variantId": iderp}]
-            }
-            api_url = BSALE_API_URL_CONSUMPTION
-            tipo_ajuste = "Consumo (Restado)"
+                if cantidad_ajuste <= 0:
+                    return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "No se realizó ajuste"}
 
-        else:  # 🔥 Stock local es mayor → Aumentar stock en Bsale
-            data_bsale = {
-                "document": "Ajuste automático",
-                "officeId": BSALE_OFFICE_ID,
-                "documentNumber": "123",
-                "note": f"Recepción de stock en Bsale para SKU {sku_clean}",
-                "details": [{"quantity": cantidad_ajuste, "code": sku_clean, "cost": lastcost or 0}]
-            }
-            api_url = BSALE_API_URL_RECEPTION
-            tipo_ajuste = "Recepción (Sumado)"
+                data_bsale = {
+                    "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
+                    "officeId": BSALE_OFFICE_ID,
+                    "details": [{"quantity": cantidad_ajuste, "variantId": iderp}]
+                }
+                api_url = BSALE_API_URL_CONSUMPTION
+                tipo_ajuste = f"Consumo (Restado) - De {stock_bsale} a {stock_local}"
 
-        try:
-            headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-            response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
-            time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
+            else:  # 🔥 Stock local es mayor → Se fuerza el stock en Bsale al valor local
+                data_bsale = {
+                    "document": "Ajuste automático",
+                    "officeId": BSALE_OFFICE_ID,
+                    "documentNumber": "123",
+                    "note": f"Recepción de stock en Bsale para SKU {sku_clean}",
+                    "details": [{"quantity": cantidad_ajuste, "code": sku_clean, "cost": lastcost or 0}]
+                }
+                api_url = BSALE_API_URL_RECEPTION
+                tipo_ajuste = f"Recepción (Sumado) - De {stock_bsale} a {stock_local}"
 
-            if response.status_code in [200, 201]:
-                skus_procesados.add(sku_clean)
-                return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "diferencia": diferencia, "mensaje": tipo_ajuste}
-            else:
-                return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
-        except Exception as e:
-            return {"sku": sku_clean, "error": str(e)}
+            try:
+                headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+                response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
+                time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
+
+                if response.status_code in [200, 201]:
+                    skus_procesados.add(sku_clean)
+                    return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "diferencia": diferencia, "mensaje": tipo_ajuste}
+                else:
+                    return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
+            except Exception as e:
+                return {"sku": sku_clean, "error": str(e)}
 
     print(f"🚀 Iniciando ajuste de stock para {total_productos} productos...")
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
