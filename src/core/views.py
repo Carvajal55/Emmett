@@ -4204,6 +4204,11 @@ def ajustar_stock_bsale(request):
     stock_local_dict = obtener_stock_local_bulk()
     skus = [p[1] for p in productos]
     stock_bsale_dict = obtener_stock_bsale_bulk(skus, batch_size=BATCH_SIZE)
+    # 🔥 Reconsulta stock en Bsale si es 0
+    for sku in stock_bsale_dict:
+        if stock_bsale_dict[sku] == 0:
+            print(f"⚠️ Reconsultando stock para SKU {sku} porque Bsale devolvió 0")
+            stock_bsale_dict[sku] = obtener_stock_bsale_bulk([sku], batch_size=1).get(sku, 0)
     
     ajustes_realizados = []
     errores_bsale = []
@@ -4226,6 +4231,8 @@ def ajustar_stock_bsale(request):
 
         cantidad_ajuste = abs(diferencia)
         if diferencia < 0:
+            # 🔥 Evitar stock negativo en Bsale
+            cantidad_ajuste = min(abs(diferencia), stock_bsale)  # No restar más de lo disponible
             data_bsale = {
                 "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
                 "officeId": BSALE_OFFICE_ID,
@@ -4252,7 +4259,8 @@ def ajustar_stock_bsale(request):
                 skus_procesados.add(sku_clean)
                 return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "diferencia": diferencia, "mensaje": tipo_ajuste}
             else:
-                return {"sku": sku_clean, "error": f"Error {response.status_code} en Bsale: {response.text}"}
+                print(f"❌ Error en Bsale para SKU {sku_clean}: {response.text}")
+                return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
         except Exception as e:
             return {"sku": sku_clean, "error": str(e)}
     
