@@ -4204,11 +4204,6 @@ def ajustar_stock_bsale(request):
     stock_local_dict = obtener_stock_local_bulk()
     skus = [p[1] for p in productos]
     stock_bsale_dict = obtener_stock_bsale_bulk(skus, batch_size=BATCH_SIZE)
-    # 🔥 Reconsulta stock en Bsale si es 0
-    for sku in stock_bsale_dict:
-        if stock_bsale_dict[sku] == 0:
-            print(f"⚠️ Reconsultando stock para SKU {sku} porque Bsale devolvió 0")
-            stock_bsale_dict[sku] = obtener_stock_bsale_bulk([sku], batch_size=1).get(sku, 0)
     
     ajustes_realizados = []
     errores_bsale = []
@@ -4231,8 +4226,6 @@ def ajustar_stock_bsale(request):
 
         cantidad_ajuste = abs(diferencia)
         if diferencia < 0:
-            # 🔥 Evitar stock negativo en Bsale
-            cantidad_ajuste = min(abs(diferencia), stock_bsale)  # No restar más de lo disponible
             data_bsale = {
                 "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
                 "officeId": BSALE_OFFICE_ID,
@@ -4259,8 +4252,7 @@ def ajustar_stock_bsale(request):
                 skus_procesados.add(sku_clean)
                 return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "diferencia": diferencia, "mensaje": tipo_ajuste}
             else:
-                print(f"❌ Error en Bsale para SKU {sku_clean}: {response.text}")
-                return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
+                return {"sku": sku_clean, "error": f"Error {response.status_code} en Bsale: {response.text}"}
         except Exception as e:
             return {"sku": sku_clean, "error": str(e)}
     
@@ -4293,42 +4285,6 @@ def ajustar_stock_bsale(request):
         "archivo": "/api/descargar-reporte-stock/"
     })
 
-@csrf_exempt
-def verificar_y_eliminar_productos(request):
-    """API para verificar qué productos existen en Bsale y eliminar los que no existen en la base de datos local."""
-    if request.method != "POST":
-        return JsonResponse({'error': 'Método no permitido.'}, status=405)
-
-    # 🔥 Obtener todos los SKUs del sistema local
-    skus_locales = list(Products.objects.values_list("sku", flat=True))
-    if not skus_locales:
-        return JsonResponse({"message": "No hay productos en la base de datos local."}, status=200)
-
-    # 🔥 Consultar Bsale en lotes
-    skus_en_bsale = set()
-    batch_size = 100  # 🔥 Tamaño del lote para consultar Bsale
-    for i in range(0, len(skus_locales), batch_size):
-        lote_skus = skus_locales[i:i + batch_size]
-        stock_bsale_dict = obtener_stock_bsale_bulk(lote_skus, batch_size=len(lote_skus))
-
-        # Agregar los SKUs encontrados en Bsale a la lista
-        skus_en_bsale.update(stock_bsale_dict.keys())
-
-    # 🔥 Identificar SKUs a eliminar
-    skus_a_eliminar = [sku for sku in skus_locales if sku not in skus_en_bsale]
-
-    # 🔥 Eliminar productos que no existen en Bsale
-    if skus_a_eliminar:
-        print(f"⚠️ Eliminando {len(skus_a_eliminar)} productos que no existen en Bsale...")
-        Products.objects.filter(sku__in=skus_a_eliminar).delete()
-
-    return JsonResponse({
-        "message": "Proceso de verificación y eliminación completado.",
-        "total_productos_locales": len(skus_locales),
-        "productos_en_bsale": len(skus_en_bsale),
-        "productos_eliminados": len(skus_a_eliminar),
-        "skus_eliminados": skus_a_eliminar
-    })
 
 
 def descargar_reporte_stock(request):
