@@ -4169,11 +4169,11 @@ def obtener_stock_bsale_bulk(skus, batch_size=50):
 BSALE_OFFICE_ID = 1
 BSALE_API_URL_CONSUMPTION = f"{BSALE_API_URL}/stocks/consumptions.json"
 BSALE_API_URL_RECEPTION = f"{BSALE_API_URL}/stocks/receptions.json"
-BATCH_SIZE = 50  # 🔥 Reducimos el tamaño de los lotes para mayor precisión
+BATCH_SIZE = 50  # 🔥 Tamaño de lote optimizado
 EXPORTS_PATH = os.path.join(settings.BASE_DIR, 'static', 'exports')
 PROCESSED_SKUS_FILE = os.path.join(EXPORTS_PATH, 'procesados.json')
-MAX_WORKERS = 5  # 🔥 Reducimos la concurrencia para asegurar consistencia
-WAIT_TIME_BSALE = 2  # 🔥 Agregamos una espera entre peticiones para evitar inconsistencias
+MAX_WORKERS = 5  # 🔥 Concurrencia optimizada
+WAIT_TIME_BSALE = 2  # 🔥 Espera entre peticiones para evitar errores
 
 # 🔥 Aseguramos que la carpeta de exportaciones exista
 os.makedirs(EXPORTS_PATH, exist_ok=True)
@@ -4192,40 +4192,42 @@ def guardar_skus_procesados(skus):
 
 @csrf_exempt
 def ajustar_stock_bsale(request):
-    """API optimizada para ajustar el stock en Bsale con validaciones adicionales."""
+    """API rápida para ajustar stock en Bsale sin ralentización."""
     if request.method != "POST":
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
     skus_procesados = cargar_skus_procesados()
-    productos = [p for p in Products.objects.values_list("id", "sku", "nameproduct", "lastcost", "iderp") if p[1] not in skus_procesados]
+    productos = [
+        p for p in Products.objects.values_list("id", "sku", "nameproduct", "lastcost", "iderp")
+        if p[1] not in skus_procesados
+    ][:5000]
+    
     if not productos:
         return JsonResponse({"message": "No hay productos pendientes para ajustar."}, status=200)
 
     stock_local_dict = obtener_stock_local_bulk()
     skus = [p[1] for p in productos]
     stock_bsale_dict = obtener_stock_bsale_bulk(skus, batch_size=BATCH_SIZE)
-    
+
     ajustes_realizados = []
     errores_bsale = []
     productos_totales = []
     total_productos = len(productos)
-    progreso_actual = 0
 
     def ajustar_producto(producto):
-        """Función para procesar cada producto asegurando consistencia."""
+        """Ajusta el stock del producto en Bsale de manera eficiente."""
         producto_id, sku, nameproduct, lastcost, iderp = producto
         sku_clean = sku.strip().upper()
         stock_local = stock_local_dict.get(producto_id, 0)
         stock_bsale = stock_bsale_dict.get(sku_clean, 0)
         diferencia = stock_local - stock_bsale
 
-        
-
         if diferencia == 0:
             return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
 
         cantidad_ajuste = abs(diferencia)
         if diferencia < 0:
+            cantidad_ajuste = min(abs(diferencia), stock_bsale)  # Evitar stock negativo en Bsale
             data_bsale = {
                 "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
                 "officeId": BSALE_OFFICE_ID,
@@ -4247,27 +4249,26 @@ def ajustar_stock_bsale(request):
         try:
             headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
             response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
-            time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera para evitar errores de sincronización
+            time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
             if response.status_code in [200, 201]:
                 skus_procesados.add(sku_clean)
                 return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "diferencia": diferencia, "mensaje": tipo_ajuste}
             else:
-                return {"sku": sku_clean, "error": f"Error {response.status_code} en Bsale: {response.text}"}
+                return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
         except Exception as e:
             return {"sku": sku_clean, "error": str(e)}
-    
+
     print(f"🚀 Iniciando ajuste de stock para {total_productos} productos...")
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_sku = {executor.submit(ajustar_producto, prod): prod[1] for prod in productos}
         for i, future in enumerate(as_completed(future_to_sku), 1):
             result = future.result()
-            progreso_actual += 1
             if "error" in result:
                 errores_bsale.append(result)
             elif "mensaje" in result:
                 ajustes_realizados.append(result)
             productos_totales.append(result)
-            
+
             if i % 50 == 0 or i == total_productos:
                 print(f"Progreso: {i}/{total_productos} productos procesados")
 
