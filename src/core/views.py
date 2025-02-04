@@ -4224,10 +4224,14 @@ def ajustar_stock_bsale(request):
 
         if diferencia == 0:
             return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
- 
+
         cantidad_ajuste = abs(diferencia)
-        if diferencia < 0:
-            cantidad_ajuste = min(abs(diferencia), stock_bsale)  # Evitar stock negativo en Bsale
+
+        if diferencia < 0:  # 🔥 Stock local es menor → Restar stock en Bsale
+            cantidad_ajuste = min(abs(diferencia), stock_bsale - stock_local)  # 🔥 Evita stock negativo
+            if cantidad_ajuste <= 0:
+                return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "No se realizó ajuste"}
+
             data_bsale = {
                 "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
                 "officeId": BSALE_OFFICE_ID,
@@ -4235,7 +4239,8 @@ def ajustar_stock_bsale(request):
             }
             api_url = BSALE_API_URL_CONSUMPTION
             tipo_ajuste = "Consumo (Restado)"
-        else:
+
+        else:  # 🔥 Stock local es mayor → Aumentar stock en Bsale
             data_bsale = {
                 "document": "Ajuste automático",
                 "officeId": BSALE_OFFICE_ID,
@@ -4250,6 +4255,7 @@ def ajustar_stock_bsale(request):
             headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
             response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
             time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
+
             if response.status_code in [200, 201]:
                 skus_procesados.add(sku_clean)
                 return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "diferencia": diferencia, "mensaje": tipo_ajuste}
