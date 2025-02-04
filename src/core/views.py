@@ -4219,8 +4219,7 @@ def ajustar_stock_bsale(request):
         stock_bsale = stock_bsale_dict.get(sku_clean, 0)
         diferencia = stock_local - stock_bsale
 
-        if abs(diferencia) > stock_local:
-            return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": "Diferencia excesiva detectada, ajuste no realizado"}
+        
 
         if diferencia == 0:
             return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
