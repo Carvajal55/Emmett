@@ -4182,7 +4182,7 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    productos = list(Products.objects.values_list("id", "sku", "lastcost", "iderp")[:500])
+    productos = list(Products.objects.values_list("id", "sku", "lastcost", "iderp"))
     total_productos = len(productos)
     if total_productos == 0:
         return JsonResponse({"message": "No hay productos para ajustar."}, status=200)
