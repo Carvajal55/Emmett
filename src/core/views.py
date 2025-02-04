@@ -4200,7 +4200,8 @@ def ajustar_stock_bsale(request):
     productos = [
         p for p in Products.objects.values_list("id", "sku", "nameproduct", "lastcost", "iderp")
         if p[1] not in skus_procesados
-    ][-5000:]
+    ]
+    """[-5000:]"""
     
     if not productos:
         return JsonResponse({"message": "No hay productos pendientes para ajustar."}, status=200)
