@@ -4250,12 +4250,13 @@ def ajustar_stock_bsale(request):
         else:  # 🔥 Stock local es mayor → Se fuerza el stock en Bsale al valor local
             cantidad_ajuste = stock_local - stock_bsale  # 🔥 Ajuste basado en la diferencia real
 
+            # 🔥 Usamos "variantId" en lugar de "code" para evitar problemas con la API de Bsale
             data_bsale = {
                 "document": "Ajuste automático",
                 "officeId": BSALE_OFFICE_ID,
                 "documentNumber": "123",
                 "note": f"Recepción de stock en Bsale para SKU {sku_clean}",
-                "details": [{"quantity": cantidad_ajuste, "code": sku_clean, "cost": lastcost or 0}]
+                "details": [{"quantity": cantidad_ajuste, "variantId": iderp, "cost": lastcost or 0}]
             }
             api_url = BSALE_API_URL_RECEPTION
             tipo_ajuste = f"Recepción (Sumado) - De {stock_bsale} a {stock_local}"
@@ -4265,9 +4266,17 @@ def ajustar_stock_bsale(request):
             response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
             time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
 
+            # 🔥 Volver a consultar el stock después de hacer una recepción para verificar que se reflejó bien en Bsale
             if response.status_code in [200, 201]:
+                stock_bsale_actualizado = obtener_stock_bsale_bulk([sku_clean], batch_size=1).get(sku_clean, stock_bsale)
                 skus_procesados.add(sku_clean)
-                return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "diferencia": diferencia, "mensaje": tipo_ajuste}
+                return {
+                    "sku": sku_clean,
+                    "stock_bsale": stock_bsale_actualizado,
+                    "stock_local": stock_local,
+                    "diferencia": stock_local - stock_bsale_actualizado,
+                    "mensaje": tipo_ajuste
+                }
             else:
                 return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
         except Exception as e:
