@@ -4224,22 +4224,25 @@ def ajustar_stock_bsale(request):
 
         diferencia = stock_local - stock_bsale
 
+        # 🔥 Inicializamos el resultado con todos los datos, incluso si no hay cambios o hay error
         resultado = {
             "sku": sku_clean,
             "nameproduct": nameproduct,
             "stock_bsale": stock_bsale,
             "stock_local": stock_local,
-            "diferencia": diferencia
+            "diferencia": diferencia,
+            "accion": "Sin cambios",  # 🔥 Se actualizará según corresponda
+            "mensaje": "",
+            "error": ""
         }
 
         if diferencia == 0:
-            resultado["accion"] = "Sin cambios"
             return resultado  # 🔥 Se devuelve incluso si no hay cambios
 
         cantidad_ajuste = abs(diferencia)
 
         if diferencia < 0:  # 🔥 Stock local es menor → Se ajusta en Bsale para igualar el local
-            cantidad_ajuste = stock_bsale - stock_local  # 🔥 Ajustar stock sin pasarse
+            cantidad_ajuste = stock_bsale - stock_local  # 🔥 Se ajusta para igualar el stock local
             if cantidad_ajuste <= 0:
                 resultado["accion"] = "No se realizó ajuste"
                 return resultado
@@ -4251,6 +4254,7 @@ def ajustar_stock_bsale(request):
             }
             api_url = BSALE_API_URL_CONSUMPTION
             resultado["mensaje"] = f"Consumo (Restado) - De {stock_bsale} a {stock_local}"
+            resultado["accion"] = "Consumo de stock"
 
         else:  # 🔥 Stock local es mayor → Se ajusta en Bsale para igualar el local
             cantidad_ajuste = stock_local - stock_bsale  # 🔥 Ajuste basado en la diferencia real
@@ -4264,6 +4268,7 @@ def ajustar_stock_bsale(request):
             }
             api_url = BSALE_API_URL_RECEPTION
             resultado["mensaje"] = f"Recepción (Sumado) - De {stock_bsale} a {stock_local}"
+            resultado["accion"] = "Recepción de stock"
 
         try:
             headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
@@ -4279,6 +4284,7 @@ def ajustar_stock_bsale(request):
             resultado["error"] = str(e)
 
         return resultado  # 🔥 Ahora siempre se devuelve algo, incluso en errores
+
 
 
 
