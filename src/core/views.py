@@ -4217,22 +4217,34 @@ def ajustar_stock_bsale(request):
 
     def ajustar_producto(producto):
         """Ajusta el stock del producto en Bsale asegurando que coincida con el stock local."""
-        producto_id, sku, nameproduct, lastcost, iderp = producto
+        producto_id, sku, nameproduct, lastcost, iderp = producto  # 🔥 nameproduct ahora se almacena correctamente
         sku_clean = sku.strip().upper()
         stock_local = stock_local_dict.get(producto_id, 0)
-        stock_bsale = stock_bsale_dict.get(sku_clean, 0)  # 🔥 No reconsultamos si es 0
+        stock_bsale = stock_bsale_dict.get(sku_clean, 0)
 
         diferencia = stock_local - stock_bsale
 
         if diferencia == 0:
-            return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
+            return {
+                "sku": sku_clean,
+                "nameproduct": nameproduct,  # 🔥 Ahora se guarda siempre
+                "stock_bsale": stock_bsale,
+                "stock_local": stock_local,
+                "accion": "Sin cambios"
+            }
 
         cantidad_ajuste = abs(diferencia)
 
-        if diferencia < 0:  # 🔥 Stock local es menor → Se fuerza el stock en Bsale al valor local
+        if diferencia < 0:  # 🔥 Stock local es menor → Se ajusta en Bsale para igualar el local
             cantidad_ajuste = stock_bsale - stock_local  # 🔥 Se ajusta para igualar el stock local
             if cantidad_ajuste <= 0:
-                return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "No se realizó ajuste"}
+                return {
+                    "sku": sku_clean,
+                    "nameproduct": nameproduct,  # 🔥 Se mantiene en el Excel
+                    "stock_bsale": stock_bsale,
+                    "stock_local": stock_local,
+                    "accion": "No se realizó ajuste"
+                }
 
             data_bsale = {
                 "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
@@ -4242,7 +4254,7 @@ def ajustar_stock_bsale(request):
             api_url = BSALE_API_URL_CONSUMPTION
             tipo_ajuste = f"Consumo (Restado) - De {stock_bsale} a {stock_local}"
 
-        else:  # 🔥 Stock local es mayor → Se fuerza el stock en Bsale al valor local
+        else:  # 🔥 Stock local es mayor → Se ajusta en Bsale para igualar el local
             cantidad_ajuste = stock_local - stock_bsale  # 🔥 Ajuste basado en la diferencia real
 
             data_bsale = {
@@ -4264,15 +4276,26 @@ def ajustar_stock_bsale(request):
                 skus_procesados.add(sku_clean)
                 return {
                     "sku": sku_clean,
+                    "nameproduct": nameproduct,  # 🔥 Se asegura que siempre se guarde
                     "stock_bsale": stock_bsale,
                     "stock_local": stock_local,
                     "diferencia": diferencia,
                     "mensaje": tipo_ajuste
                 }
             else:
-                return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
+                return {
+                    "sku": sku_clean,
+                    "nameproduct": nameproduct,  # 🔥 Se mantiene el nombre
+                    "stock_bsale": stock_bsale,
+                    "stock_local": stock_local,
+                    "error": f"Error {response.status_code} en Bsale: {response.text}"
+                }
         except Exception as e:
-            return {"sku": sku_clean, "error": str(e)}
+            return {
+                "sku": sku_clean,
+                "nameproduct": nameproduct,  # 🔥 También se guarda en caso de error
+                "error": str(e)
+            }
 
 
 
@@ -4304,7 +4327,32 @@ def ajustar_stock_bsale(request):
         "archivo": "/api/descargar-reporte-stock/"
     })
 
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
+@csrf_exempt
+def delete_products_from_excel(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        file = request.FILES['file']
+        file_path = default_storage.save(file.name, ContentFile(file.read()))
+        
+        try:
+            df = pd.read_excel(default_storage.path(file_path), dtype=str)
+            skus_to_delete = df.iloc[:, 0].dropna().unique()  # Tomar los SKU de la primera columna
+            
+            deleted_count, _ = Products.objects.filter(sku__in=skus_to_delete).delete()
+            
+            return JsonResponse({
+                'message': 'Productos eliminados correctamente',
+                'deleted_count': deleted_count,
+                'deleted_skus': list(skus_to_delete)
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+        finally:
+            default_storage.delete(file_path)
+    
+    return JsonResponse({'error': 'Método no permitido o archivo no proporcionado'}, status=400)
 
 def descargar_reporte_stock(request):
     """Devuelve el archivo Excel como descarga directa"""

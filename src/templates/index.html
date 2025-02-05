@@ -24,7 +24,9 @@
                         [[ loading ? 'Comparando...' : 'Comparar Stock en Bsale' ]]
                     </button>
 
-                   
+                    <input type="file" @change="handleFileUpload" accept=".xlsx" class="form-control">
+                    <button @click="eliminarProductos" class="btn btn-danger mt-3">Eliminar Productos</button>
+                    
 
                     <!-- Barra de Progreso -->
                     <div v-if="loading" class="mt-4">
@@ -112,6 +114,29 @@
             archivoExcel: null,  // Ruta del archivo Excel
         },
         methods: {
+
+            async eliminarProductos() {
+                if (!this.file) {
+                    Swal.fire('Advertencia', 'Debe seleccionar un archivo Excel.', 'warning');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', this.file);
+
+                try {
+                    const response = await axios.post('/api/delete-products/', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                        },
+                    });
+
+                    Swal.fire('Éxito', `${response.data.deleted_count} productos eliminados correctamente.`, 'success');
+                } catch (error) {
+                    Swal.fire('Error', 'No se pudo eliminar los productos.', 'error');
+                    console.error(error);
+                }
+            },
            
             async cargarRespaldo() {
                 if (!this.file) {
