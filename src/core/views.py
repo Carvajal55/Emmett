@@ -4220,12 +4220,7 @@ def ajustar_stock_bsale(request):
         producto_id, sku, nameproduct, lastcost, iderp = producto
         sku_clean = sku.strip().upper()
         stock_local = stock_local_dict.get(producto_id, 0)
-        stock_bsale = stock_bsale_dict.get(sku_clean, 0)
-
-        # 🔥 Si el stock en Bsale es 0, reconsultar para verificar si es un error
-        if stock_bsale == 0:
-            print(f"⚠️ Reconsultando stock en Bsale para SKU {sku_clean} porque devolvió 0...")
-            stock_bsale = obtener_stock_bsale_bulk([sku_clean], batch_size=1).get(sku_clean, 0)
+        stock_bsale = stock_bsale_dict.get(sku_clean, 0)  # 🔥 No reconsultamos si es 0
 
         diferencia = stock_local - stock_bsale
 
@@ -4250,7 +4245,6 @@ def ajustar_stock_bsale(request):
         else:  # 🔥 Stock local es mayor → Se fuerza el stock en Bsale al valor local
             cantidad_ajuste = stock_local - stock_bsale  # 🔥 Ajuste basado en la diferencia real
 
-            # 🔥 Usamos "variantId" en lugar de "code" para evitar problemas con la API de Bsale
             data_bsale = {
                 "document": "Ajuste automático",
                 "officeId": BSALE_OFFICE_ID,
@@ -4266,21 +4260,20 @@ def ajustar_stock_bsale(request):
             response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
             time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
 
-            # 🔥 Volver a consultar el stock después de hacer una recepción para verificar que se reflejó bien en Bsale
             if response.status_code in [200, 201]:
-                stock_bsale_actualizado = obtener_stock_bsale_bulk([sku_clean], batch_size=1).get(sku_clean, stock_bsale)
                 skus_procesados.add(sku_clean)
                 return {
                     "sku": sku_clean,
-                    "stock_bsale": stock_bsale_actualizado,
+                    "stock_bsale": stock_bsale,
                     "stock_local": stock_local,
-                    "diferencia": stock_local - stock_bsale_actualizado,
+                    "diferencia": diferencia,
                     "mensaje": tipo_ajuste
                 }
             else:
                 return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
         except Exception as e:
             return {"sku": sku_clean, "error": str(e)}
+
 
 
     print(f"🚀 Iniciando ajuste de stock para {total_productos} productos...")
