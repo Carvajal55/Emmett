@@ -4109,41 +4109,59 @@ WAIT_TIME_BETWEEN_BATCHES = 5  # 🔥 Espera entre lotes
 
 def obtener_stock_bsale_bulk(skus, batch_size=50):
     """
-    Obtiene el stock de Bsale en lotes.
+    Obtiene el stock de Bsale en lotes con retries y backoff para evitar bloqueos.
+    
+    🔥 batch_size: Número de SKUs por lote (50 recomendado)
     """
     stock_bsale_dict = {}
 
     def fetch_stock(sku):
-        """Consulta el stock en Bsale para un SKU específico."""
-        try:
-            headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-            url = f"https://api.bsale.io/v1/stocks.json?code={sku}"
-            response = requests.get(url, headers=headers)
+        """ Intenta obtener el stock de Bsale con reintentos en caso de error 429 """
+        attempt = 0
+        while attempt < MAX_RETRIES:
+            try:
+                headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+                response = requests.get(f"{BSALE_API_URL}/stocks.json?code={sku}&expand=variant", headers=headers)
 
-            if response.status_code == 200:
-                stocks = response.json().get("items", [])
-                stock_encontrado = sum(item["quantity"] for item in stocks)  # 🔥 Toma todos los valores de `quantity`
-                stock_bsale_dict[sku.strip().upper()] = stock_encontrado
-                print(f"📦 Stock en Bsale para SKU {sku.strip().upper()}: {stock_encontrado}")
+                if response.status_code == 200:
+                    stocks = response.json().get("items", [])
+                    if stocks:
+                        stock_bsale = stocks[0].get("quantityAvailable", 0)
+                        stock_bsale_dict[sku.strip().upper()] = stock_bsale
+                        print(f"📦 Stock en Bsale para SKU {sku.strip().upper()}: {stock_bsale}")
+                    else:
+                        print(f"⚠️ No se encontró stock en Bsale para SKU {sku}")
+                    return  # Salir si la solicitud fue exitosa
 
-            else:
-                print(f"❌ Error {response.status_code} en Bsale para SKU {sku}: {response.text}")
-                stock_bsale_dict[sku.strip().upper()] = 0  # 🔥 Si hay error, asumir stock 0
+                elif response.status_code == 429:  # 🔥 Demasiadas solicitudes
+                    wait_time = (BACKOFF_FACTOR ** attempt) + random.uniform(0, 1)
+                    print(f"⚠️ Too Many Requests (429) para SKU {sku}. Reintentando en {wait_time:.2f}s...")
+                    time.sleep(wait_time)
+                    attempt += 1
+                    continue
 
-        except Exception as e:
-            print(f"❌ Error obteniendo stock de Bsale para SKU {sku}: {e}")
-            stock_bsale_dict[sku.strip().upper()] = 0  # 🔥 Si hay error, asumir stock 0
+                else:
+                    print(f"❌ Error {response.status_code} en la API de Bsale para SKU {sku}")
+                    return  # Salir si hay otro error no manejado
+
+            except Exception as e:
+                print(f"❌ Error obteniendo stock de Bsale para SKU {sku}: {e}")
+                return  # Salir en caso de error inesperado
 
     # 🔥 Procesamos en lotes
     for i in range(0, len(skus), batch_size):
         skus_batch = skus[i:i + batch_size]
         print(f"🚀 Procesando lote {i // batch_size + 1} de {len(skus) // batch_size + 1}")
 
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        # 🔥 Reducimos concurrencia para evitar bloqueos (MAX_WORKERS=3)
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             executor.map(fetch_stock, skus_batch)
 
-        time.sleep(1)  # 🔥 Pequeña pausa para evitar bloqueos de Bsale
+        # 🔥 Esperar antes de procesar el siguiente lote
+        print(f"⏳ Esperando {WAIT_TIME_BETWEEN_BATCHES}s antes del siguiente lote...")
+        time.sleep(WAIT_TIME_BETWEEN_BATCHES)
 
+    print(f"\n🔍 SKUs obtenidos de Bsale: {list(stock_bsale_dict.keys())[:10]} ...")  
     return stock_bsale_dict
 
 
@@ -4198,68 +4216,55 @@ def ajustar_stock_bsale(request):
     total_productos = len(productos)
 
     def ajustar_producto(producto):
-        """Ajusta el stock del producto en Bsale asegurando que coincida con el stock local."""
-        producto_id, sku, nameproduct, lastcost, iderp = producto  # 🔥 iderp es el `variantId` en Bsale
-        sku_clean = sku.strip().upper()
-        stock_local = stock_local_dict.get(producto_id, 0)
-        stock_bsale = stock_bsale_dict.get(sku_clean, 0)
+            """Ajusta el stock del producto en Bsale asegurando que coincida con el stock local."""
+            producto_id, sku, nameproduct, lastcost, iderp = producto
+            sku_clean = sku.strip().upper()
+            stock_local = stock_local_dict.get(producto_id, 0)
+            stock_bsale = stock_bsale_dict.get(sku_clean, 0)
+            diferencia = stock_local - stock_bsale
 
-        diferencia = stock_local - stock_bsale
+            if diferencia == 0:
+                return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
 
-        if diferencia == 0:
-            return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
+            cantidad_ajuste = abs(diferencia)
 
-        cantidad_ajuste = abs(diferencia)
+            if diferencia < 0:  # 🔥 Stock local es menor → Se fuerza el stock en Bsale al valor local
+                cantidad_ajuste = stock_bsale - stock_local  # 🔥 Se ajusta para igualar el stock local
 
-        if diferencia < 0:  # 🔥 Stock local es menor → Se ajusta en Bsale para igualar el local
-            cantidad_ajuste = stock_bsale - stock_local  # 🔥 Se ajusta para igualar el stock local
-            if cantidad_ajuste <= 0:
-                return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "No se realizó ajuste"}
+                if cantidad_ajuste <= 0:
+                    return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "No se realizó ajuste"}
 
-            data_bsale = {
-                "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
-                "officeId": BSALE_OFFICE_ID,
-                "details": [{"quantity": cantidad_ajuste, "variantId": iderp}]  # 🔥 Usamos `iderp` directamente
-            }
-            api_url = BSALE_API_URL_CONSUMPTION
-            tipo_ajuste = f"Consumo (Restado) - De {stock_bsale} a {stock_local}"
-
-        else:  # 🔥 Stock local es mayor → Se ajusta en Bsale para igualar el local
-            cantidad_ajuste = stock_local - stock_bsale  # 🔥 Ajuste basado en la diferencia real
-
-            data_bsale = {
-                "document": "Ajuste automático",
-                "officeId": BSALE_OFFICE_ID,
-                "documentNumber": "123",
-                "note": f"Recepción de stock en Bsale para SKU {sku_clean}",
-                "details": [{"quantity": cantidad_ajuste, "variantId": iderp, "cost": lastcost or 0}]  # 🔥 Usamos `iderp`
-            }
-            api_url = BSALE_API_URL_RECEPTION
-            tipo_ajuste = f"Recepción (Sumado) - De {stock_bsale} a {stock_local}"
-
-        try:
-            headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-            response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
-            time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
-
-            if response.status_code in [200, 201]:
-                skus_procesados.add(sku_clean)
-                return {
-                    "sku": sku_clean,
-                    "stock_bsale": stock_bsale,
-                    "stock_local": stock_local,
-                    "diferencia": diferencia,
-                    "mensaje": tipo_ajuste
+                data_bsale = {
+                    "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
+                    "officeId": BSALE_OFFICE_ID,
+                    "details": [{"quantity": cantidad_ajuste, "variantId": iderp}]
                 }
-            else:
-                return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
-        except Exception as e:
-            return {"sku": sku_clean, "error": str(e)}
+                api_url = BSALE_API_URL_CONSUMPTION
+                tipo_ajuste = f"Consumo (Restado) - De {stock_bsale} a {stock_local}"
 
+            else:  # 🔥 Stock local es mayor → Se fuerza el stock en Bsale al valor local
+                data_bsale = {
+                    "document": "Ajuste automático",
+                    "officeId": BSALE_OFFICE_ID,
+                    "documentNumber": "123",
+                    "note": f"Recepción de stock en Bsale para SKU {sku_clean}",
+                    "details": [{"quantity": cantidad_ajuste, "code": sku_clean, "cost": lastcost or 0}]
+                }
+                api_url = BSALE_API_URL_RECEPTION
+                tipo_ajuste = f"Recepción (Sumado) - De {stock_bsale} a {stock_local}"
 
+            try:
+                headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+                response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
+                time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
 
-
-
+                if response.status_code in [200, 201]:
+                    skus_procesados.add(sku_clean)
+                    return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "diferencia": diferencia, "mensaje": tipo_ajuste}
+                else:
+                    return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
+            except Exception as e:
+                return {"sku": sku_clean, "error": str(e)}
 
     print(f"🚀 Iniciando ajuste de stock para {total_productos} productos...")
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -4289,32 +4294,7 @@ def ajustar_stock_bsale(request):
         "archivo": "/api/descargar-reporte-stock/"
     })
 
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
 
-@csrf_exempt
-def delete_products_from_excel(request):
-    if request.method == 'POST' and request.FILES.get('file'):
-        file = request.FILES['file']
-        file_path = default_storage.save(file.name, ContentFile(file.read()))
-        
-        try:
-            df = pd.read_excel(default_storage.path(file_path), dtype=str)
-            skus_to_delete = df.iloc[:, 0].dropna().unique()  # Tomar los SKU de la primera columna
-            
-            deleted_count, _ = Products.objects.filter(sku__in=skus_to_delete).delete()
-            
-            return JsonResponse({
-                'message': 'Productos eliminados correctamente',
-                'deleted_count': deleted_count,
-                'deleted_skus': list(skus_to_delete)
-            })
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-        finally:
-            default_storage.delete(file_path)
-    
-    return JsonResponse({'error': 'Método no permitido o archivo no proporcionado'}, status=400)
 
 def descargar_reporte_stock(request):
     """Devuelve el archivo Excel como descarga directa"""
