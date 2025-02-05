@@ -4217,44 +4217,30 @@ def ajustar_stock_bsale(request):
 
     def ajustar_producto(producto):
         """Ajusta el stock del producto en Bsale asegurando que coincida con el stock local."""
-        producto_id, sku, nameproduct, lastcost, iderp = producto  # 🔥 iderp es el variantId en Bsale
+        producto_id, sku, nameproduct, lastcost, iderp = producto  # 🔥 iderp es el `variantId` en Bsale
         sku_clean = sku.strip().upper()
         stock_local = stock_local_dict.get(producto_id, 0)
         stock_bsale = stock_bsale_dict.get(sku_clean, 0)
 
         diferencia = stock_local - stock_bsale
 
-        # 🔥 Inicializamos el resultado con todos los datos, incluso si no hay cambios o hay error
-        resultado = {
-            "sku": sku_clean,
-            "nameproduct": nameproduct,
-            "stock_bsale": stock_bsale,
-            "stock_local": stock_local,
-            "diferencia": diferencia,
-            "accion": "Sin cambios",  # 🔥 Se actualizará según corresponda
-            "mensaje": "",
-            "error": ""
-        }
-
         if diferencia == 0:
-            return resultado  # 🔥 Se devuelve incluso si no hay cambios
+            return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
 
         cantidad_ajuste = abs(diferencia)
 
         if diferencia < 0:  # 🔥 Stock local es menor → Se ajusta en Bsale para igualar el local
             cantidad_ajuste = stock_bsale - stock_local  # 🔥 Se ajusta para igualar el stock local
             if cantidad_ajuste <= 0:
-                resultado["accion"] = "No se realizó ajuste"
-                return resultado
+                return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "No se realizó ajuste"}
 
             data_bsale = {
                 "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
                 "officeId": BSALE_OFFICE_ID,
-                "details": [{"quantity": cantidad_ajuste, "variantId": iderp}]
+                "details": [{"quantity": cantidad_ajuste, "variantId": iderp}]  # 🔥 Usamos `iderp` directamente
             }
             api_url = BSALE_API_URL_CONSUMPTION
-            resultado["mensaje"] = f"Consumo (Restado) - De {stock_bsale} a {stock_local}"
-            resultado["accion"] = "Consumo de stock"
+            tipo_ajuste = f"Consumo (Restado) - De {stock_bsale} a {stock_local}"
 
         else:  # 🔥 Stock local es mayor → Se ajusta en Bsale para igualar el local
             cantidad_ajuste = stock_local - stock_bsale  # 🔥 Ajuste basado en la diferencia real
@@ -4264,26 +4250,29 @@ def ajustar_stock_bsale(request):
                 "officeId": BSALE_OFFICE_ID,
                 "documentNumber": "123",
                 "note": f"Recepción de stock en Bsale para SKU {sku_clean}",
-                "details": [{"quantity": cantidad_ajuste, "variantId": iderp, "cost": lastcost or 0}]
+                "details": [{"quantity": cantidad_ajuste, "variantId": iderp, "cost": lastcost or 0}]  # 🔥 Usamos `iderp`
             }
             api_url = BSALE_API_URL_RECEPTION
-            resultado["mensaje"] = f"Recepción (Sumado) - De {stock_bsale} a {stock_local}"
-            resultado["accion"] = "Recepción de stock"
+            tipo_ajuste = f"Recepción (Sumado) - De {stock_bsale} a {stock_local}"
 
         try:
             headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
             response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
-            time.sleep(WAIT_TIME_BSALE)
+            time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
 
             if response.status_code in [200, 201]:
                 skus_procesados.add(sku_clean)
+                return {
+                    "sku": sku_clean,
+                    "stock_bsale": stock_bsale,
+                    "stock_local": stock_local,
+                    "diferencia": diferencia,
+                    "mensaje": tipo_ajuste
+                }
             else:
-                resultado["error"] = f"Error {response.status_code} en Bsale: {response.text}"
-
+                return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
         except Exception as e:
-            resultado["error"] = str(e)
-
-        return resultado  # 🔥 Ahora siempre se devuelve algo, incluso en errores
+            return {"sku": sku_clean, "error": str(e)}
 
 
 
