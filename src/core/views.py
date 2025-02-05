@@ -4109,59 +4109,41 @@ WAIT_TIME_BETWEEN_BATCHES = 5  # 🔥 Espera entre lotes
 
 def obtener_stock_bsale_bulk(skus, batch_size=50):
     """
-    Obtiene el stock de Bsale en lotes con retries y backoff para evitar bloqueos.
-    
-    🔥 batch_size: Número de SKUs por lote (50 recomendado)
+    Obtiene el stock de Bsale en lotes.
     """
     stock_bsale_dict = {}
 
     def fetch_stock(sku):
-        """ Intenta obtener el stock de Bsale con reintentos en caso de error 429 """
-        attempt = 0
-        while attempt < MAX_RETRIES:
-            try:
-                headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-                response = requests.get(f"{BSALE_API_URL}/stocks.json?code={sku}&expand=variant", headers=headers)
+        """Consulta el stock en Bsale para un SKU específico."""
+        try:
+            headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+            url = f"https://api.bsale.io/v1/stocks.json?code={sku}"
+            response = requests.get(url, headers=headers)
 
-                if response.status_code == 200:
-                    stocks = response.json().get("items", [])
-                    if stocks:
-                        stock_bsale = stocks[0].get("quantityAvailable", 0)
-                        stock_bsale_dict[sku.strip().upper()] = stock_bsale
-                        print(f"📦 Stock en Bsale para SKU {sku.strip().upper()}: {stock_bsale}")
-                    else:
-                        print(f"⚠️ No se encontró stock en Bsale para SKU {sku}")
-                    return  # Salir si la solicitud fue exitosa
+            if response.status_code == 200:
+                stocks = response.json().get("items", [])
+                stock_encontrado = sum(item["quantity"] for item in stocks)  # 🔥 Toma todos los valores de `quantity`
+                stock_bsale_dict[sku.strip().upper()] = stock_encontrado
+                print(f"📦 Stock en Bsale para SKU {sku.strip().upper()}: {stock_encontrado}")
 
-                elif response.status_code == 429:  # 🔥 Demasiadas solicitudes
-                    wait_time = (BACKOFF_FACTOR ** attempt) + random.uniform(0, 1)
-                    print(f"⚠️ Too Many Requests (429) para SKU {sku}. Reintentando en {wait_time:.2f}s...")
-                    time.sleep(wait_time)
-                    attempt += 1
-                    continue
+            else:
+                print(f"❌ Error {response.status_code} en Bsale para SKU {sku}: {response.text}")
+                stock_bsale_dict[sku.strip().upper()] = 0  # 🔥 Si hay error, asumir stock 0
 
-                else:
-                    print(f"❌ Error {response.status_code} en la API de Bsale para SKU {sku}")
-                    return  # Salir si hay otro error no manejado
-
-            except Exception as e:
-                print(f"❌ Error obteniendo stock de Bsale para SKU {sku}: {e}")
-                return  # Salir en caso de error inesperado
+        except Exception as e:
+            print(f"❌ Error obteniendo stock de Bsale para SKU {sku}: {e}")
+            stock_bsale_dict[sku.strip().upper()] = 0  # 🔥 Si hay error, asumir stock 0
 
     # 🔥 Procesamos en lotes
     for i in range(0, len(skus), batch_size):
         skus_batch = skus[i:i + batch_size]
         print(f"🚀 Procesando lote {i // batch_size + 1} de {len(skus) // batch_size + 1}")
 
-        # 🔥 Reducimos concurrencia para evitar bloqueos (MAX_WORKERS=3)
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        with ThreadPoolExecutor(max_workers=5) as executor:
             executor.map(fetch_stock, skus_batch)
 
-        # 🔥 Esperar antes de procesar el siguiente lote
-        print(f"⏳ Esperando {WAIT_TIME_BETWEEN_BATCHES}s antes del siguiente lote...")
-        time.sleep(WAIT_TIME_BETWEEN_BATCHES)
+        time.sleep(1)  # 🔥 Pequeña pausa para evitar bloqueos de Bsale
 
-    print(f"\n🔍 SKUs obtenidos de Bsale: {list(stock_bsale_dict.keys())[:10]} ...")  
     return stock_bsale_dict
 
 
