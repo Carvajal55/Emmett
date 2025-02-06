@@ -4210,15 +4210,13 @@ def get_stock_bsale(iderp, retry=False):
                 if items:
                     stock_total = sum(item.get("quantityAvailable", 0) for item in items)
                     return stock_total, stock_data
-            elif response.status_code in [401, 403]:
-                return -1, response.text
-            elif response.status_code == 429:
-                time.sleep(2 ** attempt)
+            elif response.status_code in [401, 403, 429]:
+                return -1, {"status_code": response.status_code, "response": response.text}
             else:
-                return 0, response.text
+                return 0, {"status_code": response.status_code, "response": response.text}
         except requests.RequestException as e:
-            return 0, f"RequestException: {str(e)}"
-    return None, "Error crítico en la solicitud a Bsale"
+            return 0, {"error": "RequestException", "message": str(e)}
+    return None, {"error": "Error crítico en la solicitud a Bsale"}
 
 def get_stock_local(sku):
     product = Products.objects.filter(sku=sku).first()
@@ -4317,7 +4315,6 @@ def ajustar_stock_bsale(request):
         "productos_ajustados": data_comparacion,
         "archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"
     })
-
 
 
 
