@@ -4211,14 +4211,14 @@ def get_stock_bsale(iderp, retry=False):
                     stock_total = sum(item.get("quantityAvailable", 0) for item in items)
                     return stock_total, stock_data
             elif response.status_code in [401, 403]:
-                return -1, {}
+                return -1, response.text
             elif response.status_code == 429:
                 time.sleep(2 ** attempt)
             else:
-                return 0, {}
-        except requests.RequestException:
+                return 0, response.text
+        except requests.RequestException as e:
             time.sleep(2)
-    return 0, {}
+    return 0, "RequestException: No se pudo conectar con Bsale"
 
 def get_stock_local(sku):
     product = Products.objects.filter(sku=sku).first()
@@ -4259,8 +4259,13 @@ def procesar_producto(producto, total_productos, index, retry=False):
     iderp = producto.iderp
     cost = producto.lastcost
     stock_bsale, stock_data = get_stock_bsale(iderp, retry)
-    if not stock_data:
-        return {"sku": sku, "nombre": producto.nameproduct, "error": "No se obtuvo stock de Bsale"}
+    if not isinstance(stock_data, dict):
+        return {
+            "sku": sku,
+            "nombre": producto.nameproduct,
+            "error": "No se obtuvo stock de Bsale",
+            "stock_bsale_data": stock_data
+        }
     stock_local = get_stock_local(sku)
     diferencia = stock_local - stock_bsale
     
@@ -4294,8 +4299,7 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
     
-    #productos = list(Products.objects.order_by('-id')[:100])
-    productos = list(Products.objects.all())
+    productos = list(Products.objects.order_by('-id')[:1000])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
