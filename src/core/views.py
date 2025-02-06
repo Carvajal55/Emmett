@@ -4217,8 +4217,7 @@ def get_stock_bsale(iderp, retry=False):
             else:
                 return 0, response.text
         except requests.RequestException as e:
-            time.sleep(2)
-    return 0, "RequestException: No se pudo conectar con Bsale"
+            return 0, f"RequestException: {str(e)}"
 
 def get_stock_local(sku):
     product = Products.objects.filter(sku=sku).first()
@@ -4315,7 +4314,6 @@ def ajustar_stock_bsale(request):
         "productos_ajustados": data_comparacion,
         "archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"
     })
-
 
 
 
