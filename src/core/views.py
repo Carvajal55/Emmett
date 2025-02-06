@@ -4200,7 +4200,7 @@ BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
 def get_stock_bsale(sku, retry=False):
-    retries = 3 if not retry else 5  # Si es un reintento final, aumentar los intentos
+    retries = 3 if not retry else 5
     for attempt in range(retries):
         try:
             response = requests.get(BSALE_URL.format(sku=sku), headers=HEADERS)
@@ -4255,12 +4255,12 @@ def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
         return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}", {}
 
 def procesar_producto(producto, total_productos, index, retry=False):
-    sku = producto["sku"] if isinstance(producto, dict) else producto.sku
-    iderp = producto.get("iderp") if isinstance(producto, dict) else producto.iderp
-    cost = producto.get("lastcost") if isinstance(producto, dict) else producto.lastcost
+    sku = producto.sku
+    iderp = producto.iderp
+    cost = producto.lastcost
     stock_bsale, stock_data = get_stock_bsale(sku, retry)
     if not stock_data:
-        return {"sku": sku, "nombre": producto.get("nameproduct", "Desconocido"), "error": "No se obtuvo stock de Bsale"}
+        return {"sku": sku, "nombre": producto.nameproduct, "error": "No se obtuvo stock de Bsale"}
     stock_local = get_stock_local(sku)
     diferencia = stock_local - stock_bsale
     
@@ -4280,7 +4280,7 @@ def procesar_producto(producto, total_productos, index, retry=False):
     
     return {
         "sku": sku,
-        "nombre": producto.get("nameproduct", "Desconocido") if isinstance(producto, dict) else producto.nameproduct,
+        "nombre": producto.nameproduct,
         "stock_local": stock_local,
         "stock_bsale": stock_bsale,
         "diferencia": diferencia,
@@ -4294,24 +4294,16 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
     
-    productos = list(Products.objects.all())
+    productos = list(Products.objects.order_by('-id')[:1000])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
     with ThreadPoolExecutor(max_workers=10) as executor:
         data_comparacion = list(executor.map(lambda idx_prod: procesar_producto(idx_prod[1], total_productos, idx_prod[0]), enumerate(productos)))
     
-    productos_fallidos = [p for p in data_comparacion if p.get("error") == "No se obtuvo stock de Bsale"]
-    
-    if productos_fallidos:
-        print("🔄 Reintentando obtener stock de Bsale para SKUs fallidos...")
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            reintentos = list(executor.map(lambda p: procesar_producto(p, len(productos_fallidos), 0, retry=True), productos_fallidos))
-        
-        for retry_data in reintentos:
-            for i, original in enumerate(data_comparacion):
-                if original["sku"] == retry_data["sku"]:
-                    data_comparacion[i] = retry_data
+    print("🔄 Segunda ejecución para verificar pendientes...")
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        data_comparacion = list(executor.map(lambda idx_prod: procesar_producto(idx_prod[1], total_productos, idx_prod[0]), enumerate(productos)))
     
     df = pd.DataFrame(data_comparacion)
     excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
@@ -4322,7 +4314,6 @@ def ajustar_stock_bsale(request):
         "productos_ajustados": data_comparacion,
         "archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"
     })
-
 
 
 
