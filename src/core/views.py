@@ -4190,120 +4190,130 @@ def guardar_skus_procesados(skus):
     with open(PROCESSED_SKUS_FILE, 'w') as file:
         json.dump(list(skus), file)
 
+#-----------------------------------------------------------------------
+
+import threading
+
+BSALE_URL = "https://api.bsale.io/v1/stocks.json?code={sku}"
+BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
+BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
+HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+
+def get_stock_bsale(sku):
+    retries = 3
+    for attempt in range(retries):
+        try:
+            response = requests.get(BSALE_URL.format(sku=sku), headers=HEADERS)
+            if response.status_code == 200:
+                items = response.json().get("items", [])
+                if items:
+                    return items[0].get("quantityAvailable", 0)
+            elif response.status_code in [401, 403]:
+                return -1
+            elif response.status_code == 429:
+                time.sleep(2 ** attempt)
+            else:
+                return 0
+        except requests.RequestException:
+            time.sleep(2)
+    return 0
+
+def get_stock_local(sku):
+    product = Products.objects.filter(sku=sku).first()
+    if not product:
+        return 0
+    return Uniqueproducts.objects.filter(Q(product=product) & Q(state=0)).count()
+
+def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
+    if cantidad == 0:
+        return "No ajuste necesario"
+    
+    payload = {
+        "officeId": 1,
+        "details": [{
+            "quantity": abs(cantidad),
+        }]
+    }
+    
+    if tipo == "reception":
+        payload["details"][0]["code"] = sku  # Usar el código del producto para recepción
+        payload["details"][0]["cost"] = cost if cost else 0  # Añadir costo obligatorio
+        payload.update({"document": "Guía", "documentNumber": "123", "note": "Ajuste automático de stock"})
+        url = BSALE_RECEIVE_URL
+    else:
+        payload["details"][0]["variantId"] = iderp  # Usar variantId para consumo
+        payload.update({"note": "Ajuste automático de stock"})
+        url = BSALE_CONSUME_URL
+    
+    print(f"📦 Enviando ajuste a Bsale: SKU {sku}, Cantidad: {cantidad}, Tipo: {tipo}, Cost: {cost}, VariantId: {iderp if tipo == 'consumption' else 'N/A'}")
+    response = requests.post(url, headers=HEADERS, json=payload)
+    
+    if response.status_code == 201:
+        return f"✅ Ajuste realizado en Bsale para SKU {sku}: {tipo} {cantidad}"
+    else:
+        return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}"
+
+def procesar_producto(producto):
+    sku = producto.sku
+    iderp = producto.iderp
+    cost = producto.lastcost  # Obtener el último costo del producto
+    stock_bsale = get_stock_bsale(sku)
+    if stock_bsale == -1:
+        return {"sku": sku, "nombre": producto.nameproduct, "error": "Autenticación Bsale"}
+    stock_local = get_stock_local(sku)
+    diferencia = stock_local - stock_bsale
+    
+    ajuste_resultado = "No ajuste necesario"
+    if diferencia > 0:
+        ajuste_resultado = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
+    elif diferencia < 0:
+        ajuste_resultado = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
+    
+    return {
+        "sku": sku,
+        "nombre": producto.nameproduct,
+        "stock_local": stock_local,
+        "stock_bsale": stock_bsale,
+        "diferencia": diferencia,
+        "ajuste": ajuste_resultado
+    }
+
 @csrf_exempt
 def ajustar_stock_bsale(request):
-    """API rápida para ajustar stock en Bsale sin ralentización."""
     if request.method != "POST":
-        return JsonResponse({'error': 'Método no permitido.'}, status=405)
-
-    skus_procesados = cargar_skus_procesados()
-    productos = [
-        p for p in Products.objects.values_list("id", "sku", "nameproduct", "lastcost", "iderp")
-        if p[1] not in skus_procesados
-    ]
-    """[-5000:]"""
+        return JsonResponse({"error": "Método no permitido"}, status=405)
     
-    if not productos:
-        return JsonResponse({"message": "No hay productos pendientes para ajustar."}, status=200)
-
-    stock_local_dict = obtener_stock_local_bulk()
-    skus = [p[1] for p in productos]
-    stock_bsale_dict = obtener_stock_bsale_bulk(skus, batch_size=BATCH_SIZE)
-
-    ajustes_realizados = []
-    errores_bsale = []
-    productos_totales = []
-    total_productos = len(productos)
-
-    def ajustar_producto(producto):
-            """Ajusta el stock del producto en Bsale asegurando que coincida con el stock local."""
-            producto_id, sku, nameproduct, lastcost, iderp = producto
-            sku_clean = sku.strip().upper()
-            stock_local = stock_local_dict.get(producto_id, 0)
-            stock_bsale = stock_bsale_dict.get(sku_clean, 0)
-            diferencia = stock_local - stock_bsale
-
-            if diferencia == 0:
-                return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "Sin cambios"}
-
-            cantidad_ajuste = abs(diferencia)
-
-            if diferencia < 0:  # 🔥 Stock local es menor → Se fuerza el stock en Bsale al valor local
-                cantidad_ajuste = stock_bsale - stock_local  # 🔥 Se ajusta para igualar el stock local
-
-                if cantidad_ajuste <= 0:
-                    return {"sku": sku_clean, "name": nameproduct, "stock_bsale": stock_bsale, "stock_local": stock_local, "accion": "No se realizó ajuste"}
-
-                data_bsale = {
-                    "note": f"Consumo de stock en Bsale para SKU {sku_clean}",
-                    "officeId": BSALE_OFFICE_ID,
-                    "details": [{"quantity": cantidad_ajuste, "variantId": iderp}]
-                }
-                api_url = BSALE_API_URL_CONSUMPTION
-                tipo_ajuste = f"Consumo (Restado) - De {stock_bsale} a {stock_local}"
-
-            else:  # 🔥 Stock local es mayor → Se fuerza el stock en Bsale al valor local
-                data_bsale = {
-                    "document": "Ajuste automático",
-                    "officeId": BSALE_OFFICE_ID,
-                    "documentNumber": "123",
-                    "note": f"Recepción de stock en Bsale para SKU {sku_clean}",
-                    "details": [{"quantity": cantidad_ajuste, "code": sku_clean, "cost": lastcost or 0}]
-                }
-                api_url = BSALE_API_URL_RECEPTION
-                tipo_ajuste = f"Recepción (Sumado) - De {stock_bsale} a {stock_local}"
-
-            try:
-                headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
-                response = requests.post(api_url, headers=headers, data=json.dumps(data_bsale))
-                time.sleep(WAIT_TIME_BSALE)  # 🔥 Espera mínima para estabilidad
-
-                if response.status_code in [200, 201]:
-                    skus_procesados.add(sku_clean)
-                    return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "diferencia": diferencia, "mensaje": tipo_ajuste}
-                else:
-                    return {"sku": sku_clean, "stock_bsale": stock_bsale, "stock_local": stock_local, "error": f"Error {response.status_code} en Bsale: {response.text}"}
-            except Exception as e:
-                return {"sku": sku_clean, "error": str(e)}
-
-    print(f"🚀 Iniciando ajuste de stock para {total_productos} productos...")
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        future_to_sku = {executor.submit(ajustar_producto, prod): prod[1] for prod in productos}
-        for i, future in enumerate(as_completed(future_to_sku), 1):
-            result = future.result()
-            if "error" in result:
-                errores_bsale.append(result)
-            elif "mensaje" in result:
-                ajustes_realizados.append(result)
-            productos_totales.append(result)
-
-            if i % 50 == 0 or i == total_productos:
-                print(f"Progreso: {i}/{total_productos} productos procesados")
-
-    guardar_skus_procesados(skus_procesados)
-    file_path = os.path.join(EXPORTS_PATH, 'ajuste_stock.xlsx')
-    df = pd.DataFrame(productos_totales)
-    df.to_excel(file_path, index=False)
-
-    print("✅ Ajuste de stock completado. Archivo Excel generado.")
-
+    #productos = list(Products.objects.all()[:1000])
+    productos = list(Products.objects.all())
+    print("🔄 Iniciando comparación y ajuste de stock...")
+    
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        data_comparacion = list(executor.map(procesar_producto, productos))
+    
+    df = pd.DataFrame(data_comparacion)
+    excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
+    df.to_excel(excel_path, index=False)
+    print("✅ Comparación y ajustes finalizados. Archivo generado.")
+    
     return JsonResponse({
-        "message": "Proceso de ajuste de stock completado",
-        "ajustes_realizados": ajustes_realizados,
-        "errores_bsale": errores_bsale,
-        "archivo": "/api/descargar-reporte-stock/"
+        "productos_ajustados": data_comparacion,
+        "archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"
     })
 
+@csrf_exempt
+def descargar_excel(request):
+    excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
+    with open(excel_path, "rb") as f:
+        response = HttpResponse(f.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = "attachment; filename=stock_comparacion.xlsx"
+        return response
 
 
-def descargar_reporte_stock(request):
-    """Devuelve el archivo Excel como descarga directa"""
-    file_path = os.path.join(EXPORTS_PATH, 'ajuste_stock.xlsx')
 
-    if os.path.exists(file_path):
-        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename="ajuste_stock.xlsx")
-    else:
-        return JsonResponse({"error": "Archivo no encontrado"}, status=404)
+
+
+
+
 
 
 
