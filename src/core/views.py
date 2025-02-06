@@ -4205,18 +4205,19 @@ def get_stock_bsale(sku):
         try:
             response = requests.get(BSALE_URL.format(sku=sku), headers=HEADERS)
             if response.status_code == 200:
-                items = response.json().get("items", [])
+                stock_data = response.json()
+                items = stock_data.get("items", [])
                 if items:
-                    return items[0].get("quantityAvailable", 0)
+                    return items[0].get("quantityAvailable", 0), stock_data
             elif response.status_code in [401, 403]:
-                return -1
+                return -1, {}
             elif response.status_code == 429:
                 time.sleep(2 ** attempt)
             else:
-                return 0
+                return 0, {}
         except requests.RequestException:
             time.sleep(2)
-    return 0
+    return 0, {}
 
 def get_stock_local(sku):
     product = Products.objects.filter(sku=sku).first()
@@ -4253,11 +4254,11 @@ def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
     else:
         return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}"
 
-def procesar_producto(producto):
+def procesar_producto(producto, total_productos, index):
     sku = producto.sku
     iderp = producto.iderp
     cost = producto.lastcost  # Obtener el último costo del producto
-    stock_bsale = get_stock_bsale(sku)
+    stock_bsale, stock_data = get_stock_bsale(sku)
     if stock_bsale == -1:
         return {"sku": sku, "nombre": producto.nameproduct, "error": "Autenticación Bsale"}
     stock_local = get_stock_local(sku)
@@ -4269,13 +4270,17 @@ def procesar_producto(producto):
     elif diferencia < 0:
         ajuste_resultado = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
     
+    progreso = (index + 1) / total_productos * 100
+    print(f"🔄 Progreso: {progreso:.2f}% - Procesando SKU {sku} ({index + 1}/{total_productos})")
+    
     return {
         "sku": sku,
         "nombre": producto.nameproduct,
         "stock_local": stock_local,
         "stock_bsale": stock_bsale,
         "diferencia": diferencia,
-        "ajuste": ajuste_resultado
+        "ajuste": ajuste_resultado,
+        "stock_bsale_data": stock_data  # Guardar la respuesta completa de stock en Bsale
     }
 
 @csrf_exempt
@@ -4283,12 +4288,12 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
     
-    #productos = list(Products.objects.all()[:1000])
     productos = list(Products.objects.all())
+    total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
     with ThreadPoolExecutor(max_workers=10) as executor:
-        data_comparacion = list(executor.map(procesar_producto, productos))
+        data_comparacion = list(executor.map(lambda idx_prod: procesar_producto(idx_prod[1], total_productos, idx_prod[0]), enumerate(productos)))
     
     df = pd.DataFrame(data_comparacion)
     excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
@@ -4307,7 +4312,6 @@ def descargar_excel(request):
         response = HttpResponse(f.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response["Content-Disposition"] = "attachment; filename=stock_comparacion.xlsx"
         return response
-
 
 
 
