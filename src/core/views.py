@@ -4199,8 +4199,8 @@ BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-def get_stock_bsale(sku):
-    retries = 3
+def get_stock_bsale(sku, retry=False):
+    retries = 3 if not retry else 5  # Si es un reintento final, aumentar los intentos
     for attempt in range(retries):
         try:
             response = requests.get(BSALE_URL.format(sku=sku), headers=HEADERS)
@@ -4208,7 +4208,7 @@ def get_stock_bsale(sku):
                 stock_data = response.json()
                 items = stock_data.get("items", [])
                 if items:
-                    stock_total = sum(item.get("quantityAvailable", 0) for item in items)  # Sumar stock en todas las bodegas
+                    stock_total = sum(item.get("quantityAvailable", 0) for item in items)
                     return stock_total, stock_data
             elif response.status_code in [401, 403]:
                 return -1, {}
@@ -4238,16 +4238,15 @@ def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
     }
     
     if tipo == "reception":
-        payload["details"][0]["code"] = sku  # Usar el código del producto para recepción
-        payload["details"][0]["cost"] = cost if cost else 0  # Añadir costo obligatorio
+        payload["details"][0]["code"] = sku
+        payload["details"][0]["cost"] = cost if cost else 0
         payload.update({"document": "Guía", "documentNumber": "123", "note": "Ajuste automático de stock"})
         url = BSALE_RECEIVE_URL
     else:
-        payload["details"][0]["variantId"] = iderp  # Usar variantId para consumo
+        payload["details"][0]["variantId"] = iderp
         payload.update({"note": "Ajuste automático de stock"})
         url = BSALE_CONSUME_URL
     
-    print(f"📦 Enviando ajuste a Bsale: SKU {sku}, Cantidad: {cantidad}, Tipo: {tipo}, Cost: {cost}, VariantId: {iderp if tipo == 'consumption' else 'N/A'}")
     response = requests.post(url, headers=HEADERS, json=payload)
     
     if response.status_code == 201:
@@ -4255,13 +4254,13 @@ def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
     else:
         return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}", {}
 
-def procesar_producto(producto, total_productos, index):
+def procesar_producto(producto, total_productos, index, retry=False):
     sku = producto.sku
     iderp = producto.iderp
-    cost = producto.lastcost  # Obtener el último costo del producto
-    stock_bsale, stock_data = get_stock_bsale(sku)
-    if stock_bsale == -1:
-        return {"sku": sku, "nombre": producto.nameproduct, "error": "Autenticación Bsale"}
+    cost = producto.lastcost
+    stock_bsale, stock_data = get_stock_bsale(sku, retry)
+    if not stock_data:
+        return {"sku": sku, "nombre": producto.nameproduct, "error": "No se obtuvo stock de Bsale"}
     stock_local = get_stock_local(sku)
     diferencia = stock_local - stock_bsale
     
@@ -4270,13 +4269,9 @@ def procesar_producto(producto, total_productos, index):
     
     if diferencia > 0:
         ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
-        if not ajuste_respuesta:
-            return {"sku": sku, "nombre": producto.nameproduct, "error": "Fallo en ajuste de stock (reception)"}
     elif diferencia < 0:
-        if abs(diferencia) <= stock_bsale:  # Verificar que la resta no deje stock negativo
+        if abs(diferencia) <= stock_bsale:
             ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
-            if not ajuste_respuesta:
-                return {"sku": sku, "nombre": producto.nameproduct, "error": "Fallo en ajuste de stock (consumption)"}
         else:
             ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
     
@@ -4291,7 +4286,7 @@ def procesar_producto(producto, total_productos, index):
         "diferencia": diferencia,
         "ajuste": ajuste_resultado,
         "stock_bsale_data": stock_data,
-        "ajuste_respuesta": ajuste_respuesta  # Guardar respuesta de ajuste en Bsale
+        "ajuste_respuesta": ajuste_respuesta
     }
 
 @csrf_exempt
@@ -4299,12 +4294,25 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
     
-    productos = list(Products.objects.all().order_by('-id'))[:1000]
+    #productos = list(Products.objects.all())
+    productos = list(Products.objects.order_by('-id')[:1000])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
     with ThreadPoolExecutor(max_workers=10) as executor:
         data_comparacion = list(executor.map(lambda idx_prod: procesar_producto(idx_prod[1], total_productos, idx_prod[0]), enumerate(productos)))
+    
+    productos_fallidos = [p for p in data_comparacion if p.get("error") == "No se obtuvo stock de Bsale"]
+    
+    if productos_fallidos:
+        print("🔄 Reintentando obtener stock de Bsale para SKUs fallidos...")
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            reintentos = list(executor.map(lambda p: procesar_producto(p, len(productos_fallidos), 0, retry=True), productos_fallidos))
+        
+        for retry_data in reintentos:
+            for i, original in enumerate(data_comparacion):
+                if original["sku"] == retry_data["sku"]:
+                    data_comparacion[i] = retry_data
     
     df = pd.DataFrame(data_comparacion)
     excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
@@ -4315,14 +4323,6 @@ def ajustar_stock_bsale(request):
         "productos_ajustados": data_comparacion,
         "archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"
     })
-
-@csrf_exempt
-def descargar_excel(request):
-    excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
-    with open(excel_path, "rb") as f:
-        response = HttpResponse(f.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        response["Content-Disposition"] = "attachment; filename=stock_comparacion.xlsx"
-        return response
 
 
 
