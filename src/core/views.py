@@ -4255,12 +4255,12 @@ def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
         return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}", {}
 
 def procesar_producto(producto, total_productos, index, retry=False):
-    sku = producto.sku
-    iderp = producto.iderp
-    cost = producto.lastcost
+    sku = producto["sku"] if isinstance(producto, dict) else producto.sku
+    iderp = producto.get("iderp") if isinstance(producto, dict) else producto.iderp
+    cost = producto.get("lastcost") if isinstance(producto, dict) else producto.lastcost
     stock_bsale, stock_data = get_stock_bsale(sku, retry)
     if not stock_data:
-        return {"sku": sku, "nombre": producto.nameproduct, "error": "No se obtuvo stock de Bsale"}
+        return {"sku": sku, "nombre": producto.get("nameproduct", "Desconocido"), "error": "No se obtuvo stock de Bsale"}
     stock_local = get_stock_local(sku)
     diferencia = stock_local - stock_bsale
     
@@ -4280,7 +4280,7 @@ def procesar_producto(producto, total_productos, index, retry=False):
     
     return {
         "sku": sku,
-        "nombre": producto.nameproduct,
+        "nombre": producto.get("nameproduct", "Desconocido") if isinstance(producto, dict) else producto.nameproduct,
         "stock_local": stock_local,
         "stock_bsale": stock_bsale,
         "diferencia": diferencia,
@@ -4294,8 +4294,7 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
     
-    #productos = list(Products.objects.all())
-    productos = list(Products.objects.order_by('-id')[:1000])
+    productos = list(Products.objects.all())
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
