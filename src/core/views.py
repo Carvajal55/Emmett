@@ -4194,16 +4194,16 @@ def guardar_skus_procesados(skus):
 
 import threading
 
-BSALE_URL = "https://api.bsale.io/v1/stocks.json?code={sku}"
+BSALE_URL = "https://api.bsale.io/v1/stocks.json?variantid={iderp}"
 BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-def get_stock_bsale(sku, retry=False):
+def get_stock_bsale(iderp, retry=False):
     retries = 3 if not retry else 5
     for attempt in range(retries):
         try:
-            response = requests.get(BSALE_URL.format(sku=sku), headers=HEADERS)
+            response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS)
             if response.status_code == 200:
                 stock_data = response.json()
                 items = stock_data.get("items", [])
@@ -4258,7 +4258,7 @@ def procesar_producto(producto, total_productos, index, retry=False):
     sku = producto.sku
     iderp = producto.iderp
     cost = producto.lastcost
-    stock_bsale, stock_data = get_stock_bsale(sku, retry)
+    stock_bsale, stock_data = get_stock_bsale(iderp, retry)
     if not stock_data:
         return {"sku": sku, "nombre": producto.nameproduct, "error": "No se obtuvo stock de Bsale"}
     stock_local = get_stock_local(sku)
@@ -4294,14 +4294,10 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
     
-    productos = list(Products.objects.all())
+    productos = list(Products.objects.order_by('-id')[:100])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        data_comparacion = list(executor.map(lambda idx_prod: procesar_producto(idx_prod[1], total_productos, idx_prod[0]), enumerate(productos)))
-    
-    print("🔄 Segunda ejecución para verificar pendientes...")
     with ThreadPoolExecutor(max_workers=10) as executor:
         data_comparacion = list(executor.map(lambda idx_prod: procesar_producto(idx_prod[1], total_productos, idx_prod[0]), enumerate(productos)))
     
@@ -4314,6 +4310,7 @@ def ajustar_stock_bsale(request):
         "productos_ajustados": data_comparacion,
         "archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"
     })
+
 
 
 
