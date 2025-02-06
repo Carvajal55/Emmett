@@ -4208,7 +4208,8 @@ def get_stock_bsale(sku):
                 stock_data = response.json()
                 items = stock_data.get("items", [])
                 if items:
-                    return items[0].get("quantityAvailable", 0), stock_data
+                    stock_total = sum(item.get("quantityAvailable", 0) for item in items)  # Sumar stock en todas las bodegas
+                    return stock_total, stock_data
             elif response.status_code in [401, 403]:
                 return -1, {}
             elif response.status_code == 429:
@@ -4250,9 +4251,9 @@ def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
     response = requests.post(url, headers=HEADERS, json=payload)
     
     if response.status_code == 201:
-        return f"✅ Ajuste realizado en Bsale para SKU {sku}: {tipo} {cantidad}"
+        return f"✅ Ajuste realizado en Bsale para SKU {sku}: {tipo} {cantidad}", response.json()
     else:
-        return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}"
+        return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}", {}
 
 def procesar_producto(producto, total_productos, index):
     sku = producto.sku
@@ -4265,10 +4266,19 @@ def procesar_producto(producto, total_productos, index):
     diferencia = stock_local - stock_bsale
     
     ajuste_resultado = "No ajuste necesario"
+    ajuste_respuesta = {}
+    
     if diferencia > 0:
-        ajuste_resultado = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
+        if not ajuste_respuesta:
+            return {"sku": sku, "nombre": producto.nameproduct, "error": "Fallo en ajuste de stock (reception)"}
     elif diferencia < 0:
-        ajuste_resultado = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
+        if abs(diferencia) <= stock_bsale:  # Verificar que la resta no deje stock negativo
+            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
+            if not ajuste_respuesta:
+                return {"sku": sku, "nombre": producto.nameproduct, "error": "Fallo en ajuste de stock (consumption)"}
+        else:
+            ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
     
     progreso = (index + 1) / total_productos * 100
     print(f"🔄 Progreso: {progreso:.2f}% - Procesando SKU {sku} ({index + 1}/{total_productos})")
@@ -4280,7 +4290,8 @@ def procesar_producto(producto, total_productos, index):
         "stock_bsale": stock_bsale,
         "diferencia": diferencia,
         "ajuste": ajuste_resultado,
-        "stock_bsale_data": stock_data  # Guardar la respuesta completa de stock en Bsale
+        "stock_bsale_data": stock_data,
+        "ajuste_respuesta": ajuste_respuesta  # Guardar respuesta de ajuste en Bsale
     }
 
 @csrf_exempt
@@ -4288,7 +4299,7 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
     
-    productos = list(Products.objects.all())
+    productos = list(Products.objects.all()[-1000:])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
