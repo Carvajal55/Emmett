@@ -4218,6 +4218,7 @@ def get_stock_bsale(iderp, retry=False):
                 return 0, response.text
         except requests.RequestException as e:
             return 0, f"RequestException: {str(e)}"
+    return None, "Error crítico en la solicitud a Bsale"
 
 def get_stock_local(sku):
     product = Products.objects.filter(sku=sku).first()
@@ -4258,13 +4259,15 @@ def procesar_producto(producto, total_productos, index, retry=False):
     iderp = producto.iderp
     cost = producto.lastcost
     stock_bsale, stock_data = get_stock_bsale(iderp, retry)
-    if not isinstance(stock_data, dict):
+    
+    if stock_bsale is None:
         return {
             "sku": sku,
             "nombre": producto.nameproduct,
-            "error": "No se obtuvo stock de Bsale",
+            "error": "Error crítico en la consulta a Bsale",
             "stock_bsale_data": stock_data
         }
+    
     stock_local = get_stock_local(sku)
     diferencia = stock_local - stock_bsale
     
@@ -4298,7 +4301,7 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
     
-    productos = list(Products.objects.order_by('-id')[:1000])
+    productos = list(Products.objects.order_by('-id')[:100])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
