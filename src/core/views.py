@@ -4204,8 +4204,8 @@ MAX_REQUESTS_PER_SECOND = 10
 REQUESTS_WINDOW = 1  # Ventana de tiempo en segundos
 
 def get_stock_bsale(iderp, retry=False):
-    retries = 3 if not retry else 5
-    delay = 0.1  # Intervalo de espera inicial
+    retries = 5 if not retry else 7
+    delay = 1  # Intervalo de espera inicial
     request_counter = 0
     start_time = time.time()
     
@@ -4214,7 +4214,7 @@ def get_stock_bsale(iderp, retry=False):
             request_counter += 1
             elapsed_time = time.time() - start_time
             if request_counter >= MAX_REQUESTS_PER_SECOND:
-                sleep_time = max(0, REQUESTS_WINDOW - elapsed_time)
+                sleep_time = max(2, REQUESTS_WINDOW - elapsed_time)
                 print(f"⏳ Esperando {sleep_time:.2f} segundos para cumplir con el límite de 10 requests/segundo...")
                 time.sleep(sleep_time)
                 start_time = time.time()
@@ -4228,7 +4228,7 @@ def get_stock_bsale(iderp, retry=False):
                     stock_total = sum(item.get("quantityAvailable", 0) for item in items)
                     return stock_total, stock_data
             elif response.status_code == 429:
-                wait_time = min(5, delay * (2 ** attempt))
+                wait_time = min(10, delay * (2 ** attempt))
                 print(f"⏳ 429 Too Many Requests - Esperando {wait_time} segundos antes de reintentar...")
                 time.sleep(wait_time)
             elif response.status_code in [401, 403]:
