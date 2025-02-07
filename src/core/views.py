@@ -4166,14 +4166,9 @@ def obtener_stock_bsale_bulk(skus, batch_size=50):
 
 
 # 🔥 Configuración
-BSALE_OFFICE_ID = 1
-BSALE_API_URL_CONSUMPTION = f"{BSALE_API_URL}/stocks/consumptions.json"
-BSALE_API_URL_RECEPTION = f"{BSALE_API_URL}/stocks/receptions.json"
 BATCH_SIZE = 50  # 🔥 Tamaño de lote optimizado
 EXPORTS_PATH = os.path.join(settings.BASE_DIR, 'static', 'exports')
 PROCESSED_SKUS_FILE = os.path.join(EXPORTS_PATH, 'procesados.json')
-MAX_WORKERS = 5  # 🔥 Concurrencia optimizada
-WAIT_TIME_BSALE = 2  # 🔥 Espera entre peticiones para evitar errores
 
 # 🔥 Aseguramos que la carpeta de exportaciones exista
 os.makedirs(EXPORTS_PATH, exist_ok=True)
@@ -4210,6 +4205,7 @@ REQUESTS_WINDOW = 1  # Ventana de tiempo en segundos
 
 # Historial de timestamps de solicitudes
 request_timestamps = deque()
+retry_queue = []  # Cola de reintentos para SKU con 429
 
 def rate_limiter():
     """Asegura que no se exceda el límite de 10 solicitudes por segundo y 3000 en 5 minutos."""
@@ -4229,6 +4225,7 @@ def rate_limiter():
     
     # Agregamos el timestamp de la nueva solicitud
     request_timestamps.append(time.time())
+    time.sleep(0.1)  # Distribuye mejor las solicitudes dentro del segundo
 
 def get_stock_bsale(iderp, retry=False):
     retries = 5 if not retry else 7
@@ -4245,11 +4242,16 @@ def get_stock_bsale(iderp, retry=False):
                 stock_total = sum(item.get("quantityAvailable", 0) for item in items)
                 return stock_total, stock_data
             elif response.status_code == 429:
-                if attempt == retries - 1:
-                    return None, {"error": "Error crítico en la solicitud a Bsale después de múltiples intentos", "status_code": response.status_code, "response": response.text, "endpoint": BSALE_URL.format(iderp=iderp)}
-                wait_time = min(40, delay * (2 ** attempt))
+                retry_after = response.headers.get("Retry-After")
+                if retry_after:
+                    wait_time = int(retry_after)
+                else:
+                    wait_time = min(40, delay * (2 ** attempt))
                 print(f"⏳ 429 Too Many Requests - Esperando {wait_time} segundos antes de reintentar...")
                 time.sleep(wait_time)
+                if attempt == retries - 1:
+                    retry_queue.append(iderp)  # Guardar en la cola de reintentos
+                    return None, {"error": "Error 429, se reintentará después", "status_code": response.status_code, "endpoint": BSALE_URL.format(iderp=iderp)}
             elif response.status_code in [401, 403]:
                 return -1, {"status_code": response.status_code, "response": response.text}
             else:
@@ -4257,75 +4259,15 @@ def get_stock_bsale(iderp, retry=False):
         except requests.RequestException as e:
             return 0, {"error": "RequestException", "message": str(e)}
     return None, {"error": "Error crítico en la solicitud a Bsale", "status_code": response.status_code if 'response' in locals() else None, "response": response.text if 'response' in locals() else "No response received", "endpoint": BSALE_URL.format(iderp=iderp)}
-def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
-    if cantidad == 0:
-        return "No ajuste necesario"
-    
-    payload = {
-        "officeId": 1,
-        "details": [{
-            "quantity": abs(cantidad),
-        }]
-    }
-    
-    if tipo == "reception":
-        payload["details"][0]["code"] = sku
-        payload["details"][0]["cost"] = cost if cost else 0
-        payload.update({"document": "Guía", "documentNumber": "123", "note": "Ajuste automático de stock"})
-        url = BSALE_RECEIVE_URL
-    else:
-        payload["details"][0]["variantId"] = iderp
-        payload.update({"note": "Ajuste automático de stock"})
-        url = BSALE_CONSUME_URL
-    
-    response = requests.post(url, headers=HEADERS, json=payload)
-    
-    if response.status_code == 201:
-        return f"✅ Ajuste realizado en Bsale para SKU {sku}: {tipo} {cantidad}", response.json()
-    else:
-        return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}", {}
 
-def procesar_producto(producto, total_productos, index, retry=False):
-    sku = producto.sku
-    iderp = producto.iderp
-    cost = producto.lastcost
-    stock_bsale, stock_data = get_stock_bsale(iderp, retry)
-    
-    if stock_bsale is None:
-        return {
-            "sku": sku,
-            "nombre": producto.nameproduct,
-            "error": "Error crítico en la consulta a Bsale",
-            "stock_bsale_data": stock_data
-        }
-    
-    stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
-    diferencia = stock_local - stock_bsale
-    
-    ajuste_resultado = "No ajuste necesario"
-    ajuste_respuesta = {}
-    
-    if diferencia > 0:
-        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
-    elif diferencia < 0:
-        if abs(diferencia) <= stock_bsale:
-            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
-        else:
-            ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
-    
-    progreso = (index + 1) / total_productos * 100
-    print(f"🔄 Progreso: {progreso:.2f}% - Procesando SKU {sku} ({index + 1}/{total_productos})")
-    
-    return {
-        "sku": sku,
-        "nombre": producto.nameproduct,
-        "stock_local": stock_local,
-        "stock_bsale": stock_bsale,
-        "diferencia": diferencia,
-        "ajuste": ajuste_resultado,
-        "stock_bsale_data": stock_data,
-        "ajuste_respuesta": ajuste_respuesta
-    }
+def procesar_reintentos():
+    """Ejecuta un segundo ciclo para los SKU que recibieron error 429."""
+    if not retry_queue:
+        return
+    print(f"🔄 Procesando {len(retry_queue)} reintentos de SKU con error 429...")
+    for iderp in retry_queue:
+        get_stock_bsale(iderp, retry=True)
+    retry_queue.clear()  # Limpiar la lista después del segundo intento
 
 @csrf_exempt
 def ajustar_stock_bsale(request):

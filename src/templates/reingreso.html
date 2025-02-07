@@ -15,8 +15,7 @@
         <div class="col-md-4">
             <label for="cbTypeDocument">Tipo Documento</label>
             <select id="cbTypeDocument" v-model="form.tyDoc" class="form-select">
-                <option value="39">BOLETA</option>
-                <option value="33">FACTURA</option>
+                <option value="2">Nota de Credito</option>
             </select>
         </div>
         
@@ -72,7 +71,7 @@
                 superid: '',
                 cantidad: 1,
                 nDocument: '',
-                tyDoc: 39, // Valor predeterminado para tyDoc 39 boleta 33 factura
+                tyDoc: 2, // Valor predeterminado para tyDoc 39 boleta 33 factura
                 company: 1 // Valor predeterminado para company
             },
             productos: [],          // Lista de productos reingresados
