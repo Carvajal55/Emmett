@@ -4201,6 +4201,7 @@ HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
 def get_stock_bsale(iderp, retry=False):
     retries = 3 if not retry else 5
+    delay = 2  # Tiempo de espera entre intentos
     for attempt in range(retries):
         try:
             response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS)
@@ -4210,7 +4211,11 @@ def get_stock_bsale(iderp, retry=False):
                 if items:
                     stock_total = sum(item.get("quantityAvailable", 0) for item in items)
                     return stock_total, stock_data
-            elif response.status_code in [401, 403, 429]:
+            elif response.status_code == 429:  # Demasiadas solicitudes
+                wait_time = delay * (2 ** attempt)
+                print(f"⏳ 429 Too Many Requests - Esperando {wait_time} segundos antes de reintentar...")
+                time.sleep(wait_time)
+            elif response.status_code in [401, 403]:
                 return -1, {"status_code": response.status_code, "response": response.text}
             else:
                 return 0, {"status_code": response.status_code, "response": response.text}
@@ -4299,7 +4304,6 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
     productos = list(Products.objects.all())
-    #productos = list(Products.objects.order_by('-id')[:100])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
