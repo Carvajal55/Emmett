@@ -4200,7 +4200,7 @@ BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-MAX_REQUESTS_PER_SECOND = 8
+MAX_REQUESTS_PER_SECOND = 5
 REQUESTS_WINDOW = 1  # Ventana de tiempo en segundos
 
 def get_stock_bsale(iderp, retry=False):
@@ -4214,6 +4214,7 @@ def get_stock_bsale(iderp, retry=False):
             request_counter += 1
             elapsed_time = time.time() - start_time
             if request_counter >= MAX_REQUESTS_PER_SECOND:
+                time.sleep(REQUESTS_WINDOW / MAX_REQUESTS_PER_SECOND)
                 sleep_time = max(2, REQUESTS_WINDOW - elapsed_time)
                 print(f"⏳ Esperando {sleep_time:.2f} segundos para cumplir con el límite de 10 requests/segundo...")
                 time.sleep(sleep_time)
@@ -4228,7 +4229,7 @@ def get_stock_bsale(iderp, retry=False):
                     stock_total = sum(item.get("quantityAvailable", 0) for item in items)
                     return stock_total, stock_data
             elif response.status_code == 429:
-                wait_time = min(10, delay * (2 ** attempt))
+                wait_time = min(15, delay * (2 ** attempt))
                 print(f"⏳ 429 Too Many Requests - Esperando {wait_time} segundos antes de reintentar...")
                 time.sleep(wait_time)
             elif response.status_code in [401, 403]:
