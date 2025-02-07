@@ -4200,7 +4200,7 @@ BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-MAX_REQUESTS_PER_SECOND = 10
+MAX_REQUESTS_PER_SECOND = 8
 REQUESTS_WINDOW = 1  # Ventana de tiempo en segundos
 
 def get_stock_bsale(iderp, retry=False):
