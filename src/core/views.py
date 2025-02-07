@@ -4200,7 +4200,7 @@ BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-MAX_REQUESTS_PER_SECOND = 3
+MAX_REQUESTS_PER_SECOND = 5
 REQUESTS_WINDOW = 2  # Ventana de tiempo en segundos
 
 def get_stock_bsale(iderp, retry=False):
@@ -4238,8 +4238,7 @@ def get_stock_bsale(iderp, retry=False):
                 return 0, {"status_code": response.status_code, "response": response.text}
         except requests.RequestException as e:
             return 0, {"error": "RequestException", "message": str(e)}
-    return None, {"error": "Error crítico en la solicitud a Bsale", "status_code": response.status_code if 'response' in locals() else None, "response": response.text if 'response' in locals() else "No response received"}
-
+    return None, {"error": "Error crítico en la solicitud a Bsale", "status_code": response.status_code if 'response' in locals() else None, "response": response.text if 'response' in locals() else "No response received", "endpoint": BSALE_URL.format(iderp=iderp)}
 
 def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
     if cantidad == 0:
