@@ -4200,35 +4200,50 @@ BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-MAX_REQUESTS_PER_SECOND = 3
-REQUESTS_WINDOW = 2  # Ventana de tiempo en segundos
+import time
+import requests
+from collections import deque
+
+MAX_REQUESTS_PER_SECOND = 8  # Límite de 10 requests por segundo
+MAX_REQUESTS_PER_5_MIN = 3000  # Límite de 3000 requests en 5 minutos (300s)
+REQUESTS_WINDOW = 1  # Ventana de tiempo en segundos
+
+# Historial de timestamps de solicitudes
+request_timestamps = deque()
+
+def rate_limiter():
+    """Asegura que no se exceda el límite de 10 solicitudes por segundo y 3000 en 5 minutos."""
+    global request_timestamps
+    current_time = time.time()
+    
+    # Removemos solicitudes antiguas fuera de la ventana de 5 minutos (300s)
+    while request_timestamps and request_timestamps[0] < current_time - 300:
+        request_timestamps.popleft()
+    
+    # Verificamos si estamos excediendo el límite de 10 requests por segundo
+    if len(request_timestamps) >= MAX_REQUESTS_PER_SECOND:
+        sleep_time = 1 - (current_time - request_timestamps[0])
+        if sleep_time > 0:
+            print(f"⏳ Limitando velocidad, esperando {sleep_time:.2f} segundos...")
+            time.sleep(sleep_time)
+    
+    # Agregamos el timestamp de la nueva solicitud
+    request_timestamps.append(time.time())
 
 def get_stock_bsale(iderp, retry=False):
     retries = 5 if not retry else 7
     delay = 1  # Intervalo de espera inicial
-    request_counter = 0
-    start_time = time.time()
     
     for attempt in range(retries):
         try:
-            request_counter += 1
-            elapsed_time = time.time() - start_time
-            if request_counter >= MAX_REQUESTS_PER_SECOND:
-                time.sleep(REQUESTS_WINDOW / MAX_REQUESTS_PER_SECOND)
-                sleep_time = max(5, REQUESTS_WINDOW - elapsed_time)
-                print(f"⏳ Esperando {sleep_time:.2f} segundos para cumplir con el límite de 10 requests/segundo...")
-                time.sleep(sleep_time)
-                start_time = time.time()
-                request_counter = 0
-            
+            rate_limiter()  # Aplicamos limitación antes de la solicitud
             response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS)
+            
             if response.status_code == 200:
-                request_counter = 0  # Reiniciar contador tras éxito
                 stock_data = response.json()
                 items = stock_data.get("items", [])
-                if items:
-                    stock_total = sum(item.get("quantityAvailable", 0) for item in items)
-                    return stock_total, stock_data
+                stock_total = sum(item.get("quantityAvailable", 0) for item in items)
+                return stock_total, stock_data
             elif response.status_code == 429:
                 if attempt == retries - 1:
                     return None, {"error": "Error crítico en la solicitud a Bsale después de múltiples intentos", "status_code": response.status_code, "response": response.text, "endpoint": BSALE_URL.format(iderp=iderp)}
@@ -4242,7 +4257,6 @@ def get_stock_bsale(iderp, retry=False):
         except requests.RequestException as e:
             return 0, {"error": "RequestException", "message": str(e)}
     return None, {"error": "Error crítico en la solicitud a Bsale", "status_code": response.status_code if 'response' in locals() else None, "response": response.text if 'response' in locals() else "No response received", "endpoint": BSALE_URL.format(iderp=iderp)}
-
 def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
     if cantidad == 0:
         return "No ajuste necesario"
