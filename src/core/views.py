@@ -4298,8 +4298,8 @@ def procesar_producto(producto, total_productos, index, retry=False):
 def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
-    
-    productos = list(Products.objects.order_by('-id')[:100])
+    productos = list(Products.objects.all())
+    #productos = list(Products.objects.order_by('-id')[:100])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
