@@ -4195,16 +4195,31 @@ def guardar_skus_procesados(skus):
 import threading
 
 BSALE_URL = "https://api.bsale.io/v1/stocks.json?variantid={iderp}"
+BSALE_SKU_URL = "https://api.bsale.io/v1/stocks.json?code={sku}"
 BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
-BSALE_SKU_URL = "https://api.bsale.io/v1/stocks.json?code={sku}"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
+
+MAX_REQUESTS_PER_SECOND = 10
+REQUESTS_WINDOW = 1  # Ventana de tiempo en segundos
 
 def get_stock_bsale(iderp, retry=False):
     retries = 3 if not retry else 5
-    delay = 2  # Tiempo de espera entre intentos
+    delay = 0.1  # Intervalo de espera inicial
+    request_counter = 0
+    start_time = time.time()
+    
     for attempt in range(retries):
         try:
+            request_counter += 1
+            elapsed_time = time.time() - start_time
+            if request_counter >= MAX_REQUESTS_PER_SECOND:
+                sleep_time = max(0, REQUESTS_WINDOW - elapsed_time)
+                print(f"⏳ Esperando {sleep_time:.2f} segundos para cumplir con el límite de 10 requests/segundo...")
+                time.sleep(sleep_time)
+                start_time = time.time()
+                request_counter = 0
+            
             response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS)
             if response.status_code == 200:
                 stock_data = response.json()
@@ -4212,8 +4227,8 @@ def get_stock_bsale(iderp, retry=False):
                 if items:
                     stock_total = sum(item.get("quantityAvailable", 0) for item in items)
                     return stock_total, stock_data
-            elif response.status_code == 429:  # Demasiadas solicitudes
-                wait_time = delay * (2 ** attempt)
+            elif response.status_code == 429:
+                wait_time = min(5, delay * (2 ** attempt))
                 print(f"⏳ 429 Too Many Requests - Esperando {wait_time} segundos antes de reintentar...")
                 time.sleep(wait_time)
             elif response.status_code in [401, 403]:
@@ -4223,12 +4238,6 @@ def get_stock_bsale(iderp, retry=False):
         except requests.RequestException as e:
             return 0, {"error": "RequestException", "message": str(e)}
     return None, {"error": "Error crítico en la solicitud a Bsale"}
-
-def get_stock_local(sku):
-    product = Products.objects.filter(sku=sku).first()
-    if not product:
-        return 0
-    return Uniqueproducts.objects.filter(Q(product=product) & Q(state=0)).count()
 
 def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
     if cantidad == 0:
@@ -4272,7 +4281,7 @@ def procesar_producto(producto, total_productos, index, retry=False):
             "stock_bsale_data": stock_data
         }
     
-    stock_local = get_stock_local(sku)
+    stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
     diferencia = stock_local - stock_bsale
     
     ajuste_resultado = "No ajuste necesario"
