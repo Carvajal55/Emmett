@@ -4204,8 +4204,13 @@ HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 # Configuración de rate limiting
 MAX_REQUESTS_PER_SECOND = 3
 REQUESTS_WINDOW = 2  # Ventana de tiempo en segundos
+from threading import Thread, Lock
+from queue import Queue
 from collections import deque
-
+request_timestamps = deque()
+queue = Queue()
+lock = Lock()
+resultados = [] 
 
 
 request_timestamps = deque()
@@ -4214,32 +4219,32 @@ def rate_limiter():
     """Asegura que no se exceda el límite de solicitudes por segundo."""
     current_time = time.time()
 
-    # Remueve solicitudes fuera de la ventana de 5 minutos (300 segundos)
-    while request_timestamps and request_timestamps[0] < current_time - 300:
-        request_timestamps.popleft()
+    with lock:
+        # Remueve solicitudes fuera de la ventana de 1 segundo
+        while request_timestamps and request_timestamps[0] < current_time - REQUESTS_WINDOW:
+            request_timestamps.popleft()
 
-    # Si se excede el límite de solicitudes por segundo, espera
-    if len(request_timestamps) >= MAX_REQUESTS_PER_SECOND:
-        sleep_time = max(0, 1 - (current_time - request_timestamps[0]))
-        if sleep_time > 0:
+        # Si se excede el límite de requests, espera
+        if len(request_timestamps) >= MAX_REQUESTS_PER_SECOND:
+            sleep_time = max(0, 1 - (current_time - request_timestamps[0]))
             print(f"⏳ Limitando velocidad, esperando {sleep_time:.2f} segundos...")
             time.sleep(sleep_time)
 
-    request_timestamps.append(time.time())
+        request_timestamps.append(time.time())
 
 def get_stock_bsale(iderp, retry=False):
     retries = 5 if not retry else 7
-    delay = 2  # Espera inicial para evitar bloqueos
+    delay = 2  # Tiempo inicial de espera para evitar bloqueos
 
     for attempt in range(retries):
         try:
-            rate_limiter()
+            rate_limiter()  # Se asegura de no superar el límite
             response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS)
 
             if response.status_code == 200:
                 stock_data = response.json()
                 stock_total = sum(item.get("quantityAvailable", 0) for item in stock_data.get("items", []))
-                return stock_total, stock_data
+                return stock_total, stock_data  # Devolvemos toda la info de Bsale
 
             elif response.status_code == 429:
                 wait_time = min(60, delay * (2 ** attempt))
@@ -4256,6 +4261,67 @@ def get_stock_bsale(iderp, retry=False):
             return 0, {"error": "RequestException", "message": str(e)}
 
     return None, {"error": "Error crítico en la solicitud a Bsale"}
+
+def procesar_producto_worker():
+    """Función que ejecuta los trabajos de la cola de manera controlada."""
+    while True:
+        try:
+            item = queue.get()
+            if item is None:
+                break  # Si recibe None, finaliza el worker
+
+            index, producto, total_productos = item
+            resultado = procesar_producto(producto, total_productos, index)
+            
+            with lock:
+                resultados.append(resultado)  # Guardamos el resultado para el Excel
+            
+            queue.task_done()
+        except Exception as e:
+            print(f"❌ Error en worker: {str(e)}")
+
+def procesar_producto(producto, total_productos, index, retry=False):
+    """Procesa cada producto, compara stock local con Bsale y ajusta si es necesario."""
+    sku = producto.sku
+    iderp = producto.iderp
+    cost = producto.lastcost
+    stock_bsale, stock_data = get_stock_bsale(iderp, retry)
+
+    if stock_bsale is None:
+        return {
+            "sku": sku,
+            "nombre": producto.nameproduct,
+            "error": "Error crítico en la consulta a Bsale",
+            "stock_bsale_data": json.dumps(stock_data, indent=2)  # Guardamos JSON como string en Excel
+        }
+
+    stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
+    diferencia = stock_local - stock_bsale
+
+    ajuste_resultado = "No ajuste necesario"
+    ajuste_respuesta = {}
+
+    if diferencia > 0:
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
+    elif diferencia < 0:
+        if abs(diferencia) <= stock_bsale:
+            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
+        else:
+            ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
+
+    progreso = (index + 1) / total_productos * 100
+    print(f"🔄 Progreso: {progreso:.2f}% - Procesando SKU {sku} ({index + 1}/{total_productos})")
+
+    return {
+        "sku": sku,
+        "nombre": producto.nameproduct,
+        "stock_local": stock_local,
+        "stock_bsale": stock_bsale,
+        "diferencia": diferencia,
+        "ajuste": ajuste_resultado,
+        "stock_bsale_data": json.dumps(stock_data, indent=2),  # Guardamos toda la info de Bsale
+        "ajuste_respuesta": ajuste_respuesta
+    }
 
 def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
     """Realiza ajustes de stock en Bsale con reintentos en caso de fallas."""
