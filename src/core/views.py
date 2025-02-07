@@ -4200,7 +4200,7 @@ BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-MAX_REQUESTS_PER_SECOND = 4
+MAX_REQUESTS_PER_SECOND = 3
 REQUESTS_WINDOW = 2  # Ventana de tiempo en segundos
 
 def get_stock_bsale(iderp, retry=False):
@@ -4223,6 +4223,7 @@ def get_stock_bsale(iderp, retry=False):
             
             response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS)
             if response.status_code == 200:
+                request_counter = 0  # Reiniciar contador tras éxito
                 stock_data = response.json()
                 items = stock_data.get("items", [])
                 if items:
@@ -4231,7 +4232,7 @@ def get_stock_bsale(iderp, retry=False):
             elif response.status_code == 429:
                 if attempt == retries - 1:
                     return None, {"error": "Error crítico en la solicitud a Bsale después de múltiples intentos", "status_code": response.status_code, "response": response.text, "endpoint": BSALE_URL.format(iderp=iderp)}
-                wait_time = min(30, delay * (2 ** attempt))
+                wait_time = min(40, delay * (2 ** attempt))
                 print(f"⏳ 429 Too Many Requests - Esperando {wait_time} segundos antes de reintentar...")
                 time.sleep(wait_time)
             elif response.status_code in [401, 403]:
