@@ -4335,38 +4335,71 @@ def ajustar_stock_bsale(request):
 
 
 
-
+REQUEST_TIMEOUT = 5
 #---------------------------------
-def get_iderp_from_bsale(sku):
+def get_variant_id_from_bsale(sku):
+    """
+    Obtiene el ID de la variante desde Bsale a partir del SKU.
+    """
+    url = BSALE_SKU_URL.format(sku=sku)
     try:
-        response = requests.get(BSALE_SKU_URL.format(sku=sku), headers=HEADERS)
+        response = requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        
         if response.status_code == 200:
             stock_data = response.json()
             items = stock_data.get("items", [])
             if items:
-                return items[0]["variant"]["id"]  # Obtener el id de variant
-        return None
+                return items[0]["variant"]["id"]  # 🔹 Tomamos el primer ID de variante encontrado
+        elif response.status_code == 429:
+            print(f"⚠️ 429 Too Many Requests - Esperando 5 segundos...")
+            time.sleep(5)  # Esperamos para no sobrecargar la API
+            return get_variant_id_from_bsale(sku)  # Reintentamos la petición
+        else:
+            print(f"❌ Error en la consulta del SKU {sku}: {response.status_code}")
+            return None
     except requests.RequestException as e:
+        print(f"❌ Error en la conexión con Bsale para SKU {sku}: {e}")
         return None
 
 def update_iderp_for_all_products():
+    """
+    Consulta la API de Bsale para cada producto en la base de datos y actualiza el IDERP.
+    """
     productos = Products.objects.all()
+    start_time = time.time()
+    request_counter = 0
+
     for producto in productos:
-        new_iderp = get_iderp_from_bsale(producto.sku)
-        if new_iderp:
-            producto.iderp = new_iderp
+        if request_counter >= MAX_REQUESTS_PER_SECOND:
+            elapsed_time = time.time() - start_time
+            sleep_time = max(0, REQUESTS_WINDOW - elapsed_time)
+            print(f"⏳ Esperando {sleep_time:.2f} segundos para cumplir con el límite de 10 requests/segundo...")
+            time.sleep(sleep_time)
+            start_time = time.time()
+            request_counter = 0
+
+        variant_id = get_variant_id_from_bsale(producto.sku)
+        if variant_id:
+            producto.iderp = variant_id
             producto.save()
-            print(f"✅ IDERP actualizado para SKU {producto.sku}: {new_iderp}")
+            print(f"✅ IDERP actualizado para SKU {producto.sku}: {variant_id}")
         else:
             print(f"⚠️ No se encontró IDERP para SKU {producto.sku}")
+        
+        request_counter += 1  # Contamos la request
 
 @csrf_exempt
 def actualizar_iderp_bsale(request):
+    """
+    Endpoint que inicia la actualización de IDERP desde Bsale.
+    """
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
+    
     print("🔄 Iniciando actualización de IDERP desde Bsale...")
     update_iderp_for_all_products()
     print("✅ Actualización de IDERP completada.")
+    
     return JsonResponse({"message": "Actualización de IDERP completada"})
 
 
