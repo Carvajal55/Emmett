@@ -4200,8 +4200,8 @@ BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-MAX_REQUESTS_PER_SECOND = 4
-REQUESTS_WINDOW = 1  # Ventana de tiempo en segundos
+MAX_REQUESTS_PER_SECOND = 3
+REQUESTS_WINDOW = 2  # Ventana de tiempo en segundos
 
 def get_stock_bsale(iderp, retry=False):
     retries = 5 if not retry else 7
@@ -4215,7 +4215,7 @@ def get_stock_bsale(iderp, retry=False):
             elapsed_time = time.time() - start_time
             if request_counter >= MAX_REQUESTS_PER_SECOND:
                 time.sleep(REQUESTS_WINDOW / MAX_REQUESTS_PER_SECOND)
-                sleep_time = max(3, REQUESTS_WINDOW - elapsed_time)
+                sleep_time = max(5, REQUESTS_WINDOW - elapsed_time)
                 print(f"⏳ Esperando {sleep_time:.2f} segundos para cumplir con el límite de 10 requests/segundo...")
                 time.sleep(sleep_time)
                 start_time = time.time()
@@ -4238,7 +4238,7 @@ def get_stock_bsale(iderp, retry=False):
                 return 0, {"status_code": response.status_code, "response": response.text}
         except requests.RequestException as e:
             return 0, {"error": "RequestException", "message": str(e)}
-    return None, {"error": "Error crítico en la solicitud a Bsale"}
+    return None, {"error": "Error crítico en la solicitud a Bsale", "status_code": response.status_code if 'response' in locals() else None, "response": response.text if 'response' in locals() else "No response received"}
 
 
 def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
@@ -4315,7 +4315,8 @@ def procesar_producto(producto, total_productos, index, retry=False):
 def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
-    productos = list(Products.objects.all())
+    #productos = list(Products.objects.all())
+    productos = list(Products.objects.order_by('-id')[:1000])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
