@@ -4216,60 +4216,98 @@ resultados = []
 request_timestamps = deque()
 
 
-# Parámetros de límite de tasa
 MAX_REQUESTS_PER_SECOND = 3
 REQUESTS_WINDOW = 2  # Ventana de tiempo en segundos
-MAX_REQUESTS_PER_MINUTE = 3000
-RATE_LIMIT_RETRIES = 5
-
-request_timestamps = deque()
 
 def rate_limiter():
+    """Asegura que no se exceda el límite de 10 solicitudes por segundo y 3000 en 5 minutos."""
     global request_timestamps
     current_time = time.time()
     
-    # Removemos solicitudes fuera de la ventana de 5 minutos (300s)
+    # Removemos solicitudes antiguas fuera de la ventana de 5 minutos (300s)
     while request_timestamps and request_timestamps[0] < current_time - 300:
         request_timestamps.popleft()
     
-    # Verificamos si estamos excediendo el límite de solicitudes por segundo
+    # Verificamos si estamos excediendo el límite de 10 requests por segundo
     if len(request_timestamps) >= MAX_REQUESTS_PER_SECOND:
-        sleep_time = max(0.5, 1 - (current_time - request_timestamps[0]))
-        print(f"⏳ Esperando {sleep_time:.2f} segundos para respetar el rate limit...")
-        time.sleep(sleep_time)
+        sleep_time = 1 - (current_time - request_timestamps[0])
+        if sleep_time > 0:
+            print(f"⏳ Limitando velocidad, esperando {sleep_time:.2f} segundos...")
+            time.sleep(sleep_time)
     
+    # Agregamos el timestamp de la nueva solicitud
     request_timestamps.append(time.time())
-    time.sleep(0.2)  # Distribuir mejor las solicitudes
+    time.sleep(0.1)  # Distribuye mejor las solicitudes dentro del segundo
 
 def get_stock_bsale(iderp, retry=False):
-    retries = RATE_LIMIT_RETRIES if not retry else RATE_LIMIT_RETRIES + 2
+    retries = 5 if not retry else 7
     delay = 1  # Intervalo de espera inicial
+    request_counter = 0
+    start_time = time.time()
     
     for attempt in range(retries):
         try:
-            rate_limiter()
-            response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS)
+            request_counter += 1
+            elapsed_time = time.time() - start_time
+            if request_counter >= MAX_REQUESTS_PER_SECOND:
+                time.sleep(REQUESTS_WINDOW / MAX_REQUESTS_PER_SECOND)
+                sleep_time = max(5, REQUESTS_WINDOW - elapsed_time)
+                print(f"⏳ Esperando {sleep_time:.2f} segundos para cumplir con el límite de 10 requests/segundo...")
+                time.sleep(sleep_time)
+                start_time = time.time()
+                request_counter = 0
             
+            response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS)
             if response.status_code == 200:
                 stock_data = response.json()
                 items = stock_data.get("items", [])
-                stock_total = sum(item.get("quantityAvailable", 0) for item in items)
-                return stock_total, stock_data
+
+                if items:
+                    # SUMAMOS quantity en lugar de quantityAvailable
+                    stock_total = sum(item.get("quantity", 0) for item in items)
+                    return stock_total, stock_data
             
             elif response.status_code == 429:
-                wait_time = min(30, delay * (2 ** attempt))
+                if attempt == retries - 1:
+                    return None, {"error": "Error crítico en la solicitud a Bsale después de múltiples intentos", "status_code": response.status_code, "response": response.text, "endpoint": BSALE_URL.format(iderp=iderp)}
+                wait_time = min(40, delay * (2 ** attempt))
                 print(f"⏳ 429 Too Many Requests - Esperando {wait_time} segundos antes de reintentar...")
                 time.sleep(wait_time)
-            
             elif response.status_code in [401, 403]:
                 return -1, {"status_code": response.status_code, "response": response.text}
             else:
                 return 0, {"status_code": response.status_code, "response": response.text}
-        
         except requests.RequestException as e:
             return 0, {"error": "RequestException", "message": str(e)}
+    return None, {"error": "Error crítico en la solicitud a Bsale", "status_code": response.status_code if 'response' in locals() else None, "response": response.text if 'response' in locals() else "No response received", "endpoint": BSALE_URL.format(iderp=iderp)}
+
+def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
+    if cantidad == 0:
+        return "No ajuste necesario"
     
-    return None, {"error": "Error crítico en la solicitud a Bsale"}
+    payload = {
+        "officeId": 1,
+        "details": [{
+            "quantity": abs(cantidad),
+        }]
+    }
+    
+    if tipo == "reception":
+        payload["details"][0]["code"] = sku
+        payload["details"][0]["cost"] = cost if cost else 0
+        payload.update({"document": "Guía", "documentNumber": "123", "note": "Ajuste automático de stock"})
+        url = BSALE_RECEIVE_URL
+    else:
+        payload["details"][0]["variantId"] = iderp
+        payload.update({"note": "Ajuste automático de stock"})
+        url = BSALE_CONSUME_URL
+    
+    response = requests.post(url, headers=HEADERS, json=payload)
+    
+    if response.status_code == 201:
+        return f"✅ Ajuste realizado en Bsale para SKU {sku}: {tipo} {cantidad}", response.json()
+    else:
+        return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}", {}
 
 def procesar_producto(producto, total_productos, index, retry=False):
     sku = producto.sku
@@ -4278,12 +4316,26 @@ def procesar_producto(producto, total_productos, index, retry=False):
     stock_bsale, stock_data = get_stock_bsale(iderp, retry)
     
     if stock_bsale is None:
-        return {"sku": sku, "nombre": producto.nameproduct, "error": "Error crítico en la consulta a Bsale", "stock_bsale_data": stock_data}
+        return {
+            "sku": sku,
+            "nombre": producto.nameproduct,
+            "error": "Error crítico en la consulta a Bsale",
+            "stock_bsale_data": stock_data
+        }
     
     stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
     diferencia = stock_local - stock_bsale
+    
     ajuste_resultado = "No ajuste necesario"
     ajuste_respuesta = {}
+    
+    if diferencia > 0:
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
+    elif diferencia < 0:
+        if abs(diferencia) <= stock_bsale:
+            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
+        else:
+            ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
     
     progreso = (index + 1) / total_productos * 100
     print(f"🔄 Progreso: {progreso:.2f}% - Procesando SKU {sku} ({index + 1}/{total_productos})")
@@ -4303,12 +4355,12 @@ def procesar_producto(producto, total_productos, index, retry=False):
 def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
-    
     productos = list(Products.objects.all())
+    #productos = list(Products.objects.order_by('-id')[:1000])
     total_productos = len(productos)
     print("🔄 Iniciando comparación y ajuste de stock...")
     
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         data_comparacion = list(executor.map(lambda idx_prod: procesar_producto(idx_prod[1], total_productos, idx_prod[0]), enumerate(productos)))
     
     df = pd.DataFrame(data_comparacion)
@@ -4320,8 +4372,6 @@ def ajustar_stock_bsale(request):
         "productos_ajustados": data_comparacion,
         "archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"
     })
-
-
 
 
 REQUEST_TIMEOUT = 5
