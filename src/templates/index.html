@@ -60,6 +60,9 @@
 
         <!-- Gestión de Respaldo de Productos -->
         <div class="col-md-6 mb-4">
+            <div>
+                <button @click="actualizarIdErp">Actualizar IDERP</button>
+              </div>
             <div class="card h-100">
                 <div class="card-header bg-warning text-dark">
                     <h6 class="mb-0">Gestión de Unique Products</h6>
@@ -205,6 +208,28 @@
                         this.loading = false;
                     });
             },
+            async actualizarIdErp() {
+                try {
+                    this.loading = true;
+                    this.progressMessage = "Actualizando IDERP...";
+
+                    const response = await axios.post("/api/actualizar_iderp_bsale/");
+
+                    console.log("✅ Respuesta de actualización:", response.data);
+                    this.loading = false;
+
+                    Swal.fire({
+                    title: "¡Actualización completada!",
+                    text: "Los IDERP han sido actualizados en Bsale.",
+                    icon: "success",
+                    confirmButtonText: "Aceptar"
+                    });
+                } catch (error) {
+                    console.error("❌ Error al actualizar IDERP:", error);
+                    Swal.fire("Error", "Hubo un problema al actualizar los IDERP.", "error");
+                    this.loading = false;
+                }
+                },
 
             checkProgress() {
                 axios.get("/api/progreso_stock/")

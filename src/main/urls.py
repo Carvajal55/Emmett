@@ -131,6 +131,7 @@ urlpatterns = [
    path('api/validate-superid-interno/', core_views.validate_superid_simplified_interno, name='validate_superid'),
    path("api/ajustar_stock_bsale/", core_views.ajustar_stock_bsale, name="ajustar_stock_bsale"),
   # path('api/delete-products/', core_views.delete_products_from_excel, name='delete_products_from_excel'),
+    path("api/actualizar_iderp_bsale/", core_views.actualizar_iderp_bsale, name="actualizar_iderp_bsale"),
 
 #    path('api/comparar-stock-bsale/', core_views.comparar_stock_bsale, name='comparar_stock_bsale'),
 #    path('api/obtener-progreso/', core_views.obtener_progreso, name='obtener_progreso'),

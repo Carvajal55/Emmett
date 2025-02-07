@@ -4197,6 +4197,7 @@ import threading
 BSALE_URL = "https://api.bsale.io/v1/stocks.json?variantid={iderp}"
 BSALE_RECEIVE_URL = "https://api.bsale.io/v1/stocks/receptions.json"
 BSALE_CONSUME_URL = "https://api.bsale.io/v1/stocks/consumptions.json"
+BSALE_SKU_URL = "https://api.bsale.io/v1/stocks.json?code={sku}"
 HEADERS = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
 def get_stock_bsale(iderp, retry=False):
@@ -4324,7 +4325,38 @@ def ajustar_stock_bsale(request):
 
 
 
+#---------------------------------
+def get_iderp_from_bsale(sku):
+    try:
+        response = requests.get(BSALE_SKU_URL.format(sku=sku), headers=HEADERS)
+        if response.status_code == 200:
+            stock_data = response.json()
+            items = stock_data.get("items", [])
+            if items:
+                return items[0]["variant"]["id"]  # Obtener el id de variant
+        return None
+    except requests.RequestException as e:
+        return None
 
+def update_iderp_for_all_products():
+    productos = Products.objects.all()
+    for producto in productos:
+        new_iderp = get_iderp_from_bsale(producto.sku)
+        if new_iderp:
+            producto.iderp = new_iderp
+            producto.save()
+            print(f"✅ IDERP actualizado para SKU {producto.sku}: {new_iderp}")
+        else:
+            print(f"⚠️ No se encontró IDERP para SKU {producto.sku}")
+
+@csrf_exempt
+def actualizar_iderp_bsale(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+    print("🔄 Iniciando actualización de IDERP desde Bsale...")
+    update_iderp_for_all_products()
+    print("✅ Actualización de IDERP completada.")
+    return JsonResponse({"message": "Actualización de IDERP completada"})
 
 
 # # Variable global para almacenar el progreso
