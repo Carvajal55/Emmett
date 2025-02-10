@@ -4271,54 +4271,57 @@ def get_stock_bsale(iderp, retry=False):
 
     return None, {"error": "Error crítico en la solicitud a Bsale"}
 
-def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost):
-    """Realiza ajustes de stock en Bsale con reintentos en caso de fallas."""
+def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost, stock_data):
+    """Ajusta el stock en Bsale distribuyendo el consumo entre oficinas disponibles."""
     if cantidad == 0:
         return "No ajuste necesario", {}
 
-    payload = {
-        "officeId": 1,
-        "details": [{
-            "quantity": abs(cantidad),
-        }]
-    }
+    payloads = []  # Lista de payloads para múltiples oficinas
+    url = BSALE_CONSUME_URL if tipo == "consumption" else BSALE_RECEIVE_URL
 
-    if tipo == "reception":
-        payload["details"][0]["code"] = sku
-        payload["details"][0]["cost"] = cost if cost else 0
-        payload.update({
-            "document": "Guía",
-            "documentNumber": "123",
-            "note": "Ajuste automático de stock"
-        })
-        url = BSALE_RECEIVE_URL
-    else:
-        payload["details"][0]["variantId"] = iderp
-        payload.update({
-            "note": "Ajuste automático de stock"
-        })
-        url = BSALE_CONSUME_URL
+    # Obtener oficinas con stock disponible
+    oficinas = sorted(
+        stock_data.get("items", []),
+        key=lambda x: x["quantityAvailable"],  # Ordenar por cantidad disponible
+        reverse=True  # Primero las oficinas con más stock
+    )
 
-    retries = 3
-    for attempt in range(retries):
-        try:
-            response = requests.post(url, headers=HEADERS, json=payload)
+    cantidad_restante = abs(cantidad)  # Lo que necesitamos restar
 
-            if response.status_code == 201:
-                return f"✅ Ajuste realizado en Bsale para SKU {sku}: {tipo} {cantidad}", response.json()
+    for oficina in oficinas:
+        office_id = oficina["office"]["id"]
+        disponible = oficina["quantityAvailable"]
 
-            elif response.status_code == 429:
-                wait_time = min(30, 2 ** attempt)
-                print(f"⏳ 429 Too Many Requests - Esperando {wait_time} segundos antes de reintentar ajuste...")
-                time.sleep(wait_time)
+        if disponible > 0:
+            ajustar = min(cantidad_restante, disponible)  # No restar más de lo disponible
+            payload = {
+                "officeId": office_id,
+                "details": [{
+                    "quantity": ajustar,
+                    "variantId": iderp
+                }]
+            }
 
-            else:
-                return f"❌ Error en ajuste para SKU {sku}: {response.status_code} - {response.text}", {}
+            payloads.append(payload)
+            cantidad_restante -= ajustar
 
-        except requests.RequestException as e:
-            print(f"❌ Error de conexión al intentar ajustar stock: {e}")
+            if cantidad_restante <= 0:
+                break  # Ya ajustamos todo
 
-    return f"❌ Error en ajuste para SKU {sku} tras {retries} intentos", {}
+    # Si aún hay cantidad por descontar, significa que no hay suficiente stock
+    if cantidad_restante > 0 and tipo == "consumption":
+        return f"❌ Error: No se puede restar {abs(cantidad)} porque el stock total en Bsale es insuficiente", {}
+
+    # Enviar ajustes a Bsale
+    resultados = []
+    for payload in payloads:
+        response = requests.post(url, headers=HEADERS, json=payload)
+        if response.status_code == 201:
+            resultados.append(f"✅ Ajuste realizado en oficina {payload['officeId']}")
+        else:
+            resultados.append(f"❌ Error en ajuste en oficina {payload['officeId']}: {response.status_code} - {response.text}")
+
+    return " | ".join(resultados), payloads
 
 def procesar_producto_worker():
     """Función que ejecuta los trabajos de la cola de manera controlada."""
@@ -5393,7 +5396,7 @@ def restore_unique_products_view(request):
 
                 restored_products.append(Uniqueproducts(
                     product=existing_products[sku],
-                    superid=record.get("superid"),
+                    superid=record.get("Superid"),
                     correlative=record.get("correlative"),
                     printlabel=record.get("printlabel"),
                     state=record.get("state"),

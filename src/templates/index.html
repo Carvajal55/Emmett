@@ -23,9 +23,10 @@
                     <button @click="iniciarComparacion" class="btn btn-primary mt-3" :disabled="loading">
                         [[ loading ? 'Comparando...' : 'Comparar Stock en Bsale' ]]
                     </button>
-
-                    <input type="file" @change="handleFileUpload" accept=".xlsx" class="form-control">
-                    <button @click="eliminarProductos" class="btn btn-danger mt-3">Eliminar Productos</button>
+                    <div class="d-none">
+                        <input type="file" @change="handleFileUpload" accept=".xlsx" class="form-control">
+                        <button @click="eliminarProductos" class="btn btn-danger mt-3">Eliminar Productos</button>
+                    </div>
                     
 
                     <!-- Barra de Progreso -->
@@ -61,19 +62,20 @@
         <!-- Gestión de Respaldo de Productos -->
         <div class="col-md-6 mb-4">
             <div>
-                <button @click="actualizarIdErp">Actualizar IDERP</button>
               </div>
             <div class="card h-100">
                 <div class="card-header bg-warning text-dark">
                     <h6 class="mb-0">Gestión de Unique Products</h6>
                 </div>
                 <div class="card-body">
-                    <button @click="hacerRespaldo" class="btn btn-primary mt-3">Hacer Respaldo</button>
-                    <button @click="descargarBackup" class="btn btn-primary mt-3">Descargar Respaldo</button>
+                <button class="btn btn-primary mt-3" @click="actualizarIdErp">Actualizar IDERP</button>
+
+                    <button @click="hacerRespaldo" class="d-none btn btn-primary mt-3">Hacer Respaldo</button>
+                    <button @click="descargarBackup" class="d-none btn btn-primary mt-3">Descargar Respaldo</button>
                     <button @click="descargarBackupExcel" class="btn btn-primary mt-3">Descargar Excel</button>
 
                    <!-- Cargar respaldo -->
-                    <div class="card-header mt-4">
+                    <div class="d-none card-header mt-4">
                         <h6 class="mb-0">Cargar Respaldo</h6>
                     </div>
                     <div class="card-body">

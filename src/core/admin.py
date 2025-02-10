@@ -2,17 +2,27 @@ from django.contrib import admin
 from core.models import *
 from openpyxl import Workbook
 from django.http import HttpResponse
+from django.db.models.functions import Cast, Substr
+from django.db.models import IntegerField
 
-
-
-# Configuración del admin para el modelo Products con exportación a Excel
 @admin.register(Products)
 class ProductsAdmin(admin.ModelAdmin):
-    list_display = ('sku', 'nameproduct', 'brands', 'currentstock','uniquecodebar')  # Mostrar campos clave en Products
+    list_display = ('sku', 'nameproduct', 'brands', 'currentstock', 'uniquecodebar')  # Mostrar campos clave en Products
     search_fields = ('sku', 'nameproduct', 'brands', '=iderp')  # Agregar búsqueda para SKU, nombre del producto y marcas
     actions = ['export_products_to_excel']  # Añadir la acción de exportar a Excel
 
+    def get_queryset(self, request):
+        """
+        Ordena los SKU solo por los números, ignorando el prefijo de tres letras.
+        """
+        qs = super().get_queryset(request)
+        return qs.annotate(
+            sku_number=Cast(Substr('sku', 4), IntegerField())  # Extrae y convierte solo los números
+        ).order_by('sku_number')  # Ordena solo por el número
     def export_products_to_excel(self, request, queryset):
+        """
+        Exporta la lista de productos seleccionados a un archivo Excel.
+        """
         # Crear un nuevo libro de trabajo y hoja
         wb = Workbook()
         ws = wb.active
