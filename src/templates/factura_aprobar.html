@@ -1,6 +1,21 @@
 {% extends 'partials/base.html' %}
 {% load static %}
+{% block css %}
+<style>
+    .table-container {
+        max-height: 500px; /* Ajusta la altura de la tabla */
+        overflow-y: auto; /* Permite hacer scroll en el contenido */
+        border: 1px solid #ccc;
+    }
 
+    .table thead {
+        position: sticky;
+        top: 0;
+        background-color: white;
+        z-index: 10;
+    }
+</style>
+{% endblock css %}
 {% block content %}
 <div id="app" class="m-2">
     <h3>Aprobación de Factura</h3>
@@ -200,70 +215,53 @@
 
 
     <!-- Detalles de la factura -->
-    <table v-if="detalles.length > 0" class="table table-striped">
-        <thead>
-            <tr>
-                <th style="width: 3%;">#</th>
-                <th style="width: 8%;">SKU</th>
-                <th style="width: 15%;">PRODUCTO</th>
-                <th style="width: 5%; text-align: center;">QTY</th>
-                <th style="width: 5%; text-align: center;">DCTO</th>
-                <th style="width: 10%; text-align: right;">COSTO REAL</th>
-                <th style="width: 10%; text-align: right;">COSTO</th>
-                <th style="width: 8%; text-align: right;">Ú.COSTO</th>
-                <th style="width: 8%; text-align: right;">Ú.PRECIO</th>
-                <th style="width: 10%; text-align: right;">PRECIO BSALE</th>
-                <th style="width: 10%; text-align: right;">TOTAL</th>
-                <th style="width: 18%;">PRECIO BASE</th>
-                <th style="width: 5%; text-align: center;">MARGEN</th>
-                <th style="width: 5%; text-align: center;">STOCK</th>
-                <th style="width: 10%;">ACCIÓN</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr v-for="(detalle, index) in detalles" :key="detalle.sku" style="font-size: 0.9rem;">
-                <td>[[ index + 1 ]]</td>
-                <td>[[ detalle.sku ]]</td>
-                <td>[[ detalle.model ]]</td>
-                <td style="text-align: center;">[[ detalle.qty ]]</td>
-                <td style="text-align: center;">[[ detalle.dctoItem ]] %</td>
-                <td style="text-align: right;">[[ formatCurrency(detalle.cost_with_discount) ]]</td>
-                <td style="text-align: right;">[[ formatCurrency(detalle.cost) ]]</td>
-                <td style="text-align: right;">[[ formatCurrency(detalle.lastCost || 0) ]]</td>
-                <td style="text-align: right;">[[ formatCurrency(detalle.lastPrice || 0) ]]</td>
-                <td style="text-align: right;">[[ formatCurrency(detalle.bsalePrice || 0) ]]</td>
-                <td style="text-align: right;">[[ formatCurrency(calcularTotal(detalle.cost_with_discount, detalle.qty)) ]]</td>
-                <td>
-                    <input
-                        type="number"
-                        class="form-control px-0"
-                        v-model="detalle.precioBase"
-                        placeholder="Precio Base"
-                        @input="calcularMargen(detalle)" 
-                        style="font-size: 0.9rem; width: 100%;" 
-                    />
-                </td>
-                <td style="text-align: center;">[[ detalle.margen ]]%</td>
-                <td style="text-align: center;">[[ detalle.totalStock ]]</td>
-                <td>
-                    <button
-                        class="btn btn-info btn-sm"
-                        style="font-size: 0.9rem;" 
-                        @click="abrirModal(detalle)"
-                    >
-                       P.MarketPlace
-                    </button>
-                    <button
-                        class="btn btn-primary btn-sm mt-1"
-                        style="font-size: 0.9rem;"
-                        @click="actualizarPrecioBase(detalle)"
-                    >
-                        P.Base
-                    </button>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="table-container">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th style="width: 3%;">#</th>
+                    <th style="width: 8%;">SKU</th>
+                    <th style="width: 15%;">PRODUCTO</th>
+                    <th style="width: 5%; text-align: center;">QTY</th>
+                    <th style="width: 5%; text-align: center;">DCTO</th>
+                    <th style="width: 10%; text-align: right;">COSTO REAL</th>
+                    <th style="width: 10%; text-align: right;">COSTO</th>
+                    <th style="width: 8%; text-align: right;">Ú.COSTO</th>
+                    <th style="width: 8%; text-align: right;">Ú.PRECIO</th>
+                    <th style="width: 10%; text-align: right;">PRECIO BSALE</th>
+                    <th style="width: 10%; text-align: right;">TOTAL</th>
+                    <th style="width: 18%;">PRECIO BASE</th>
+                    <th style="width: 5%; text-align: center;">MARGEN</th>
+                    <th style="width: 5%; text-align: center;">STOCK</th>
+                    <th style="width: 10%;">ACCIÓN</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="(detalle, index) in detalles" :key="detalle.sku">
+                    <td>[[ index + 1 ]]</td>
+                    <td>[[ detalle.sku ]]</td>
+                    <td>[[ detalle.model ]]</td>
+                    <td style="text-align: center;">[[ detalle.qty ]]</td>
+                    <td style="text-align: center;">[[ detalle.dctoItem ]] %</td>
+                    <td style="text-align: right;">[[ formatCurrency(detalle.cost_with_discount) ]]</td>
+                    <td style="text-align: right;">[[ formatCurrency(detalle.cost) ]]</td>
+                    <td style="text-align: right;">[[ formatCurrency(detalle.lastCost || 0) ]]</td>
+                    <td style="text-align: right;">[[ formatCurrency(detalle.lastPrice || 0) ]]</td>
+                    <td style="text-align: right;">[[ formatCurrency(detalle.bsalePrice || 0) ]]</td>
+                    <td style="text-align: right;">[[ formatCurrency(calcularTotal(detalle.cost_with_discount, detalle.qty)) ]]</td>
+                    <td>
+                        <input type="number" class="form-control" v-model="detalle.precioBase" placeholder="Precio Base">
+                    </td>
+                    <td style="text-align: center;">[[ detalle.margen ]]%</td>
+                    <td style="text-align: center;">[[ detalle.totalStock ]]</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" @click="abrirModal(detalle)">P.MarketPlace</button>
+                        <button class="btn btn-primary btn-sm mt-1" @click="actualizarPrecioBase(detalle)">P.Base</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
     
 
     <!-- Mostrar un mensaje si no hay detalles -->
