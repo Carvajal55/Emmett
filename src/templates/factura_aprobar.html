@@ -248,13 +248,7 @@
                     <td style="text-align: right;">[[ formatCurrency(detalle.bsalePrice || 0) ]]</td>
                     <td style="text-align: right;">[[ formatCurrency(calcularTotal(detalle.cost_with_discount, detalle.qty)) ]]</td>
                     <td>
-                        <input 
-                            type="text" 
-                            class="form-control" 
-                            v-model="detalle.precioBaseFormatted" 
-                            placeholder="Precio Base"
-                            @input="updatePrecioBase(detalle)"
-                        >
+                        <input type="text" class="form-control" v-model="detalle.precioBase" placeholder="Precio Base">
                     </td>
                     <td style="text-align: center;">[[ detalle.margen ]]%</td>
                     <td style="text-align: center;">[[ detalle.totalStock ]]</td>
@@ -295,11 +289,6 @@
                 { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
                 
             ],
-            detalle: {
-                precioBase: 0, // Guarda el número sin formato
-                precioBaseFormatted: "0", // Para mostrarlo formateado
-            },
-
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
             precioSeleccionado: null,
@@ -321,12 +310,6 @@
             
         },
         methods: {
-            updatePrecioBase(detalle) {
-                let rawValue = detalle.precioBaseFormatted; // Valor con separadores
-                let numericValue = this.parseNumber(rawValue); // Convertir a número sin formato
-                detalle.precioBase = numericValue; // Guardar número real para cálculos
-                detalle.precioBaseFormatted = this.formatNumber(numericValue); // Mostrar con formato
-            },
             asignarPrecioGlobal() {
                 // Verificar que el precio global sea válido y el input esté habilitado
                 if (this.habilitarInputGlobal && this.precioGlobal !== null && this.precioGlobal >= 0) {
@@ -423,8 +406,8 @@
             },
             obtenerValorActual(precio) {
                 const data = {
-                    price_list_id: precio.id, // ID de la lista de precios
-                    sku: this.skuSeleccionado // SKU seleccionado
+                    price_list_id: precio.id, // ID de la lista de precios (ej: MercadoLibre, Paris, etc.)
+                    sku: this.skuSeleccionado // SKU del producto seleccionado
                 };
 
                 axios.post('/api/obtener_valor_actual/', data)
@@ -436,7 +419,7 @@
                             const valorConIva = Math.floor(valorRecibido * 1.19); // Sumar IVA y redondear
                             precio.valorActual = valorConIva;
                         } else {
-                            precio.valorActual = 'No disponible';
+                            precio.valorActual = 'Pendiente';
                         }
                     })
                     .catch(error => {
@@ -552,15 +535,18 @@
                 this.nombreSeleccionado = detalle.model;
                 this.precioSeleccionado = detalle.precioBase;
                 this.detalleSeleccionado = detalle;
-                console.log(detalle,"Detalle")
 
-                // Inicializar las listas de precios al abrir el modal
+                console.log("Detalle seleccionado:", detalle);
+
+                // Inicializar las listas de precios con valores por defecto
                 this.listasPrecios = this.initializeListasPrecios(detalle);
-                // Llamar a obtenerValorActual para cada precio en las listas de precios
+
+                // Llamar a la API para cada lista de precios y obtener valores actuales
                 this.listasPrecios.forEach(precio => {
-                    this.obtenerValorActual(precio);
+                    this.obtenerValorActual(precio); 
                 });
 
+                // Mostrar el modal después de cargar los datos
                 $('#modalPrecios').modal('show');
             },
             actualizarListasPrecios() {
