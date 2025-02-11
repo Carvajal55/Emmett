@@ -279,3 +279,17 @@ class InvoiceProductSuperID(models.Model):
         return f"SuperID: {self.superid} - Despachado: {self.dispatched}"
 
 
+class MarketplacePrice(models.Model):
+    product = models.ForeignKey(Products, on_delete=models.CASCADE, related_name="marketplace_prices")
+    marketplace = models.CharField(max_length=100)  # Nombre del Marketplace (Ej: MercadoLibre, Paris, Ripley, etc.)
+    last_price = models.IntegerField(blank=True, null=True)  # Último precio registrado
+    last_update = models.DateTimeField(auto_now=True)  # Fecha de la última actualización
+
+    class Meta:
+        db_table = 'marketplace_prices'
+        unique_together = ('product', 'marketplace')  # Evita duplicados para un mismo producto y marketplace
+
+    def __str__(self):
+        return f"{self.product.sku} - {self.marketplace}: {self.last_price} CLP"
+
+

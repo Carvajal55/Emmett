@@ -508,7 +508,7 @@ def producto_detalles(request, product_id):
         return JsonResponse({'error': 'Producto no encontrado'}, status=404)
 
 
-#FACTURAS
+# FACTURAS
 @csrf_exempt
 @require_POST
 def actualizar_precio(request):
@@ -587,15 +587,35 @@ def actualizar_precio(request):
         updated_data = put_response.json()
         print(f"Datos actualizados en Bsale: {updated_data}")
 
-        # Paso 5: Actualizar el lastPrice en la base de datos local
-        from .models import Products  # Importa el modelo si no está ya importado
+        # Paso 5: Actualizar en la base de datos local
+        from .models import Products, MarketplacePrice  # Importa los modelos si no están ya importados
+        from django.utils.timezone import now
+
         try:
             print(f"Buscando el producto con SKU: {sku}")
             product = Products.objects.get(sku=sku)
             print(f"Producto encontrado: {product}")
-            product.lastprice = float(b_price)
-            product.save()
-            print(f"Producto actualizado en la base de datos local: {product}")
+
+            if type == 3:  # **Precio Base**
+                product.lastprice = float(b_price)
+                product.save()
+                print(f"Producto actualizado en la base de datos local: {product}")
+            else:  # **Es un marketplace, guardarlo en MarketplacePrice**
+                marketplace_name = get_marketplace_name(type)
+
+                precio, created = MarketplacePrice.objects.get_or_create(
+                    product=product,
+                    marketplace=marketplace_name,
+                    defaults={'last_price': float(b_price)}
+                )
+
+                if not created:
+                    precio.last_price = float(b_price)
+                    precio.last_update = now()
+                    precio.save()
+
+                print(f"Precio actualizado en MarketplacePrice: {precio}")
+
         except Products.DoesNotExist:
             print(f"Error: Producto con SKU {sku} no encontrado en la base de datos local")
             return JsonResponse({'error': f'Producto con SKU {sku} no encontrado en la base de datos'}, status=404)
@@ -606,7 +626,7 @@ def actualizar_precio(request):
         # Retornar la respuesta exitosa
         print("Precio actualizado correctamente")
         return JsonResponse({
-            'message': 'Precio actualizado correctamente en Bsale y lastPrice actualizado en la base de datos local',
+            'message': 'Precio actualizado correctamente en Bsale y en la base de datos local',
             'updated_data': updated_data
         }, status=200)
 
@@ -616,6 +636,17 @@ def actualizar_precio(request):
     except Exception as e:
         print(f"Error inesperado: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
+
+# **Helper para obtener el nombre del marketplace**
+def get_marketplace_name(type_id):
+    marketplace_mapping = {
+        10: "MercadoLibre",
+        12: "Paris",
+        13: "Ripley",
+        14: "Walmart",
+        11: "Falabella"
+    }
+    return marketplace_mapping.get(type_id, "Desconocido")
     
 def listar_compras(request):
     # Obtener parámetros de filtro y paginación desde el request
