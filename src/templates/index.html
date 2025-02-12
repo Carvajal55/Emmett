@@ -99,6 +99,9 @@
         </div>
         <div class="col-md-6">
             <div class="card h-100">
+                <div class=" card-header mt-4">
+                    <h6 class="mb-0">Cargar Provedores o Categorias</h6>
+                </div>
                 <div class=" card-body">
                     <input type="file" @change="handleFileUpload" class="form-control">
                     <button @click="uploadFile('/api/cargar-proveedores/')" class="btn btn-primary mt-3">Cargar Proveedores</button>
