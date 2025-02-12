@@ -5832,16 +5832,23 @@ def carga_masiva_proveedores(request):
         file = request.FILES['file']
         try:
             df = pd.read_excel(file)
+
+            proveedores_creados = []
             for _, row in df.iterrows():
-                Supplier.objects.create(
-                    namesupplier=row['namesupplier'],
-                    rutsupplier=row['rutsupplier'],
-                    alias=row['alias']
+                proveedor = Supplier(
+                    namesupplier=row.get('namesupplier', '').strip(),
+                    rutsupplier=row['rutsupplier'].strip() if pd.notna(row['rutsupplier']) else None,
+                    alias=row['alias'].strip() if pd.notna(row['alias']) else None
                 )
-            return JsonResponse({'message': 'Proveedores cargados correctamente'}, status=201)
+                proveedor.save()
+                proveedores_creados.append(proveedor.namesupplier)
+
+            return JsonResponse({'message': f'Se cargaron {len(proveedores_creados)} proveedores correctamente'}, status=201)
+
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    return JsonResponse({'error': 'Método no permitido o archivo no proporcionado'}, status=405)
 
 
 @csrf_exempt
@@ -5850,14 +5857,22 @@ def carga_masiva_categorias(request):
         file = request.FILES['file']
         try:
             df = pd.read_excel(file)
+
+            categorias_creadas = []
             for _, row in df.iterrows():
-                Categoryserp.objects.create(
-                    namecategory=row['namecategory'],
-                    parentcategoryid=row['parentcategoryid'],
-                    childrencategoryid=row['childrencategoryid'],
-                    iderp=row['iderp']
+                categoria = Categoryserp(
+                    namecategory=row.get('namecategory', '').strip(),
+                    parentcategoryid=int(row['parentcategoryid']) if pd.notna(row['parentcategoryid']) else None,
+                    childrencategoryid=int(row['childrencategoryid']) if pd.notna(row['childrencategoryid']) else None,
+                    iderp=int(row['iderp']) if pd.notna(row['iderp']) else None
                 )
-            return JsonResponse({'message': 'Categorías cargadas correctamente'}, status=201)
+                categoria.save()
+                categorias_creadas.append(categoria.namecategory)
+
+            return JsonResponse({'message': f'Se cargaron {len(categorias_creadas)} categorías correctamente'}, status=201)
+
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    return JsonResponse({'error': 'Método no permitido o archivo no proporcionado'}, status=405)
+
