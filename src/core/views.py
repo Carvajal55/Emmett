@@ -5815,4 +5815,82 @@ def generar_excel_stock(request):
 
 #     except Exception as e:
 #         return JsonResponse({'error': str(e)}, status=500)
-    
+
+import pandas as pd
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework import status
+from core.models import Supplier
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile  
+
+class CargaMasivaProveedoresView(APIView):
+    """Carga masiva de proveedores desde un archivo Excel"""
+    def post(self, request, *args, **kwargs):
+        file = request.FILES.get("file")
+        if not file:
+            return Response({"error": "No se recibió un archivo"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Guardar temporalmente el archivo
+        file_path = default_storage.save(f"temp/{file.name}", ContentFile(file.read()))
+
+        try:
+            # Cargar el archivo Excel
+            df = pd.read_excel(file_path)
+
+            # Validar columnas esperadas
+            required_columns = {"namesupplier", "rutsupplier", "alias"}
+            if not required_columns.issubset(df.columns):
+                return Response({"error": "El archivo no contiene las columnas esperadas"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Optimizar creación de proveedores
+            proveedores = []
+            for _, row in df.iterrows():
+                proveedores.append(Supplier(
+                    namesupplier=row["namesupplier"],
+                    rutsupplier=row["rutsupplier"],
+                    alias=row["alias"]
+                ))
+
+            Supplier.objects.bulk_create(proveedores)
+
+            return Response({"message": "Proveedores cargados con éxito"}, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"error": f"Ocurrió un error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class CargaMasivaCategoriasView(APIView):
+    """Carga masiva de categorías desde un archivo Excel"""
+    def post(self, request, *args, **kwargs):
+        file = request.FILES.get("file")
+        if not file:
+            return Response({"error": "No se recibió un archivo"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Guardar temporalmente el archivo
+        file_path = default_storage.save(f"temp/{file.name}", ContentFile(file.read()))
+
+        try:
+            # Cargar el archivo Excel
+            df = pd.read_excel(file_path)
+
+            # Validar columnas esperadas
+            required_columns = {"namecategory", "parentcategoryid", "childrencategoryid", "iderp"}
+            if not required_columns.issubset(df.columns):
+                return Response({"error": "El archivo no contiene las columnas esperadas"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Optimizar creación de categorías
+            categorias = []
+            for _, row in df.iterrows():
+                categorias.append(Categoryserp(
+                    namecategory=row["namecategory"],
+                    parentcategoryid=row["parentcategoryid"] if pd.notna(row["parentcategoryid"]) else None,
+                    childrencategoryid=row["childrencategoryid"] if pd.notna(row["childrencategoryid"]) else None,
+                    iderp=row["iderp"] if pd.notna(row["iderp"]) else None,
+                ))
+
+            Categoryserp.objects.bulk_create(categorias)
+
+            return Response({"message": "Categorías cargadas con éxito"}, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"error": f"Ocurrió un error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -97,6 +97,15 @@
                 </div>
             </div>
         </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class=" card-body">
+                    <input type="file" @change="handleFileUpload" class="form-control">
+                    <button @click="uploadFile('/api/cargar-proveedores/')" class="btn btn-primary mt-3">Cargar Proveedores</button>
+                    <button @click="uploadFile('/api/cargar-categorias/')" class="btn btn-success mt-3">Cargar Categorías</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -277,6 +286,25 @@
 
             descargarBackupExcel() {
                 window.location.href = '/api/generar-excel-stock/';
+            },
+            async uploadFile(apiEndpoint) {
+                if (!this.file) {
+                    Swal.fire('Advertencia', 'Debe seleccionar un archivo Excel.', 'warning');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', this.file);
+
+                try {
+                    const response = await axios.post(apiEndpoint, formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+
+                    Swal.fire('Éxito', response.data.message, 'success');
+                } catch (error) {
+                    Swal.fire('Error', 'Error al cargar el archivo.', 'error');
+                }
             },
 
             async uploadProductsFile() {
