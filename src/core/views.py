@@ -5824,6 +5824,9 @@ from core.models import Supplier
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile  
 
+
+
+@csrf_exempt
 class CargaMasivaProveedoresView(APIView):
     """Carga masiva de proveedores desde un archivo Excel"""
     def post(self, request, *args, **kwargs):
@@ -5858,7 +5861,9 @@ class CargaMasivaProveedoresView(APIView):
 
         except Exception as e:
             return Response({"error": f"Ocurrió un error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
+
+@csrf_exempt
 class CargaMasivaCategoriasView(APIView):
     """Carga masiva de categorías desde un archivo Excel"""
     def post(self, request, *args, **kwargs):
