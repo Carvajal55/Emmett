@@ -5827,75 +5827,37 @@ from django.core.files.base import ContentFile
 
 
 @csrf_exempt
-class CargaMasivaProveedoresView(APIView):
-    """Carga masiva de proveedores desde un archivo Excel"""
-    def post(self, request, *args, **kwargs):
-        file = request.FILES.get("file")
-        if not file:
-            return Response({"error": "No se recibió un archivo"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Guardar temporalmente el archivo
-        file_path = default_storage.save(f"temp/{file.name}", ContentFile(file.read()))
-
+def carga_masiva_proveedores(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        file = request.FILES['file']
         try:
-            # Cargar el archivo Excel
-            df = pd.read_excel(file_path)
-
-            # Validar columnas esperadas
-            required_columns = {"namesupplier", "rutsupplier", "alias"}
-            if not required_columns.issubset(df.columns):
-                return Response({"error": "El archivo no contiene las columnas esperadas"}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Optimizar creación de proveedores
-            proveedores = []
+            df = pd.read_excel(file)
             for _, row in df.iterrows():
-                proveedores.append(Supplier(
-                    namesupplier=row["namesupplier"],
-                    rutsupplier=row["rutsupplier"],
-                    alias=row["alias"]
-                ))
-
-            Supplier.objects.bulk_create(proveedores)
-
-            return Response({"message": "Proveedores cargados con éxito"}, status=status.HTTP_201_CREATED)
-
+                Supplier.objects.create(
+                    namesupplier=row['namesupplier'],
+                    rutsupplier=row['rutsupplier'],
+                    alias=row['alias']
+                )
+            return JsonResponse({'message': 'Proveedores cargados correctamente'}, status=201)
         except Exception as e:
-            return Response({"error": f"Ocurrió un error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
 
 
 @csrf_exempt
-class CargaMasivaCategoriasView(APIView):
-    """Carga masiva de categorías desde un archivo Excel"""
-    def post(self, request, *args, **kwargs):
-        file = request.FILES.get("file")
-        if not file:
-            return Response({"error": "No se recibió un archivo"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Guardar temporalmente el archivo
-        file_path = default_storage.save(f"temp/{file.name}", ContentFile(file.read()))
-
+def carga_masiva_categorias(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        file = request.FILES['file']
         try:
-            # Cargar el archivo Excel
-            df = pd.read_excel(file_path)
-
-            # Validar columnas esperadas
-            required_columns = {"namecategory", "parentcategoryid", "childrencategoryid", "iderp"}
-            if not required_columns.issubset(df.columns):
-                return Response({"error": "El archivo no contiene las columnas esperadas"}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Optimizar creación de categorías
-            categorias = []
+            df = pd.read_excel(file)
             for _, row in df.iterrows():
-                categorias.append(Categoryserp(
-                    namecategory=row["namecategory"],
-                    parentcategoryid=row["parentcategoryid"] if pd.notna(row["parentcategoryid"]) else None,
-                    childrencategoryid=row["childrencategoryid"] if pd.notna(row["childrencategoryid"]) else None,
-                    iderp=row["iderp"] if pd.notna(row["iderp"]) else None,
-                ))
-
-            Categoryserp.objects.bulk_create(categorias)
-
-            return Response({"message": "Categorías cargadas con éxito"}, status=status.HTTP_201_CREATED)
-
+                Categoryserp.objects.create(
+                    namecategory=row['namecategory'],
+                    parentcategoryid=row['parentcategoryid'],
+                    childrencategoryid=row['childrencategoryid'],
+                    iderp=row['iderp']
+                )
+            return JsonResponse({'message': 'Categorías cargadas correctamente'}, status=201)
         except Exception as e:
-            return Response({"error": f"Ocurrió un error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Método no permitido'}, status=405)

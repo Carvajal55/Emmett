@@ -161,8 +161,8 @@ urlpatterns = [
     #Exportar excel 
     path('api/generar-excel-stock/', core_views.generar_excel_stock, name='generar_excel_stock'),
 
-    path('api/cargar-categorias/', core_views.CargaMasivaCategoriasView.as_view(), name="cargar-categorias"),
-    path('api/cargar-proveedores/', core_views.CargaMasivaProveedoresView.as_view(), name="cargar-proveedores"),
+    path('api/cargar-categorias/', core_views.carga_masiva_categorias, name="cargar-categorias"),
+    path('api/cargar-proveedores/', core_views.carga_masiva_proveedores, name="cargar-proveedores"),
     
 
 
