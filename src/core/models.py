@@ -279,19 +279,19 @@ class InvoiceProductSuperID(models.Model):
         return f"SuperID: {self.superid} - Despachado: {self.dispatched}"
 
 
-# class MarketplacePrice(models.Model):
-#     product = models.ForeignKey(
-#         Products,
-#         on_delete=models.CASCADE,
-#         related_name="marketplace_prices",
-#         db_column="idProduct"  # Asegura que usa la columna correcta
-#     )
-#     marketplace = models.CharField(max_length=100)
-#     last_price = models.IntegerField(blank=True, null=True)
-#     last_update = models.DateTimeField(auto_now=True)
+class MarketplacePrice(models.Model):
+    product = models.ForeignKey(
+        Products,
+        on_delete=models.CASCADE,
+        related_name="marketplace_prices",
+        db_column="idProduct"  # Asegura que usa la columna correcta
+    )
+    marketplace = models.CharField(max_length=100)
+    last_price = models.IntegerField(blank=True, null=True)
+    last_update = models.DateTimeField(auto_now=True)
 
-#     class Meta:
-#         db_table = 'marketplace_prices'
-#         unique_together = ('product', 'marketplace')
+    class Meta:
+        db_table = 'marketplace_prices'
+        unique_together = ('product', 'marketplace')
 
 
