@@ -5899,18 +5899,18 @@ def cargaMasivaSectoresView(request):
             sectores_creados = []
             for _, row in df.iterrows():
                 sector = Sectoroffice(
-                    idoffice=row['idOffice'],
-                    iduserresponsible=row['idUserResponsible'],
-                    zone=row['zone'],
-                    floor=row['floor'],
-                    section=row['section'],
-                    namesector=row['nameSector'],
-                    picturearea=row['pictureArea'],
-                    diagramarea=row['diagramArea'],
-                    description=row['description'],
-                    pdfbarcode=row['pdfBarcode'],
-                    state=row['state'],
-                    namedescriptive=row['nameDescriptive']
+                    idoffice=row['idOffice'] if pd.notna(row['idOffice']) else None,
+                    iduserresponsible=row['idUserResponsible'] if pd.notna(row['idUserResponsible']) else None,
+                    zone=row['zone'] if pd.notna(row['zone']) else None,
+                    floor=row['floor'] if pd.notna(row['floor']) else None,
+                    section=row['section'] if pd.notna(row['section']) else None,
+                    namesector=row['nameSector'] if pd.notna(row['nameSector']) else None,
+                    picturearea=row['pictureArea'] if pd.notna(row['pictureArea']) else None,
+                    diagramarea=row['diagramArea'] if pd.notna(row['diagramArea']) else None,
+                    description=row['description'] if pd.notna(row['description']) else None,
+                    pdfbarcode=row['pdfBarcode'] if pd.notna(row['pdfBarcode']) else None,
+                    state=row['state'] if pd.notna(row['state']) else None,
+                    namedescriptive=row['nameDescriptive'] if pd.notna(row['nameDescriptive']) else None
                 )
                 sectores_creados.append(sector)
 
