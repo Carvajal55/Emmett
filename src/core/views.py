@@ -5876,3 +5876,52 @@ def carga_masiva_categorias(request):
 
     return JsonResponse({'error': 'Método no permitido o archivo no proporcionado'}, status=405)
 
+from django.core.exceptions import ValidationError
+
+@csrf_exempt
+def cargaMasivaSectoresView(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        try:
+            # Leer el archivo Excel
+            file = request.FILES['file']
+            df = pd.read_excel(file)
+
+            # Validar que las columnas necesarias existan
+            required_columns = {'idOffice', 'idUserResponsible', 'zone', 'floor', 'section', 'nameSector', 
+                                'pictureArea', 'diagramArea', 'description', 'pdfBarcode', 'state', 'nameDescriptive'}
+            if not required_columns.issubset(df.columns):
+                return JsonResponse({'error': 'El archivo debe contener las columnas requeridas.'}, status=400)
+
+            # Reemplazar valores NaN con None
+            df = df.where(pd.notna(df), None)
+
+            # Crear objetos y guardarlos en la base de datos
+            sectores_creados = []
+            for _, row in df.iterrows():
+                sector = Sectoroffice(
+                    idoffice=row['idOffice'],
+                    iduserresponsible=row['idUserResponsible'],
+                    zone=row['zone'],
+                    floor=row['floor'],
+                    section=row['section'],
+                    namesector=row['nameSector'],
+                    picturearea=row['pictureArea'],
+                    diagramarea=row['diagramArea'],
+                    description=row['description'],
+                    pdfbarcode=row['pdfBarcode'],
+                    state=row['state'],
+                    namedescriptive=row['nameDescriptive']
+                )
+                sectores_creados.append(sector)
+
+            # Guardar todos los sectores en una sola transacción
+            Sectoroffice.objects.bulk_create(sectores_creados)
+
+            return JsonResponse({'message': f'Se cargaron {len(sectores_creados)} sectores correctamente.'}, status=200)
+        
+        except ValidationError as e:
+            return JsonResponse({'error': str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': f'Error procesando el archivo: {str(e)}'}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido o archivo no proporcionado.'}, status=400)

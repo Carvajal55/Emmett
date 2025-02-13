@@ -102,10 +102,22 @@
                 <div class=" card-header mt-4">
                     <h6 class="mb-0">Cargar Provedores o Categorias</h6>
                 </div>
-                <div class=" card-body">
-                    <input type="file" @change="handleFileUpload" class="form-control">
-                    <button @click="uploadFile('/api/cargar-proveedores/')" class="btn btn-primary mt-3">Cargar Proveedores</button>
-                    <button @click="uploadFile('/api/cargar-categorias/')" class="btn btn-success mt-3">Cargar Categorías</button>
+                <div class="mt-4">
+                    <h6>Cargar Sectores</h6>
+                    <input type="file" @change="handleFileUpload" accept=".xlsx" class="form-control">
+                    <button @click="uploadFile('/api/cargar-sectores/', 'Sectores')" class="btn btn-success mt-3">Cargar Sectores</button>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>Cargar Categorías</h6>
+                    <input type="file" @change="handleFileUpload" accept=".xlsx" class="form-control">
+                    <button @click="uploadFile('/api/cargar-categorias/', 'Categorías')" class="btn btn-primary mt-3">Cargar Categorías</button>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>Cargar Proveedores</h6>
+                    <input type="file" @change="handleFileUpload" accept=".xlsx" class="form-control">
+                    <button @click="uploadFile('/api/cargar-proveedores/', 'Proveedores')" class="btn btn-warning mt-3">Cargar Proveedores</button>
                 </div>
             </div>
         </div>
@@ -290,9 +302,9 @@
             descargarBackupExcel() {
                 window.location.href = '/api/generar-excel-stock/';
             },
-            async uploadFile(apiEndpoint) {
+            async uploadFile(apiEndpoint, fileType) {
                 if (!this.file) {
-                    Swal.fire('Advertencia', 'Debe seleccionar un archivo Excel.', 'warning');
+                    Swal.fire('Advertencia', `Debe seleccionar un archivo Excel para ${fileType}.`, 'warning');
                     return;
                 }
 
@@ -304,9 +316,16 @@
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
 
-                    Swal.fire('Éxito', response.data.message, 'success');
+                    Swal.fire({
+                        title: 'Éxito',
+                        text: `${fileType} cargados correctamente.`,
+                        icon: 'success',
+                        confirmButtonText: 'Aceptar'
+                    });
+
                 } catch (error) {
-                    Swal.fire('Error', 'Error al cargar el archivo.', 'error');
+                    console.error(`Error al cargar ${fileType}:`, error);
+                    Swal.fire('Error', `Error al cargar el archivo de ${fileType}.`, 'error');
                 }
             },
 
