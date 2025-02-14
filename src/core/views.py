@@ -5940,3 +5940,45 @@ def cargaMasivaSectoresView(request):
             return JsonResponse({'error': f'Error procesando el archivo: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Método no permitido o archivo no proporcionado.'}, status=400)
+
+
+def normalize_brand_name(name):
+    """ Normaliza el nombre de la marca eliminando espacios extras y convirtiéndolo en título."""
+    return name.strip().title() if isinstance(name, str) else None
+
+@csrf_exempt
+def bulk_upload_brands(request):
+    try:
+        if request.method != 'POST':
+            return JsonResponse({"status": "error", "message": "Método no permitido."})
+
+        # Leer archivo Excel
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
+
+        df = pd.read_excel(uploaded_file, header=None)  # Sin encabezados, solo nombres de marcas
+        df.columns = ["name"]  # Asignar un nombre a la única columna
+
+        # Normalizar nombres de marcas
+        df["name"] = df["name"].apply(normalize_brand_name)
+        df.dropna(inplace=True)  # Eliminar valores nulos
+        df.drop_duplicates(inplace=True)  # Eliminar duplicados
+
+        # Obtener marcas existentes
+        existing_brands = set(Brand.objects.values_list("name", flat=True))
+
+        # Crear nuevas marcas si no existen
+        new_brands = [Brand(name=name) for name in df["name"] if name not in existing_brands]
+
+        if new_brands:
+            Brand.objects.bulk_create(new_brands)
+            return JsonResponse({
+                "status": "success",
+                "message": f"Se insertaron {len(new_brands)} nuevas marcas."
+            })
+        else:
+            return JsonResponse({"status": "info", "message": "No se encontraron marcas nuevas para insertar."})
+
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)})

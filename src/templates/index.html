@@ -119,6 +119,12 @@
                     <input type="file" @change="handleFileUpload" accept=".xlsx" class="form-control">
                     <button @click="uploadFile('/api/cargar-proveedores/', 'Proveedores')" class="btn btn-warning mt-3">Cargar Proveedores</button>
                 </div>
+
+                <div class="mt-4">
+                    <h6>Cargar Marcas</h6>
+                    <input type="file" @change="handleFileUpload" accept=".xlsx" class="form-control">
+                    <button @click="uploadFile('/api/upload-brands/', 'Marcas')" class="btn btn-warning mt-3">Cargar Marcas</button>
+                </div>
             </div>
         </div>
     </div>

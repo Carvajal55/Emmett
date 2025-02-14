@@ -164,6 +164,7 @@ urlpatterns = [
     path('api/cargar-categorias/', core_views.carga_masiva_categorias, name="cargar-categorias"),
     path('api/cargar-proveedores/', core_views.carga_masiva_proveedores, name="cargar-proveedores"),
     path('api/cargar-sectores/', core_views.cargaMasivaSectoresView, name="cargar-sectores"),
+    path('api/upload-brands/', core_views.bulk_upload_brands, name='bulk_upload_brands'),
     
 
 
