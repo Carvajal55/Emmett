@@ -1226,8 +1226,9 @@ def create_supplier(request):
 
 from .models import Products, Brand
 from datetime import datetime
+import re
+from django.db.models import Max
 
-# 🔥 Mapeo de prefijos para categorías
 def get_sku_prefix(categoria):
     prefix_map = {
         "audio": "AUD",
@@ -1239,27 +1240,27 @@ def get_sku_prefix(categoria):
     }
     return prefix_map.get(categoria, "OTR")  # Si no encuentra, usa 'OTR'
 
-from django.db.models import Max
-import re
 
-# 🔥 Obtener el siguiente SKU de forma global
 def obtener_correlativo():
-    """ Busca el SKU más alto en la base de datos y genera el siguiente correlativo de forma global. """
-    # Buscar el SKU más alto en toda la base de datos sin importar la categoría
-    max_sku = Products.objects.aggregate(max_sku=Max('sku'))['max_sku']
+    """ Busca el SKU con el número más alto e incrementa el correlativo globalmente. """
+    # Obtener el SKU con el número más alto
+    max_sku = Products.objects.values_list('sku', flat=True)
 
-    if max_sku:
-        match = re.match(r'([A-Z]+)(\d+)', max_sku)  # Separamos prefijo y número
-        if match:
-            max_number = int(match.group(2))  # Convertimos la parte numérica
-            nuevo_numero = max_number + 1  # Incrementamos
-        else:
-            nuevo_numero = 1
+    # Extraer solo los números de los SKUs
+    sku_numbers = [
+        int(re.search(r'^\D+(\d+)$', sku).group(1)) 
+        for sku in max_sku if re.search(r'^\D+(\d+)$', sku)
+    ]
+
+    # Obtener el número más alto y sumarle 1
+    if sku_numbers:
+        nuevo_numero = max(sku_numbers) + 1
     else:
-        nuevo_numero = 1  # Si no hay productos, empezamos desde 1
+        nuevo_numero = 1  # Si no hay SKUs, empieza desde 1
 
-    # Formatear el nuevo número con ceros a la izquierda
+    # Formatear el nuevo número con ceros a la izquierda (ej. 00001)
     return str(nuevo_numero).zfill(5)
+
 
 @csrf_exempt
 def crear_producto(request):
@@ -1284,7 +1285,7 @@ def crear_producto(request):
         if marca not in marcas_existentes:
             return JsonResponse({"error": f"La marca '{marca}' no existe. Selecciona una marca válida."}, status=400)
 
-        # Generar el SKU con el prefijo correspondiente y el correlativo general
+        # Generar el SKU con el prefijo correspondiente y el correlativo global
         prefix = get_sku_prefix(categoria)
         correlativo = obtener_correlativo()
         sku = f"{prefix}{correlativo}"  # 🔥 Ahora el número es global
