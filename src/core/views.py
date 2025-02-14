@@ -5571,12 +5571,16 @@ def bulk_upload_products(request):
         if request.method != 'POST':
             return JsonResponse({"status": "error", "message": "Método no permitido."})
 
-        # Leer archivo JSON
+        # Leer archivo JSON con manejo de codificación
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
             return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
 
-        file_data = uploaded_file.read().decode('utf-8')
+        try:
+            file_data = uploaded_file.read().decode('utf-8')
+        except UnicodeDecodeError:
+            file_data = uploaded_file.read().decode('ISO-8859-1', errors='replace')
+        
         products_data = json.loads(file_data)
 
         # Normalizar claves
@@ -5638,6 +5642,7 @@ def bulk_upload_products(request):
     except Exception as e:
         print(f"Error durante la carga: {e}")
         return JsonResponse({"status": "error", "message": str(e)})
+
     
 def obtener_tipos_productos_y_guardar(request):
     try:
