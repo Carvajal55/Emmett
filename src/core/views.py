@@ -1239,6 +1239,9 @@ def get_sku_prefix(categoria):
     }
     return prefix_map.get(categoria, "OTR")  # Si no encuentra, usa 'OTR'
 
+from django.db.models import Max
+import re
+
 # 🔥 Obtener el siguiente SKU de forma global
 def obtener_correlativo():
     """ Busca el SKU más alto en la base de datos y genera el siguiente correlativo de forma global. """
