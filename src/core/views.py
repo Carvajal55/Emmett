@@ -5550,6 +5550,21 @@ def generar_pdf_errores(errores, pdf_filename):
         print(f"Error al generar el PDF: {str(e)}")
 
 
+def normalize_keys(data):
+    """Normaliza los nombres de las claves en los datos recibidos."""
+    key_mapping = {
+        "sku": "sku",
+        "namep": "nameproduct",
+        "brands": "brand",
+        "codeba": "codebar",
+        "lastcost": "lastcost",
+        "lastprice": "lastprice",
+        "createdate": "createdate",
+        "currentstock": "currentstock",
+        "uniquecodebar": "uniquecodebar",
+    }
+    return [{key_mapping.get(k, k): v for k, v in record.items()} for record in data]
+
 @csrf_exempt
 def bulk_upload_products(request):
     try:
@@ -5576,19 +5591,19 @@ def bulk_upload_products(request):
         new_products = []
         duplicate_skus = []
         for record in tqdm(products_data, desc="Cargando productos", unit="producto"):
-            sku = record.get("aux")  # En tu JSON, AUX representa el SKU
+            sku = record.get("sku")
 
             # Verificar si el SKU ya existe
             if sku in existing_skus:
                 duplicate_skus.append(sku)
                 continue  # Saltar al siguiente registro
 
-            # Convertir fecha si es necesario
+            # Convertir fecha correctamente
             createdate = record.get("createdate")
-            if createdate and createdate != 0:
+            if createdate:
                 try:
-                    createdate = datetime.fromtimestamp(int(createdate) / 1000)
-                except (ValueError, TypeError):
+                    createdate = datetime.strptime(createdate, "%Y/%m/%d %H:%M:%S")
+                except ValueError:
                     createdate = None
             else:
                 createdate = None
@@ -5598,28 +5613,13 @@ def bulk_upload_products(request):
                 Products(
                     sku=sku,
                     nameproduct=record.get("nameproduct"),
-                    prefixed=record.get("prefixed"),
                     brands=record.get("brand"),
                     codebar=record.get("codebar"),
-                    codebar2=record.get("codebar2"),
-                    codebar3=record.get("codebar3"),
-                    iderp=record.get("iderp"),
-                    codsupplier=record.get("codsupplier"),
-                    description=record.get("description"),
-                    lastcost=record.get("lastcost"),
-                    latestreplenishment=None,  # Manejo adicional si se necesita
-                    lastprice=record.get("lastprice"),
-                    currentstock=record.get("currentstock"),
+                    lastcost=record.get("lastcost") or 0,
+                    lastprice=record.get("lastprice") or 0,
+                    currentstock=record.get("currentstock", 0),
                     createdate=createdate,
-                    imgthumbs=record.get("imgthumbs"),
-                    idmelimain=record.get("idmelimain"),
-                    idproduct=record.get("idproduct"),
-                    meliprice_s1=record.get("meliprice_s1"),
-                    uniquecodebar=record.get("uniquecodebar", False),
-                    profundidad=record.get("profundidad"),
-                    largo=record.get("largo"),
-                    alto=record.get("alto"),
-                    peso=record.get("peso"),
+                    uniquecodebar=record.get("uniquecodebar"),
                 )
             )
 
