@@ -5577,11 +5577,19 @@ def bulk_upload_products(request):
             return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
 
         try:
-            file_data = uploaded_file.read().decode('utf-8')
-        except UnicodeDecodeError:
-            file_data = uploaded_file.read().decode('ISO-8859-1', errors='replace')
-        
-        products_data = json.loads(file_data)
+            file_data = uploaded_file.read()
+            if not file_data:
+                return JsonResponse({"status": "error", "message": "El archivo está vacío."})
+            
+            try:
+                file_data = file_data.decode('utf-8')
+            except UnicodeDecodeError:
+                file_data = file_data.decode('ISO-8859-1', errors='replace')
+            
+            print(f"Contenido del archivo: {file_data[:500]}")  # Mostrar los primeros 500 caracteres para depuración
+            products_data = json.loads(file_data)
+        except json.JSONDecodeError as e:
+            return JsonResponse({"status": "error", "message": f"Error al decodificar JSON: {str(e)}"})
 
         # Normalizar claves
         products_data = normalize_keys(products_data)
@@ -5612,6 +5620,13 @@ def bulk_upload_products(request):
             else:
                 createdate = None
 
+            # Convertir uniquecodebar a booleano o None
+            uniquecodebar = record.get("uniquecodebar")
+            if isinstance(uniquecodebar, bool):
+                pass  # Mantener el valor
+            else:
+                uniquecodebar = None  # Si es un número o texto, convertirlo en None
+
             # Crear objeto de producto
             new_products.append(
                 Products(
@@ -5623,7 +5638,7 @@ def bulk_upload_products(request):
                     lastprice=record.get("lastprice") or 0,
                     currentstock=record.get("currentstock", 0),
                     createdate=createdate,
-                    uniquecodebar=record.get("uniquecodebar"),
+                    uniquecodebar=uniquecodebar,
                 )
             )
 
