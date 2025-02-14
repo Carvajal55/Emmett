@@ -84,6 +84,8 @@ class UsuarioAdmin(admin.ModelAdmin):
 
    
 
+admin.site.register(Supplier)
+
 admin.site.register(Brand)
 
 admin.site.register(Category)
