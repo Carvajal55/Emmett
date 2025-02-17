@@ -3456,8 +3456,17 @@ def fetch_invoice_products(request):
     # Formatear los datos para la respuesta
     product_list = []
     for product in invoice_products:
-        # Buscar el producto en el modelo `Products` para obtener el nombre y descripción
+        # 🔥 Log para depuración
+        print(f"Buscando producto con SKU: {product.product_sku}")
+
+        # Buscar el producto en el modelo `Products`
         product_info = Products.objects.filter(sku=product.product_sku).first()
+
+        if not product_info:
+            print(f"❌ Producto no encontrado en la BD para SKU: {product.product_sku}")
+        else:
+            print(f"✅ Producto encontrado: {product_info.nameproduct}")
+
         product_list.append({
             'code': product.product_sku,
             'name': product_info.nameproduct if product_info else 'Nombre no encontrado',
