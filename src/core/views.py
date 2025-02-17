@@ -2756,13 +2756,7 @@ def dispatch_consumption_interno(request):
             company = data.get('company')
             products = data.get('products', [])
 
-            print(f"📌 nDocument: {n_document}")
-            print(f"📌 typeDocument: {type_document}")
-            print(f"📌 company: {company}")
-            print(f"📌 products: {products}")
-
             if not company or not products:
-                print("❌ Error: Faltan datos obligatorios.")
                 return JsonResponse({
                     'title': 'Datos incompletos',
                     'icon': 'error',
@@ -2782,37 +2776,28 @@ def dispatch_consumption_interno(request):
                 }
             )
             sector_despachados_id = sector_despachados.idsectoroffice
-            print("✅ Sector 'Despachados' obtenido/creado:", sector_despachados)
 
             with transaction.atomic():
                 superids = [product.get('superid') for product in products]
-                print("📌 SuperIDs recibidos:", superids)
-
-                # 🔥 Ahora usamos una LISTA en vez de diccionario para manejar duplicados
                 unique_products = list(Uniqueproducts.objects.filter(
                     superid__in=superids, state=0
                 ).select_related('product'))
-
-                print("📌 Productos únicos encontrados:", unique_products)
 
                 for product in products:
                     superid = product.get('superid')
                     cantidad = int(product.get('quantity', 1))
 
-                    # 🔍 Buscar TODOS los productos con este `superid`
                     matching_products = [up for up in unique_products if up.superid == superid]
 
                     if not matching_products:
-                        print(f"❌ Error: SuperID {superid} no encontrado en la base de datos.")
+                        print(f"🚨 Error: SuperID {superid} no encontrado en la base de datos.")
                         return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'})
 
                     for unique_product in matching_products:
-                        print(f"🚀 Procesando SuperID: {superid}, Cantidad: {cantidad}")
+                        print(f"✅ Procesando SuperID {superid} - Producto SKU: {unique_product.product.sku}")
 
-                        # 🔥 Descontar en Bsale solo si no hay número de documento
+                        # 🔥 DESCONTAR STOCK EN BSALE 🔥
                         if not n_document:
-                            print(f"🟢 SuperID {superid}: Descontando en Bsale (sin documento).")
-
                             data_bsale = {
                                 "note": f"Despacho interno desde empresa {company}",
                                 "officeId": 1,
@@ -2820,23 +2805,19 @@ def dispatch_consumption_interno(request):
                             }
                             headers = {"access_token": BSALE_API_TOKEN, "Content-Type": "application/json"}
 
-                            print("📤 Enviando datos a Bsale:", data_bsale)
+                            print("📡 Enviando datos a Bsale:", data_bsale)
 
                             response = requests.post(
-                                f"{BSALE_API_URL}/stocks/consumptions.json", headers=headers, json=data_bsale
+                                "https://api.bsale.io/v1/stocks/consumptions.json", headers=headers, json=data_bsale
                             )
 
-                            print("📩 Respuesta de Bsale:", response.status_code, response.text)
+                            print("📡 Respuesta de Bsale:", response.status_code, response.text)
 
                             if response.status_code not in [200, 201]:
-                                print(f"❌ Error en Bsale para SuperID {superid}: {response.text}")
+                                print(f"🚨 Error al descontar en Bsale para SuperID {superid}: {response.text}")
                                 raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
 
-                        else:
-                            print(f"🔵 SuperID {superid}: No se descuenta en Bsale porque `nDocument` está presente.")
-
-                        # 🔥 Actualizar producto en el sistema local
-                        print(f"🔄 Actualizando SuperID {superid} en la BD local.")
+                        # 🔥 ACTUALIZAR STOCK LOCAL 🔥
                         unique_product.location = sector_despachados_id
                         unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
                         unique_product.typedocout = type_document
@@ -2846,17 +2827,27 @@ def dispatch_consumption_interno(request):
                         unique_product.ncompany = company
                         unique_product.locationname = "Despachado"
                         unique_product.save()
+                        print(f"✅ SuperID {superid} actualizado correctamente en el sistema local.")
 
-                        print(f"✅ SuperID {superid} actualizado correctamente.")
+                        # 🔥 ACTUALIZAR `dispatched_quantity` EN `InvoiceProduct` 🔥
+                        invoice_product = InvoiceProduct.objects.filter(
+                            invoice__document_number=n_document,
+                            product_sku=unique_product.product.sku
+                        ).first()
 
-            print("✅✅✅ Despacho interno COMPLETADO con éxito.")
+                        if invoice_product:
+                            print(f"📌 Antes de actualizar: dispatched_quantity={invoice_product.dispatched_quantity}")
+                            invoice_product.dispatched_quantity += 1  # Incrementamos la cantidad despachada
+                            invoice_product.is_complete = invoice_product.dispatched_quantity >= invoice_product.total_quantity
+                            invoice_product.save()
+                            print(f"✅ Después de actualizar: dispatched_quantity={invoice_product.dispatched_quantity}, is_complete={invoice_product.is_complete}")
+
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
         except Exception as e:
             print("❌ Error durante el despacho interno:", str(e))
             return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
-    print("❌ Método no permitido.")
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
 
 def descontar_stock_bsale(sku, cantidad):
