@@ -194,35 +194,41 @@
                     if (response.data.icon === 'success') {
                         const sku = response.data.sku;
 
-                        // Buscar el producto asociado en la lista de productos del documento
-                        const product = this.products.find(product => product.code === sku);
+                        // 🔥 Buscar todos los productos con el mismo SKU
+                        const matchingProducts = this.products.filter(product => product.code === sku);
 
-                        if (product) {
-                            // Validar que no se exceda la cantidad permitida
+                        if (matchingProducts.length === 0) {
+                            Swal.fire('Error', 'Producto no encontrado en la lista del documento.', 'error');
+                            return;
+                        }
+
+                        // 🔥 Recorremos todos los productos con ese SKU
+                        for (let product of matchingProducts) {
                             if (product.quantityScanned >= product.quantity) {
-                                playSound('errorSound');
-                                Swal.fire('Error', 'La cantidad despachada ya alcanzó el máximo permitido para este producto.', 'error');
-                                return;
+                                // Si ya está completo, pasamos al siguiente
+                                continue;
                             }
 
-                            // Verificar si el SuperID ya está vinculado
+                            // ✅ Vinculamos el SuperID
                             if (!product.superids.includes(superid)) {
                                 product.superids.push(superid);
                                 product.quantityScanned++;
-                                product.is_complete = product.quantityScanned >= product.quantity;
 
-                                this.playSound('successSound');
+                                // ✅ Marcamos como completo si alcanza la cantidad
+                                if (product.quantityScanned >= product.quantity) {
+                                    product.is_complete = true;
+                                }
 
-                                // Despachar el producto después de vincular el superid
+                                // 🔥 Despachamos en el backend
                                 this.dispatchSuperid(superid, sku);
-                            } else {
-                                Swal.fire('Error', 'El SuperID ya está vinculado a este producto.', 'error');
+                                break; // Salimos después de actualizar la primera coincidencia incompleta
                             }
-                        } else {
-                            Swal.fire('Error', 'Producto no encontrado en la lista del documento.', 'error');
                         }
+
+                        this.playSound('successSound');
+
                     } else {
-                        this.playSound('errorSound'); // Sonido de error
+                        this.playSound('errorSound');
                         Swal.fire('Error', response.data.error || 'Error al validar el SuperID.', 'error');
                     }
                 }).catch(error => {
