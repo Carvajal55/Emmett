@@ -3460,7 +3460,8 @@ def fetch_invoice_products(request):
         print(f"Buscando producto con SKU: {product.product_sku}")
 
         # Buscar el producto en el modelo `Products`
-        product_info = Products.objects.filter(sku=product.product_sku).first()
+        product_info = Products.objects.filter(sku__iexact=product.product_sku.strip()).first()
+
 
         if not product_info:
             print(f"❌ Producto no encontrado en la BD para SKU: {product.product_sku}")
