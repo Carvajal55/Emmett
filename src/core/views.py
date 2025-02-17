@@ -448,7 +448,7 @@ def producto_detalles(request, product_id):
         ).only('id', 'sku', 'nameproduct', 'lastprice').get(id=product_id)
 
         # Cargar bodegas válidas
-        bodega_ids_included = [1, 2, 4, 6, 9, 10, 11]
+        bodega_ids_included = [1, 2, 4, 6, 9, 10, 11,12]
         bodega_mapping = cache.get('bodega_mapping')
         if not bodega_mapping:
             bodegas = Bodega.objects.filter(idoffice__in=bodega_ids_included).only('idoffice', 'name')
