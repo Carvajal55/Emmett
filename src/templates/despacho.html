@@ -256,30 +256,48 @@
                 axios.get('/api/fetch-invoice-products/', {
                     params: { number: this.nDocument, type: this.typeDocument }
                 }).then(async response => {
-                    console.log('Productos obtenidos del modelo:', response.data.products);
+                    console.log('📌 Productos obtenidos del modelo:', response.data.products);
 
                     // 🔥 Guardar si el documento está completamente despachado
                     this.invoiceComplete = response.data.invoice_dispatched;
 
                     // Mapear productos y obtener detalles adicionales
                     this.products = await Promise.all(response.data.products.map(async product => {
-                        const details = await this.fetchProductDetails(product.code);
-                        return {
-                            code: product.code,
-                            name: details.name,
-                            description: details.description,
-                            quantity: product.total_quantity,
-                            quantityScanned: product.dispatched_quantity,
-                            superids: [],
-                            is_complete: product.is_complete,
-                        };
+                        const cleanSku = product.code.trim();  // 🔥 Eliminar espacios en el SKU
+                        console.log(`🛠 Buscando detalles para SKU: ${cleanSku}`);
+
+                        try {
+                            const details = await this.fetchProductDetails(cleanSku);
+                            console.log(`✅ Detalles obtenidos para ${cleanSku}:`, details);
+
+                            return {
+                                code: cleanSku,
+                                name: details.name || 'Nombre no encontrado',
+                                description: details.description || 'Descripción no encontrada',
+                                quantity: product.total_quantity,
+                                quantityScanned: product.dispatched_quantity,
+                                superids: [],
+                                is_complete: product.is_complete,
+                            };
+                        } catch (error) {
+                            console.error(`❌ Error al obtener detalles para SKU: ${cleanSku}`, error);
+                            return {
+                                code: cleanSku,
+                                name: 'Error al obtener nombre',
+                                description: 'Error al obtener descripción',
+                                quantity: product.total_quantity,
+                                quantityScanned: product.dispatched_quantity,
+                                superids: [],
+                                is_complete: product.is_complete,
+                            };
+                        }
                     }));
 
-                    console.log('Productos procesados:', this.products);
+                    console.log('✅ Productos procesados:', this.products);
                     this.dispatchReady = true;
                 }).catch(error => {
                     Swal.fire('Error', 'No se pudieron obtener los detalles del documento.', 'error');
-                    console.error('Error al obtener productos:', error);
+                    console.error('❌ Error al obtener productos:', error);
                 });
             },
 
