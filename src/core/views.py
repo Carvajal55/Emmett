@@ -3055,11 +3055,8 @@ def dispatch_consumption(request):
     if request.method == "POST":
         try:
             # Log para depurar los datos recibidos
-            print("Datos recibidos en la solicitud (raw body):", request.body)
-
-            # Parsear los datos
+            print("📩 Datos recibidos en la solicitud:", request.body)
             data = json.loads(request.body)
-            print("Datos parseados (JSON):", data)
 
             n_document = data.get('nDocument', 0)
             type_document = data.get('typeDocument')
@@ -3074,7 +3071,6 @@ def dispatch_consumption(request):
                     'message': 'Faltan datos obligatorios en la solicitud.'
                 }, status=400)
 
-            # Usar una transacción para garantizar consistencia
             with transaction.atomic():
                 for product in products:
                     superid = product.get('superid')
@@ -3096,44 +3092,55 @@ def dispatch_consumption(request):
                             'message': 'El documento no existe en la base de datos.'
                         }, status=404)
 
-                    # Verificar el producto asociado a la factura
-                    invoice_product = InvoiceProduct.objects.filter(invoice=invoice, product_sku=sku).first()
-                    if not invoice_product:
+                    # 🔥 Buscar TODAS las líneas en `InvoiceProduct` con el mismo SKU
+                    invoice_products = InvoiceProduct.objects.filter(invoice=invoice, product_sku=sku, is_complete=False).order_by('id')
+
+                    if not invoice_products.exists():
                         return JsonResponse({
                             'title': 'Producto no encontrado',
                             'icon': 'error',
-                            'message': f'El producto con SKU {sku} no está asociado al documento.'
+                            'message': f'El producto con SKU {sku} no está asociado al documento o ya fue despachado.'
                         }, status=404)
 
-                    # Validar si ya se alcanzó la cantidad total permitida
-                    if invoice_product.dispatched_quantity >= invoice_product.total_quantity:
-                        return JsonResponse({
-                            'title': 'Cantidad excedida',
-                            'icon': 'error',
-                            'message': f'La cantidad máxima permitida para el SKU {sku} ya fue despachada.'
-                        }, status=400)
-
                     # Validar si el SuperID ya fue procesado
-                    if InvoiceProductSuperID.objects.filter(product=invoice_product, superid=superid).exists():
+                    if InvoiceProductSuperID.objects.filter(product__invoice=invoice, superid=superid).exists():
                         return JsonResponse({
                             'title': 'SuperID ya registrado',
                             'icon': 'error',
                             'message': f'El SuperID {superid} ya está registrado para el SKU {sku}.'
                         }, status=400)
 
-                    # Asociar el SuperID al producto
-                    InvoiceProductSuperID.objects.create(
-                        product=invoice_product,
-                        superid=superid,
-                        dispatched=True
-                    )
+                    # 🔥 DESPACHAR EL PRODUCTO
+                    cantidad_a_despachar = 1
+                    for invoice_product in invoice_products:
+                        if cantidad_a_despachar <= 0:
+                            break  # Ya despachamos la cantidad requerida
 
-                    # Actualizar cantidad despachada y estado del producto
-                    invoice_product.dispatched_quantity += 1
-                    invoice_product.is_complete = invoice_product.dispatched_quantity >= invoice_product.total_quantity
-                    invoice_product.save()
+                        cantidad_disponible = invoice_product.total_quantity - invoice_product.dispatched_quantity
+                        cantidad_a_despachar_actual = min(cantidad_a_despachar, cantidad_disponible)
 
-                    # Descontar stock en la tabla `Uniqueproducts`
+                        invoice_product.dispatched_quantity += cantidad_a_despachar_actual
+                        invoice_product.is_complete = invoice_product.dispatched_quantity >= invoice_product.total_quantity
+                        invoice_product.save()
+
+                        # Crear el SuperID asociado
+                        InvoiceProductSuperID.objects.create(
+                            product=invoice_product,
+                            superid=superid,
+                            dispatched=True
+                        )
+
+                        cantidad_a_despachar -= cantidad_a_despachar_actual
+                        print(f"✅ Despachado SKU {sku}: {cantidad_a_despachar_actual} unidades.")
+
+                    if cantidad_a_despachar > 0:
+                        return JsonResponse({
+                            'title': 'Cantidad excedida',
+                            'icon': 'error',
+                            'message': f'La cantidad máxima permitida para el SKU {sku} ya fue despachada.'
+                        }, status=400)
+
+                    # 🔥 DESCONTAR STOCK LOCAL
                     unique_product = Uniqueproducts.objects.filter(
                         superid=superid, state=0
                     ).select_related('product').first()
@@ -3164,14 +3171,14 @@ def dispatch_consumption(request):
                     unique_product.datelastinventory = timezone.now()
                     unique_product.save()
 
-                    print(f"SuperID {superid} procesado y despachado.")
+                    print(f"✅ SuperID {superid} procesado y despachado.")
 
-                # Verificar si todos los productos de la factura están completos
+                # 🔥 Verificar si todos los productos de la factura están completos
                 all_products_complete = InvoiceProduct.objects.filter(invoice=invoice, is_complete=False).count() == 0
                 if all_products_complete:
                     invoice.dispatched = True
                     invoice.save()
-                    print(f"Factura {n_document} marcada como despachada.")
+                    print(f"✅ Factura {n_document} marcada como despachada.")
 
             return JsonResponse({
                 'title': 'SuperIDs procesados con éxito',
@@ -3180,7 +3187,7 @@ def dispatch_consumption(request):
             }, status=200)
 
         except Exception as e:
-            print("Error durante el despacho:", str(e))
+            print("❌ Error durante el despacho:", str(e))
             return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
 
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
