@@ -2339,7 +2339,7 @@ def reingresar_producto(request):
             unique_product.ncompany = company
             unique_product.locationname = "Reingresado"
             unique_product.typedocincome = type_document
-            unique_product.location = 100020  # ID de almacén para reingreso
+            unique_product.location = 100001  # ID de almacén para reingreso
             unique_product.save()
 
             producto_reingresado = {
@@ -2747,12 +2747,11 @@ def format_table(details):
 def dispatch_consumption_interno(request):
     if request.method == "POST":
         try:
-            print("📩 Datos recibidos en la solicitud (raw body):", request.body)
+            print("📩 Datos recibidos en la solicitud:", request.body)
             data = json.loads(request.body)
-            print("📑 Datos parseados (JSON):", data)
 
-            n_document = data.get('nDocument')  # Número de documento, puede ser None
-            type_document = data.get('typeDocument', 0)  # Tipo predeterminado: 0
+            n_document = data.get('nDocument')
+            type_document = data.get('typeDocument', 0)
             company = data.get('company')
             products = data.get('products', [])
 
@@ -2764,7 +2763,7 @@ def dispatch_consumption_interno(request):
                 }, status=400)
 
             # 🔥 Obtener o crear el sector "Despachados"
-            sector_despachados, created = Sectoroffice.objects.get_or_create(
+            sector_despachados, _ = Sectoroffice.objects.get_or_create(
                 zone="DESP",
                 defaults={
                     'idoffice': 0,
@@ -2829,18 +2828,33 @@ def dispatch_consumption_interno(request):
                         unique_product.save()
                         print(f"✅ SuperID {superid} actualizado correctamente en el sistema local.")
 
-                        # 🔥 ACTUALIZAR `dispatched_quantity` EN `InvoiceProduct` 🔥
-                        invoice_product = InvoiceProduct.objects.filter(
+                        # 🔥 ACTUALIZAR TODAS LAS LÍNEAS DE `InvoiceProduct` CON EL MISMO SKU 🔥
+                        invoice_products = InvoiceProduct.objects.filter(
                             invoice__document_number=n_document,
-                            product_sku=unique_product.product.sku
-                        ).first()
+                            product_sku=unique_product.product.sku,
+                            is_complete=False  # Solo actualizar las líneas que aún no están completas
+                        ).order_by('id')  # Aseguramos el orden para evitar inconsistencias
 
-                        if invoice_product:
-                            print(f"📌 Antes de actualizar: dispatched_quantity={invoice_product.dispatched_quantity}")
-                            invoice_product.dispatched_quantity += 1  # Incrementamos la cantidad despachada
+                        print(f"🔍 Productos pendientes a actualizar: {invoice_products.count()}")
+
+                        cantidad_restante = cantidad
+                        for invoice_product in invoice_products:
+                            if cantidad_restante <= 0:
+                                break  # Ya se despachó toda la cantidad requerida
+
+                            cantidad_disponible = invoice_product.total_quantity - invoice_product.dispatched_quantity
+                            cantidad_a_despachar = min(cantidad_restante, cantidad_disponible)
+
+                            invoice_product.dispatched_quantity += cantidad_a_despachar
                             invoice_product.is_complete = invoice_product.dispatched_quantity >= invoice_product.total_quantity
                             invoice_product.save()
-                            print(f"✅ Después de actualizar: dispatched_quantity={invoice_product.dispatched_quantity}, is_complete={invoice_product.is_complete}")
+
+                            cantidad_restante -= cantidad_a_despachar
+                            print(f"✅ Actualizado InvoiceProduct {invoice_product.id}: dispatched_quantity={invoice_product.dispatched_quantity}, is_complete={invoice_product.is_complete}")
+
+                        if cantidad_restante > 0:
+                            print(f"🚨 Error: Se intentó despachar más cantidad de la permitida para el SKU {unique_product.product.sku}")
+                            return JsonResponse({'title': 'Cantidad excedida', 'icon': 'error', 'message': f'La cantidad máxima permitida para el SKU {unique_product.product.sku} ya fue despachada.'})
 
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 
