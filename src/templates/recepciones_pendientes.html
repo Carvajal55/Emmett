@@ -7,42 +7,42 @@
         <!-- Búsqueda por folio -->
        <!-- Filtro por estado de facturas -->
        <div class="row mb-3">
-        <h5>Gestión de Facturas</h5>
+            <h5>Gestión de Facturas</h5>
+            
+            <!-- Búsqueda por Proveedor -->
+            <div class="col-md-4">
+                <input
+                    type="text"
+                    class="form-control"
+                    placeholder="Buscar por proveedor"
+                    v-model="searchProveedor"
+                    @input="fetchFacturas(1)"
+                />
+            </div>
         
-        <!-- Búsqueda por Proveedor -->
-        <div class="col-md-4">
-            <input
-                type="text"
-                class="form-control"
-                placeholder="Buscar por proveedor"
-                v-model="searchProveedor"
-                @input="fetchFacturas(1)"
-            />
-        </div>
-    
-        <!-- Búsqueda por Folio (Número de Factura) -->
-        <div class="col-md-4">
-            <input
-                type="text"
-                class="form-control"
-                placeholder="Buscar por número de factura"
-                v-model="searchFolio"
-                @input="fetchFacturas(1)"
-            />
-        </div>
-    
-        <!-- Filtro por estado de facturas -->
-        <div class="col-md-4">
-            <select
-                v-model="estadoSeleccionado"
-                class="form-select"
-                @change="fetchFacturas(1)"
-            >
-                <option value="pendientes">Por Aprobar</option>
-                <option value="aprobadas">Aprobadas</option>
-            </select>
-        </div>
-    </div>
+            <!-- Búsqueda por Folio (Número de Factura) -->
+            <div class="col-md-4">
+                <input
+                    type="text"
+                    class="form-control"
+                    placeholder="Buscar por número de factura"
+                    v-model="searchFolio"
+                    @input="fetchFacturas(1)"
+                />
+            </div>
+        
+            <!-- Filtro por estado de facturas -->
+            <div class="col-md-4">
+                <select
+                    v-model="estadoSeleccionado"
+                    class="form-select"
+                    @change="fetchFacturas(1)"
+                >
+                    <option value="pendientes">Por Aprobar</option>
+                    <option value="aprobadas">Aprobadas</option>
+                </select>
+            </div>
+         </div>
 
 
         <!-- Tabla para las facturas -->
@@ -154,6 +154,7 @@
             facturas: [],  // Lista de facturas
             searchQuery: '',  // Búsqueda por folio
             searchProveedor: '',  // 🔥 Agrega esta variable para la búsqueda por proveedor
+            searchFolio: '',  // 🔥 Variable para buscar por número de factura (folio)
             currentPage: 1,  // Página actual
             totalPages: 1,  // Total de páginas
             estadoSeleccionado: 'pendientes'
