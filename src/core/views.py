@@ -3790,7 +3790,7 @@ def imprimir_etiqueta_qr(request):
 
                 # Nombre del producto
                 # Limitar el nombre del producto a un máximo de 20 caracteres, agregando "..." si es necesario
-                nombre_truncado = textwrap.shorten(producto.nameproduct, width=20, placeholder="...")
+                nombre_truncado = textwrap.shorten(producto.nameproduct, width=30, placeholder="...")
                 #pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
                 pdf.drawString(x_qr, y_qr - 15, f"{nombre_truncado}")
 
