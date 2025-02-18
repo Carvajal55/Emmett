@@ -189,45 +189,56 @@
 
             // Agregar SuperID a la lista de productos escaneados
             agregarProductoEscaneado(superid) {
-                if (!this.sectorQuery) {
-                    Swal.fire('Error', 'Primero escanea un sector.', 'error');
-                    this.playSound('error');
-                    return;
-                }
+                // Buscar el producto en la lista de productos del sector
+                const productoEnSector = this.productosEnSector.find(p => p.superid === superid);
 
-                axios.post('/api/anadir-producto-sector/', {
-                    superid: superid,
-                    sector: this.sectorQuery
-                })
-                .then(response => {
-                    if (response.data.resp === 1) {
+                if (productoEnSector) {
+                    // Si el producto ya está en el sector y no ha sido escaneado previamente
+                    if (!this.productosEscaneados.some(p => p.superid === superid)) {
+                        this.productosEscaneados.push({
+                            superid: productoEnSector.superid,
+                            sku: productoEnSector.sku || '---',  // 🔥 Se asegura que no sea undefined
+                            name: productoEnSector.name || 'Sin nombre'  // 🔥 Se asegura que no sea undefined
+                        });
                         this.playSound('success');
-
-                        // 🔥 Obtener el producto recién añadido de la respuesta de la API
-                        const producto = response.data.producto;
-
-                        if (producto) {
-                            this.productosEscaneados.push({
-                                superid: producto.superid,
-                                sku: producto.sku || '---',
-                                name: producto.name || 'Sin nombre'
-                            });
-                        } else {
-                            // 🔥 Si no se encuentra, agregarlo con valores por defecto
-                            this.productosEscaneados.push({ superid, sku: '---', name: 'Sin nombre' });
-                        }
-
-                        // 🔥 Actualizar lista de productos en el sector
-                        this.buscarProductosSector();
-                    } else {
-                        this.playSound('error');
                     }
-                })
-                .catch(error => {
-                    this.playSound('error');
-                    Swal.fire('Error', 'Ocurrió un problema al agregar el producto.', 'error');
-                    console.error('Error al agregar producto:', error);
-                });
+                } else {
+                    // Si el producto no está en el sector, consultar en la API
+                    if (!this.sectorQuery) {
+                        Swal.fire('Error', 'Primero escanea un sector.', 'error');
+                        this.playSound('error');
+                        return;
+                    }
+
+                    axios.post('/api/anadir-producto-sector/', {
+                        productos: [{ superid }],
+                        sector: this.sectorQuery
+                    })
+                    .then(response => {
+                        if (response.data.resp === 1) {
+                            this.playSound('success');
+
+                            // Verificar si la respuesta de la API tiene SKU y nombre
+                            const nuevoProducto = {
+                                superid,
+                                sku: response.data.producto?.sku || '---',
+                                name: response.data.producto?.name || 'Sin nombre'
+                            };
+
+                            this.productosEscaneados.push(nuevoProducto);
+
+                            // Actualizar lista de productos en el sector
+                            this.buscarProductosSector();
+                        } else {
+                            this.playSound('error');
+                        }
+                    })
+                    .catch(error => {
+                        this.playSound('error');
+                        Swal.fire('Error', 'Ocurrió un problema al agregar el producto.', 'error');
+                        console.error('Error al agregar producto:', error);
+                    });
+                }
             },
             playSound(type) {
                 const audioElement = type === 'success' ? document.getElementById('successSound') : document.getElementById('errorSound');

@@ -2041,7 +2041,7 @@ def anadir_producto_sector(request):
                 return JsonResponse({'resp': 3, 'msg': 'Sector no encontrado.'})
 
             # Verificar si el producto con el Super ID existe
-            producto = Uniqueproducts.objects.filter(superid=superid).select_related('product').first()
+            producto = Uniqueproducts.objects.filter(superid=superid).first()
             if not producto:
                 return JsonResponse({'resp': 3, 'msg': f'Producto con Super ID "{superid}" no encontrado.'})
 
@@ -2049,23 +2049,11 @@ def anadir_producto_sector(request):
             producto.location = sector_obj.idsectoroffice
             producto.save()
 
-            # Obtener información del producto para responderla en el JSON
-            product_info = {
-                "superid": producto.superid,
-                "sku": producto.product.sku if producto.product else "Desconocido",
-                "name": producto.product.nameproduct if producto.product else "Sin nombre"
-            }
-
-            return JsonResponse({
-                'resp': 1,
-                'msg': 'Producto añadido con éxito al sector.',
-                'producto': product_info  # 🔥 Devolvemos datos del producto añadido
-            })
+            return JsonResponse({'resp': 1, 'msg': 'Producto añadido con éxito al sector.'})
         else:
             return JsonResponse({'resp': 3, 'msg': 'Formato de sector incorrecto.'})
 
     return JsonResponse({'resp': 3, 'msg': 'Método no permitido.'})
-
 
 """ CUADRAR SETORES """
 @csrf_exempt
