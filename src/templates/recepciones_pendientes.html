@@ -6,28 +6,43 @@
     <div class="container-fluid">
         <!-- Búsqueda por folio -->
        <!-- Filtro por estado de facturas -->
-        <div class="row mb-3">
-            <h5>Gestión de Facturas</h5>
-            <div class="col-md-4">
-                <input
-                    type="text"
-                    class="form-control"
-                    placeholder="Buscar por folio"
-                    v-model="searchQuery"
-                    @input="fetchFacturas(1)"
-                />
-            </div>
-            <div class="col-md-4">
-                <select
-                    v-model="estadoSeleccionado"
-                    class="form-select"
-                    @change="fetchFacturas(1)"
-                >
-                    <option value="pendientes">Por Aprobar</option>
-                    <option value="aprobadas">Aprobadas</option>
-                </select>
-            </div>
+       <div class="row mb-3">
+        <h5>Gestión de Facturas</h5>
+        
+        <!-- Búsqueda por Proveedor -->
+        <div class="col-md-4">
+            <input
+                type="text"
+                class="form-control"
+                placeholder="Buscar por proveedor"
+                v-model="searchProveedor"
+                @input="fetchFacturas(1)"
+            />
         </div>
+    
+        <!-- Búsqueda por Folio (Número de Factura) -->
+        <div class="col-md-4">
+            <input
+                type="text"
+                class="form-control"
+                placeholder="Buscar por número de factura"
+                v-model="searchFolio"
+                @input="fetchFacturas(1)"
+            />
+        </div>
+    
+        <!-- Filtro por estado de facturas -->
+        <div class="col-md-4">
+            <select
+                v-model="estadoSeleccionado"
+                class="form-select"
+                @change="fetchFacturas(1)"
+            >
+                <option value="pendientes">Por Aprobar</option>
+                <option value="aprobadas">Aprobadas</option>
+            </select>
+        </div>
+    </div>
 
 
         <!-- Tabla para las facturas -->
@@ -150,6 +165,7 @@
             // Obtener las facturas pendientes desde la API
             fetchFacturas(page = 1) {
                 this.currentPage = page;
+
                 // Mapear estado seleccionado a valores de status
                 const statusMapping = {
                     pendientes: 0, // Status 0: facturas pendientes
@@ -157,9 +173,10 @@
                 };
 
                 let params = {
-                    status: statusMapping[this.estadoSeleccionado], // Dinámicamente según el estado seleccionado
+                    status: statusMapping[this.estadoSeleccionado], // Estado seleccionado
                     page: this.currentPage,
-                    q: this.searchQuery // Búsqueda por folio
+                    proveedor: this.searchProveedor,  // Nuevo filtro de proveedor
+                    folio: this.searchFolio  // Nuevo filtro de folio
                 };
 
                 axios.get('/api/listar-facturas-pendientes/', { params })
