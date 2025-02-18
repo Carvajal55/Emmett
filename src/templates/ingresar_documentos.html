@@ -1,6 +1,35 @@
 {% extends 'partials/base-fluid.html' %}
 {% load static %}
 
+{% block css %}
+<style>
+    /* Más espacio en la parte final del sitio */
+    body {
+        padding-bottom: 50px;
+    }
+
+    /* Ajustar el tamaño del texto y la tabla */
+    .table-hover th, .table-hover td {
+        font-size: 0.8rem;
+        padding: 0.3rem;
+    }
+
+    /* Asegurar que el botón de agregar esté siempre visible */
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    /* Truncar texto largo */
+    .text-truncate {
+        display: inline-block;
+        max-width: 150px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+</style>
+{% endblock css %}
+
 {% block content %}
 <div id="app" class="m-2 extra-small ">
     <h3>Agregar Recepción EMMETT [[ currentDate ]]</h3>
@@ -483,30 +512,31 @@
                 <input type="text" class="form-control form-control-sm mb-3" placeholder="Buscar producto por SKU o Nombre"
                        v-model="searchProduct" @input="searchProductos" />
             
-                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                    <table class="table table-striped table-hover" style="font-size: 0.8rem;">
-                        <thead>
-                            <tr>
-                                <th style="width: 10%; padding: 0.3rem;">SKU</th>
-                                <th style="width: 15%; padding: 0.3rem;">Nombre</th>
-                                <th style="width: 10%; padding: 0.3rem;">Marca</th>
-                                <th style="width: 10%; padding: 0.3rem;">U.Precio</th>
-                                <th style="width: 5%; padding: 0.3rem;">Agregar</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(producto, index) in productos" :key="producto.id">
-                                <td style="padding: 0.3rem;">[[ producto.sku ]]</td>
-                                <td class="text-truncate" style="padding: 0.3rem;">[[ producto.nameproduct ]]</td>
-                                <td style="padding: 0.3rem;">[[ producto.brands ]]</td>
-                                <td style="padding: 0.3rem;">[[ formatCurrency(producto.lastcost) ]]</td>
-                                <td style="padding: 0.3rem;">
-                                    <button class="btn btn-primary btn-sm" @click="agregarProducto(producto)">Agregar</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto; overflow-x: auto;">
+                        <table class="table table-striped table-hover" style="font-size: 0.8rem;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 15%;">SKU</th>
+                                    <th style="width: 35%;">Nombre</th>
+                                    <th style="width: 15%;">Marca</th>
+                                    <th style="width: 15%;">U.Precio</th>
+                                    <th style="width: 10%;">Agregar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(producto, index) in productos" :key="producto.id">
+                                    <td>[[ producto.sku ]]</td>
+                                    <td class="text-truncate" style="max-width: 150px; overflow: hidden; white-space: nowrap;">[[ producto.nameproduct ]]</td>
+                                    <td>[[ producto.brands ]]</td>
+                                    <td>[[ formatCurrency(producto.lastcost) ]]</td>
+                                    <td>
+                                        <button class="btn btn-primary btn-sm" @click="agregarProducto(producto)">Agregar</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
             </div>
             
             <!-- Estilos inline para hacer la tabla más compacta -->
