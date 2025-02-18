@@ -21,7 +21,7 @@
     <!-- Contenedor de las tablas -->
     <div class="row mt-4">
         <!-- Tabla para mostrar los productos en el sector -->
-        <div class="col-md-6" v-if="!loading && productosEnSector.length">
+        <div class="col-md-6" v-if="sectorQuery">
             <h4>Productos en el sector [[ sectorQuery ]]</h4>
             <table class="table table-striped table-hover">
                 <thead>
@@ -74,8 +74,8 @@
                     <tr v-for="(producto, index) in productosEscaneados" :key="producto.superid">
                         <td>[[ index + 1 ]]</td>
                         <td>[[ producto.superid ]]</td>
-                        <td>[[ producto.sku ]]</td>
-                        <td>[[ producto.name ]]</td>
+                        <td>[[ producto.sku || '---' ]]</td> <!-- 🔥 Asegurar que nunca sea undefined -->
+                        <td>[[ producto.name || 'Sin nombre' ]]</td> <!-- 🔥 Asegurar que nunca sea undefined -->
                     </tr>
                 </tbody>
             </table>
@@ -189,6 +189,7 @@
 
             // Agregar SuperID a la lista de productos escaneados
             agregarProductoEscaneado(superid) {
+                // Buscar el producto en la lista de productos del sector
                 const productoEnSector = this.productosEnSector.find(p => p.superid === superid);
 
                 if (productoEnSector) {
@@ -196,13 +197,13 @@
                     if (!this.productosEscaneados.some(p => p.superid === superid)) {
                         this.productosEscaneados.push({
                             superid: productoEnSector.superid,
-                            sku: productoEnSector.sku,
-                            name: productoEnSector.name
+                            sku: productoEnSector.sku || '---',  // 🔥 Se asegura que no sea undefined
+                            name: productoEnSector.name || 'Sin nombre'  // 🔥 Se asegura que no sea undefined
                         });
                         this.playSound('success');
                     }
                 } else {
-                    // Si el producto no está en el sector, usar la API para agregarlo
+                    // Si el producto no está en el sector, consultar en la API
                     if (!this.sectorQuery) {
                         Swal.fire('Error', 'Primero escanea un sector.', 'error');
                         this.playSound('error');
@@ -216,23 +217,24 @@
                     .then(response => {
                         if (response.data.resp === 1) {
                             this.playSound('success');
-                            
+
+                            // Verificar si la respuesta de la API tiene SKU y nombre
+                            const nuevoProducto = {
+                                superid,
+                                sku: response.data.producto?.sku || '---',
+                                name: response.data.producto?.name || 'Sin nombre'
+                            };
+
+                            this.productosEscaneados.push(nuevoProducto);
+
                             // Actualizar lista de productos en el sector
                             this.buscarProductosSector();
-
-                            // Añadir el producto escaneado a la lista de escaneados
-                            this.productosEscaneados.push({
-                                superid,
-                                sku: response.data.producto?.sku || 'Desconocido',
-                                name: response.data.producto?.name || 'Desconocido'
-                            });
                         } else {
                             this.playSound('error');
                         }
                     })
                     .catch(error => {
                         this.playSound('error');
-
                         Swal.fire('Error', 'Ocurrió un problema al agregar el producto.', 'error');
                         console.error('Error al agregar producto:', error);
                     });
