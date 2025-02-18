@@ -3711,6 +3711,7 @@ def validate_superid_simplified(request):
 """Imprimir Etiquetas"""
 from reportlab.lib.utils import ImageReader
 from datetime import date
+import textwrap
 
 @csrf_exempt
 def imprimir_etiqueta_qr(request):
@@ -3788,7 +3789,11 @@ def imprimir_etiqueta_qr(request):
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
 
                 # Nombre del producto
-                pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
+                # Limitar el nombre del producto a un máximo de 20 caracteres, agregando "..." si es necesario
+                nombre_truncado = textwrap.shorten(producto.nameproduct, width=20, placeholder="...")
+                #pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
+                pdf.drawString(x_qr, y_qr - 15, f"{nombre_truncado}")
+
 
                 # Código de barras
                 barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
