@@ -763,63 +763,63 @@ def resumen_factura(request):
     else:
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    @csrf_exempt
-    def listar_facturas_pendientes(request):
-        # Obtener parámetros de consulta
-        proveedor = request.GET.get('proveedor', '').strip()
-        folio = request.GET.get('folio', '').strip()
-        page = request.GET.get('page', 1)
-        status = request.GET.get('status', 0)  # Facturas pendientes por defecto
+@csrf_exempt
+def listar_facturas_pendientes(request):
+    # Obtener parámetros de consulta
+    proveedor = request.GET.get('proveedor', '').strip()
+    folio = request.GET.get('folio', '').strip()
+    page = request.GET.get('page', 1)
+    status = request.GET.get('status', 0)  # Facturas pendientes por defecto
 
+    try:
+        # Convertir page a entero para evitar errores
         try:
-            # Convertir page a entero para evitar errores
-            try:
-                page = int(page)
-            except ValueError:
-                page = 1  # Si no es un número válido, establecer la página en 1
+            page = int(page)
+        except ValueError:
+            page = 1  # Si no es un número válido, establecer la página en 1
 
-            # Filtrar por estado
-            facturas = Purchase.objects.filter(status=status).order_by('-dateadd')
+        # Filtrar por estado
+        facturas = Purchase.objects.filter(status=status).order_by('-dateadd')
 
-            # Filtrar por proveedor si se ingresó
-            if proveedor:
-                facturas = facturas.filter(suppliername__icontains=proveedor)
+        # Filtrar por proveedor si se ingresó
+        if proveedor:
+            facturas = facturas.filter(suppliername__icontains=proveedor)
 
-            # Filtrar por folio dentro de ese proveedor
-            if folio:
-                facturas = facturas.filter(number__icontains=folio)
+        # Filtrar por folio dentro de ese proveedor
+        if folio:
+            facturas = facturas.filter(number__icontains=folio)
 
-            # Paginación (10 facturas por página)
-            paginator = Paginator(facturas, 10)
-            try:
-                facturas_page = paginator.page(page)
-            except PageNotAnInteger:
-                facturas_page = paginator.page(1)
-            except EmptyPage:
-                facturas_page = paginator.page(paginator.num_pages)
+        # Paginación (10 facturas por página)
+        paginator = Paginator(facturas, 10)
+        try:
+            facturas_page = paginator.page(page)
+        except PageNotAnInteger:
+            facturas_page = paginator.page(1)
+        except EmptyPage:
+            facturas_page = paginator.page(paginator.num_pages)
 
-            # Preparar los datos de las facturas
-            facturas_data = [{
-                'id': factura.id,
-                'typeDocument': factura.typedoc,
-                'number': factura.number,
-                'supplier': factura.supplier,
-                'supplierName': factura.suppliername,
-                'subtotal': factura.subtotal,
-                'status': factura.status,
-                'dateAdd': factura.dateadd.strftime('%Y-%m-%d'),
-            } for factura in facturas_page]
+        # Preparar los datos de las facturas
+        facturas_data = [{
+            'id': factura.id,
+            'typeDocument': factura.typedoc,
+            'number': factura.number,
+            'supplier': factura.supplier,
+            'supplierName': factura.suppliername,
+            'subtotal': factura.subtotal,
+            'status': factura.status,
+            'dateAdd': factura.dateadd.strftime('%Y-%m-%d'),
+        } for factura in facturas_page]
 
-            # Crear la respuesta
-            response = {
-                'data': facturas_data,
-                'total_pages': paginator.num_pages,
-                'current_page': facturas_page.number,
-            }
-            return JsonResponse(response, safe=False, status=200)
+        # Crear la respuesta
+        response = {
+            'data': facturas_data,
+            'total_pages': paginator.num_pages,
+            'current_page': facturas_page.number,
+        }
+        return JsonResponse(response, safe=False, status=200)
 
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 @csrf_exempt
 def rechazar_factura(request):
