@@ -58,11 +58,37 @@
                 </button>
             </div>
             <div class="col-4">
-                <label for="nDocument" class="form-label">Buscar por Nro de Documento</label>
+                <label for="nDocument" class="form-label">Buscar Factura</label>
                 <div class="input-group">
-                    <input class="form-control" type="number" @keyup.enter="buscarFactura" v-model="form.numeroDocumento">
-                    <button class="input-group-text" @click="buscarFactura"><i class="bi bi-search"></i></button>
+                    <!-- Selector de tipo de documento -->
+                    <select class="form-select" v-model="form.tipoDocumento">
+                        <option value="33">Factura</option>
+                        <option value="52">Guía de Despacho</option>
+                    </select>
+            
+                    <!-- Input con autocompletado -->
+                    <input 
+                        class="form-control" 
+                        type="number" 
+                        v-model="form.numeroDocumento" 
+                        placeholder="Ingrese N° de Factura" 
+                        @input="buscarSugerenciasFactura" 
+                        @keyup.enter="buscarFactura"
+                        list="sugerenciasFacturas"
+                    >
+            
+                    <!-- Botón de búsqueda -->
+                    <button class="input-group-text" @click="buscarFactura">
+                        <i class="bi bi-search"></i>
+                    </button>
                 </div>
+            
+                <!-- Lista de sugerencias de facturas -->
+                <datalist id="sugerenciasFacturas">
+                    <option v-for="factura in sugerenciasFacturas" :key="factura.id" :value="factura.number">
+                        [[ factura.number ]] - [[ factura.supplier_name ]]
+                    </option>
+                </datalist>
             </div>
         </div>
 <!-- Línea gruesa -->
@@ -593,6 +619,7 @@
                 observaciones: '',
                 img_url:''
             },
+            sugerenciasFacturas: [], // Para almacenar las facturas recientes
             imagenFactura: null, // Para almacenar la imagen seleccionada
             
             pagination: {
@@ -706,6 +733,25 @@
             },
         },
         methods: {
+            async buscarSugerenciasFactura() {
+                if (this.form.numeroDocumento.length < 2) {
+                    this.sugerenciasFacturas = [];
+                    return;
+                }
+
+                try {
+                    const response = await axios.get('/api/get-facturas-recientes/', {
+                        params: { 
+                            type: this.form.tipoDocumento, 
+                            number: this.form.numeroDocumento 
+                        }
+                    });
+
+                    this.sugerenciasFacturas = response.data;
+                } catch (error) {
+                    console.error("Error al buscar sugerencias:", error);
+                }
+            },
             cargarCategorias() {
                 fetch("/api/listar-categorias/") // Cambia esta URL según tu endpoint
                     .then((response) => response.json())
@@ -790,8 +836,8 @@
 
                     // Rellenar el formulario con los datos de la factura
                     this.form = {
-                        rutProveedor: data.headers.supplier,
-                        razonSocial: data.headers.supplierName,
+                        rutProveedor: data.proveedor ? data.proveedor.rut : "",
+                        razonSocial: data.proveedor ? data.proveedor.nombre : "",
                         tipoDocumento: data.headers.typeDocument,
                         numeroDocumento: data.headers.nDocument,
                         fechaEmision: data.headers.datePurchase,
@@ -815,7 +861,7 @@
                         completo: detalle.checkItem === "true",
                     }));
 
-                    Swal.fire('Éxito', 'Factura cargada correctamente.', 'success');
+                    Swal.fire('Éxito', 'Factura y proveedor cargados correctamente.', 'success');
                 } catch (error) {
                     console.error('Error al buscar la factura:', error);
                     Swal.fire('Error', 'No se encontró la factura.', 'error');

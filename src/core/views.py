@@ -1188,13 +1188,48 @@ def get_factura(request):
         status__in=[0, 2]  # Solo estados Pendientes (0) o Rechazados (2)
     )
 
+    # Buscar el proveedor asociado a la factura
+    proveedor = Supplier.objects.filter(id=factura.supplier_id).first()
+    
+    if not proveedor:
+        proveedor_data = {"error": "Proveedor no encontrado"}
+    else:
+        proveedor_data = {
+            "id": proveedor.id,
+            "rut": proveedor.rutsupplier,
+            "nombre": proveedor.namesupplier
+        }
+
     # Leer el archivo JSON desde el campo `urlJson`
     try:
         with open(factura.urljson, 'r') as json_file:
             data = json.load(json_file)
+
+        # Agregar datos del proveedor a la respuesta
+        data["proveedor"] = proveedor_data
+        
         return JsonResponse(data, safe=False)
     except FileNotFoundError:
         return JsonResponse({'error': 'El archivo JSON no existe.'}, status=404)
+    
+def get_facturas_recientes(request):
+    tipo_documento = request.GET.get('type', '')
+    numero_documento = request.GET.get('number', '')
+
+    if not numero_documento.isdigit():
+        return JsonResponse([], safe=False)
+
+    facturas = Purchase.objects.filter(
+        typedoc=tipo_documento, 
+        number__startswith=numero_documento
+    ).order_by('-datepurchase')[:10]  # Últimas 10 coincidencias
+
+    data = [
+        {"id": factura.id, "number": factura.number, "supplier_name": factura.supplier_name}
+        for factura in facturas
+    ]
+
+    return JsonResponse(data, safe=False)
 
 def get_suppliers(request):
     # Obtiene el parámetro de búsqueda (si existe)

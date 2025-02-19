@@ -74,6 +74,7 @@ urlpatterns = [
     path('api/get-brands/', core_views.search_brands, name='search_brands'),
     path('api/get-categories/', core_views.get_categories, name='get_categories'),
     path('api/get-factura/', core_views.get_factura, name='get_factura'),
+    path('api/get-facturas-recientes/', core_views.get_facturas_recientes, name='get-facturas-recientes'),
     path('api/create-supplier/', core_views.create_supplier, name='create_supplier'),
     path('api/create-product/', core_views.crear_producto, name='crear_producto'),
     path('api/generar-json/', core_views.generar_json, name='generar_json'),
