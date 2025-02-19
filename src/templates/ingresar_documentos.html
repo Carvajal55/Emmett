@@ -58,37 +58,21 @@
                 </button>
             </div>
             <div class="col-4">
-                <label for="nDocument" class="form-label">Buscar Factura</label>
-                <div class="input-group">
-                    <!-- Selector de tipo de documento -->
-                    <select class="form-select" v-model="form.tipoDocumento">
-                        <option value="33">Factura</option>
-                        <option value="52">Guía de Despacho</option>
-                    </select>
-            
-                    <!-- Input con autocompletado -->
-                    <input 
-                        class="form-control" 
-                        type="number" 
-                        v-model="form.numeroDocumento" 
-                        placeholder="Ingrese N° de Factura" 
-                        @input="buscarSugerenciasFactura" 
-                        @keyup.enter="buscarFactura"
-                        list="sugerenciasFacturas"
-                    >
-            
-                    <!-- Botón de búsqueda -->
-                    <button class="input-group-text" @click="buscarFactura">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </div>
-            
-                <!-- Lista de sugerencias de facturas -->
-                <datalist id="sugerenciasFacturas">
-                    <option v-for="factura in sugerenciasFacturas" :key="factura.id" :value="factura.number">
-                        [[ factura.number ]] - [[ factura.supplier_name ]]
+                <label for="proveedorSelect" class="form-label">Seleccionar Proveedor</label>
+                <select class="form-select" v-model="form.proveedor" @change="buscarFacturasPorProveedor">
+                    <option value="">Selecciona un proveedor</option>
+                    <option v-for="proveedor in proveedores" :key="proveedor.id" :value="proveedor.rutsupplier">
+                        [[ proveedor.rutsupplier ]] - [[ proveedor.namesupplier ]]
                     </option>
-                </datalist>
+                </select>
+            </div>
+            
+            <div class="col-4">
+                <label for="nDocument" class="form-label">Número de Folio</label>
+                <div class="input-group">
+                    <input class="form-control" type="number" @keyup.enter="buscarFactura" v-model="form.numeroDocumento" :disabled="!form.proveedor">
+                    <button class="input-group-text" @click="buscarFactura" :disabled="!form.proveedor"><i class="bi bi-search"></i></button>
+                </div>
             </div>
         </div>
 <!-- Línea gruesa -->
@@ -733,23 +717,17 @@
             },
         },
         methods: {
-            async buscarSugerenciasFactura() {
-                if (this.form.numeroDocumento.length < 2) {
-                    this.sugerenciasFacturas = [];
-                    return;
-                }
+            async buscarFacturasPorProveedor() {
+                if (!this.form.proveedor) return;
 
                 try {
-                    const response = await axios.get('/api/get-facturas-recientes/', {
-                        params: { 
-                            type: this.form.tipoDocumento, 
-                            number: this.form.numeroDocumento 
-                        }
+                    const response = await axios.get('/api/listar-facturas-proveedor/', {
+                        params: { supplier: this.form.proveedor }
                     });
-
-                    this.sugerenciasFacturas = response.data;
+                    this.facturasDisponibles = response.data.facturas;
                 } catch (error) {
-                    console.error("Error al buscar sugerencias:", error);
+                    console.error('Error al obtener facturas del proveedor:', error);
+                    this.facturasDisponibles = [];
                 }
             },
             cargarCategorias() {
@@ -821,23 +799,26 @@
                 }
             },
             async buscarFactura() {
+                if (!this.form.proveedor || !this.form.numeroDocumento) {
+                    Swal.fire("Error", "Debes seleccionar un proveedor y escribir un número de folio.", "error");
+                    return;
+                }
+
                 try {
                     const response = await axios.get('/api/get-factura/', {
                         params: {
-                            type: this.form.tipoDocumento,
+                            supplier: this.form.proveedor,
                             number: this.form.numeroDocumento,
                         },
                     });
 
                     const data = response.data;
 
-                    // Guardar el ID de la factura en el estado
                     this.facturaId = data.headers.idFactura;
 
-                    // Rellenar el formulario con los datos de la factura
                     this.form = {
-                        rutProveedor: data.proveedor ? data.proveedor.rut : "",
-                        razonSocial: data.proveedor ? data.proveedor.nombre : "",
+                        rutProveedor: data.headers.supplier,
+                        razonSocial: data.headers.supplierName,
                         tipoDocumento: data.headers.typeDocument,
                         numeroDocumento: data.headers.nDocument,
                         fechaEmision: data.headers.datePurchase,
@@ -861,10 +842,10 @@
                         completo: detalle.checkItem === "true",
                     }));
 
-                    Swal.fire('Éxito', 'Factura y proveedor cargados correctamente.', 'success');
+                    Swal.fire("Éxito", "Factura cargada correctamente.", "success");
                 } catch (error) {
-                    console.error('Error al buscar la factura:', error);
-                    Swal.fire('Error', 'No se encontró la factura.', 'error');
+                    console.error("Error al buscar la factura:", error);
+                    Swal.fire("Error", "No se encontró la factura.", "error");
                 }
             },
             // Actualizar descuentos para todos los productos
@@ -1176,69 +1157,69 @@
                 }
             },
             enviarDatos() {
-    const formData = new FormData();
+                const formData = new FormData();
 
-    // Adjuntar imagen si existe
-    if (this.form.img_url) {
-        formData.append("img_url", this.form.img_url);
-    }
+                // Adjuntar imagen si existe
+                if (this.form.img_url) {
+                    formData.append("img_url", this.form.img_url);
+                }
 
-    // Adjuntar el JSON como string
-    formData.append("jsonData", JSON.stringify({
-        facturaId: this.facturaId,
-        headers: {
-            supplier: this.form.rutProveedor,
-            supplierName: this.form.razonSocial,
-            typeDocument: this.form.tipoDocumento,
-            nDocument: this.form.numeroDocumento,
-            dcto: this.form.descuentoGeneral,
-            datePurchase: this.form.fechaEmision,
-            dateExpired: this.form.fechaVencimiento,
-            observation: this.form.observaciones,
-            typePay: this.form.tipoPago,
-            nCheque: this.form.numeroCheque,
-            qtyCheque: this.form.cantidadCheque,
-            subtotal: this.totalSubtotales,
-            urlPDF: "",
-            urlJson: "",
-            dateReception: this.currentDate,
-            userProcess: "Nombre Usuario"
-        },
-        details: this.productosDocumento.map(producto => ({
-            qty: producto.cantidad,
-            received_quantity: producto.received_quantity,
-            completo: producto.completo,
-            cost: producto.costo,
-            dctoItem: producto.descuento,
-            subtotalItem: producto.subtotal,
-            sku: producto.sku,
-            model: producto.model,
-        }))
-    }));
+                // Adjuntar el JSON como string
+                formData.append("jsonData", JSON.stringify({
+                    facturaId: this.facturaId,
+                    headers: {
+                        supplier: this.form.rutProveedor,
+                        supplierName: this.form.razonSocial,
+                        typeDocument: this.form.tipoDocumento,
+                        nDocument: this.form.numeroDocumento,
+                        dcto: this.form.descuentoGeneral,
+                        datePurchase: this.form.fechaEmision,
+                        dateExpired: this.form.fechaVencimiento,
+                        observation: this.form.observaciones,
+                        typePay: this.form.tipoPago,
+                        nCheque: this.form.numeroCheque,
+                        qtyCheque: this.form.cantidadCheque,
+                        subtotal: this.totalSubtotales,
+                        urlPDF: "",
+                        urlJson: "",
+                        dateReception: this.currentDate,
+                        userProcess: "Nombre Usuario"
+                    },
+                    details: this.productosDocumento.map(producto => ({
+                        qty: producto.cantidad,
+                        received_quantity: producto.received_quantity,
+                        completo: producto.completo,
+                        cost: producto.costo,
+                        dctoItem: producto.descuento,
+                        subtotalItem: producto.subtotal,
+                        sku: producto.sku,
+                        model: producto.model,
+                    }))
+                }));
 
-    axios.post('/api/generar-json/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    .then(response => {
-        Swal.fire({
-            title: 'Éxito',
-            text: 'La factura se ha guardado correctamente.',
-            icon: 'success',
-            confirmButtonText: 'OK'
-        }).then(() => {
-            window.location.href = "{% url 'recepciones_pendientes' %}";
-        });
-    })
-    .catch(error => {
-        console.error("Error al enviar los datos:", error);
-        Swal.fire({
-            title: 'Error',
-            text: 'Hubo un problema al guardar la factura.',
-            icon: 'error',
-            confirmButtonText: 'OK'
-        });
-    });
-},
+                axios.post('/api/generar-json/', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                })
+                .then(response => {
+                    Swal.fire({
+                        title: 'Éxito',
+                        text: 'La factura se ha guardado correctamente.',
+                        icon: 'success',
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        window.location.href = "{% url 'recepciones_pendientes' %}";
+                    });
+                })
+                .catch(error => {
+                    console.error("Error al enviar los datos:", error);
+                    Swal.fire({
+                        title: 'Error',
+                        text: 'Hubo un problema al guardar la factura.',
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+                });
+            },
 
             mostrarTodosLosProveedores() {
                 // Obtener la lista completa de proveedores

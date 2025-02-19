@@ -1480,32 +1480,30 @@ def generar_json(request):
             with open(absolute_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(data, json_file, ensure_ascii=False, indent=4)
 
-            # Guardar en la base de datos
-            purchase, created = Purchase.objects.update_or_create(
+            # Guardar en la base de datos sin sobrescribir facturas previas
+            purchase = Purchase.objects.create(
                 typedoc=type_document,
                 number=number_document,
-                defaults={
-                    'supplier': supplier,
-                    'suppliername': supplier_name,
-                    'observation': observation,
-                    'dateadd': timezone.now(),
-                    'dateproccess': date_purchase,
-                    'subtotal': subtotal_with_discount,
-                    'urljson': relative_json_path,
-                    'urlimg': relative_file_path,  # Guardar la ruta relativa del archivo
-                    'status': 0,
-                }
+                supplier=supplier,
+                suppliername=supplier_name,
+                observation=observation,
+                dateadd=timezone.now(),
+                dateproccess=date_purchase,
+                subtotal=subtotal_with_discount,
+                urljson=relative_json_path,
+                urlimg=relative_file_path,  # Guardar la ruta relativa del archivo
+                status=0,
             )
 
             return JsonResponse({
-                'message': 'Archivo JSON procesado correctamente',
+                'message': 'Factura guardada correctamente',
                 'urlJson': relative_json_path,
                 'subtotalWithoutDiscount': subtotal_without_discount,
                 'subtotalWithDiscount': subtotal_with_discount,
                 'iva': iva_amount,
                 'subtotalBruto': subtotal_bruto,
                 'purchaseId': purchase.id,
-                'action': 'created' if created else 'updated'
+                'action': 'created'
             }, status=201)
 
         except Exception as e:
@@ -1514,6 +1512,16 @@ def generar_json(request):
 
     return JsonResponse({'error': 'Método no permitido'}, status=405)
 
+@csrf_exempt
+def listar_facturas_proveedor(request):
+    supplier = request.GET.get('supplier')
+
+    if not supplier:
+        return JsonResponse({'error': 'Proveedor no especificado'}, status=400)
+
+    facturas = Purchase.objects.filter(supplier=supplier).values('typedoc', 'number', 'dateproccess')
+
+    return JsonResponse({'facturas': list(facturas)}, safe=False)
 
 def get_products(request):
     query = request.GET.get('q', '')
