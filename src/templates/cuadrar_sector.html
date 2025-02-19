@@ -189,21 +189,18 @@
 
             // Agregar SuperID a la lista de productos escaneados
             agregarProductoEscaneado(superid) {
-                // Buscar el producto en la lista de productos del sector
                 const productoEnSector = this.productosEnSector.find(p => p.superid === superid);
 
                 if (productoEnSector) {
-                    // Si el producto ya está en el sector y no ha sido escaneado previamente
                     if (!this.productosEscaneados.some(p => p.superid === superid)) {
                         this.productosEscaneados.push({
                             superid: productoEnSector.superid,
-                            sku: productoEnSector.sku || '---',  // 🔥 Se asegura que no sea undefined
-                            name: productoEnSector.name || 'Sin nombre'  // 🔥 Se asegura que no sea undefined
+                            sku: productoEnSector.sku || '---',
+                            name: productoEnSector.name || 'Sin nombre'
                         });
                         this.playSound('success');
                     }
                 } else {
-                    // Si el producto no está en el sector, consultar en la API
                     if (!this.sectorQuery) {
                         Swal.fire('Error', 'Primero escanea un sector.', 'error');
                         this.playSound('error');
@@ -218,16 +215,14 @@
                         if (response.data.resp === 1) {
                             this.playSound('success');
 
-                            // Verificar si la respuesta de la API tiene SKU y nombre
-                            const nuevoProducto = {
-                                superid,
-                                sku: response.data.producto?.sku || '---',
-                                name: response.data.producto?.name || 'Sin nombre'
-                            };
+                            const productoInfo = response.data.producto || {};
 
-                            this.productosEscaneados.push(nuevoProducto);
+                            this.productosEscaneados.push({
+                                superid: superid,
+                                sku: productoInfo.sku || '---',
+                                name: productoInfo.name || 'Sin nombre'
+                            });
 
-                            // Actualizar lista de productos en el sector
                             this.buscarProductosSector();
                         } else {
                             this.playSound('error');

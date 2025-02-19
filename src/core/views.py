@@ -1936,6 +1936,7 @@ def add_product_to_sector(request):
                 if sector:
                     productos_no_encontrados = []
                     productos_actualizados = 0
+                    producto_info = None  # Variable para almacenar la información del producto agregado
 
                     for producto_data in productos:
                         superid = producto_data.get('superid', '')
@@ -1946,8 +1947,15 @@ def add_product_to_sector(request):
                             if producto:
                                 # Validar que el producto no tenga estado 1 (vendido o no disponible)
                                 if producto.state == 1:
-                                    productos_no_encontrados.append(superid)  # Añadir a los productos no procesados
+                                    productos_no_encontrados.append(superid)
                                     continue  # Saltar al siguiente producto
+
+                                # Obtener los detalles del producto
+                                producto_info = {
+                                    'superid': producto.superid,
+                                    'sku': producto.product.sku if producto.product else '',
+                                    'name': producto.product.nameproduct if producto.product else 'Sin nombre'
+                                }
 
                                 # Actualizar la ubicación del producto al sector correspondiente
                                 producto.location = sector.idsectoroffice
@@ -1972,7 +1980,8 @@ def add_product_to_sector(request):
                             'resp': 1,
                             'msg': 'Todos los productos fueron añadidos con éxito.',
                             'productos_actualizados': productos_actualizados,
-                            'sector': sector.namesector
+                            'sector': sector.namesector,
+                            'producto': producto_info  # Enviar los detalles del último producto agregado
                         })
                 else:
                     return JsonResponse({'resp': 3, 'msg': f'Sector "{name_sector}" no encontrado.'})
