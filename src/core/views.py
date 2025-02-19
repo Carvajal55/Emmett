@@ -1187,15 +1187,32 @@ def get_factura(request):
     print("Proveedor:", supplier)
 
     try:
-        factura = Purchase.objects.get(
+        # Buscar la factura con los parámetros correctos
+        factura = get_object_or_404(
+            Purchase,
             typedoc=tipo_documento,
             number=numero_documento,
             supplier=supplier
         )
+
         print("✅ Factura encontrada:", factura)
-    except Purchase.DoesNotExist:
-        print("❌ No se encontró la factura en la base de datos")
-        return JsonResponse({'error': 'Factura no encontrada'}, status=404)
+
+        # Leer el JSON asociado a la factura
+        with open(factura.urljson, 'r') as json_file:
+            data = json.load(json_file)
+
+        # Agregar el ID de la factura en la respuesta
+        data["facturaId"] = factura.id
+
+        return JsonResponse(data, safe=False)
+
+    except FileNotFoundError:
+        print("❌ No se encontró el archivo JSON asociado a la factura.")
+        return JsonResponse({'error': 'El archivo JSON no existe.'}, status=404)
+
+    except Exception as e:
+        print(f"❌ Error inesperado: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
     
 def get_facturas_recientes(request):
     tipo_documento = request.GET.get('type', '')
