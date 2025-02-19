@@ -812,39 +812,48 @@
                         },
                     });
 
+                    console.log("🚀 Respuesta de la API:", response.data);
+
+                    if (!response.data.headers) {
+                        Swal.fire("Error", "La factura no contiene datos válidos.", "error");
+                        return;
+                    }
+
                     const data = response.data;
 
                     this.facturaId = data.headers.idFactura;
 
                     this.form = {
-                        rutProveedor: data.headers.supplier,
-                        razonSocial: data.headers.supplierName,
-                        tipoDocumento: data.headers.typeDocument,
-                        numeroDocumento: data.headers.nDocument,
-                        fechaEmision: data.headers.datePurchase,
-                        fechaVencimiento: data.headers.dateExpired,
-                        descuentoGeneral: data.headers.dcto,
-                        tipoPago: data.headers.typePay,
-                        numeroCheque: data.headers.nCheque,
-                        cantidadCheque: data.headers.qtyCheque,
-                        subtotal: data.headers.subtotal,
-                        observaciones: data.headers.observation,
+                        rutProveedor: data.headers.supplier || '',
+                        razonSocial: data.headers.supplierName || '',
+                        tipoDocumento: data.headers.typeDocument || '',
+                        numeroDocumento: data.headers.nDocument || '',
+                        fechaEmision: data.headers.datePurchase || '',
+                        fechaVencimiento: data.headers.dateExpired || '',
+                        descuentoGeneral: data.headers.dcto || 0,
+                        tipoPago: data.headers.typePay || '',
+                        numeroCheque: data.headers.nCheque || 0,
+                        cantidadCheque: data.headers.qtyCheque || 0,
+                        subtotal: data.headers.subtotal || 0,
+                        observaciones: data.headers.observation || '',
                     };
 
-                    this.productosDocumento = data.details.map(detalle => ({
-                        model: detalle.model,
-                        sku: detalle.sku,
-                        cantidad: detalle.qty,
+                    this.productosDocumento = data.details ? data.details.map(detalle => ({
+                        model: detalle.model || '',
+                        sku: detalle.sku || '',
+                        cantidad: detalle.qty || 0,
                         received_quantity: detalle.received_quantity || 0,
-                        costo: detalle.cost,
-                        descuento: detalle.dctoItem,
-                        subtotal: detalle.subtotalItem,
+                        costo: detalle.cost || 0,
+                        descuento: detalle.dctoItem || 0,
+                        subtotal: detalle.subtotalItem || 0,
                         completo: detalle.checkItem === "true",
-                    }));
+                    })) : [];
+
+                    console.log("📌 Data procesada:", this.form, this.productosDocumento);
 
                     Swal.fire("Éxito", "Factura cargada correctamente.", "success");
                 } catch (error) {
-                    console.error("Error al buscar la factura:", error);
+                    console.error("❌ Error al buscar la factura:", error);
                     Swal.fire("Error", "No se encontró la factura.", "error");
                 }
             },

@@ -1179,36 +1179,26 @@ def get_categories(request):
 def get_factura(request):
     tipo_documento = request.GET.get('type')
     numero_documento = request.GET.get('number')
+    supplier = request.GET.get('supplier')
 
-    # Buscar la factura por tipo, número de documento y estado
     factura = get_object_or_404(
-        Purchase, 
-        typedoc=tipo_documento, 
+        Purchase,
+        typedoc=tipo_documento,
         number=numero_documento,
-        status__in=[0, 2]  # Solo estados Pendientes (0) o Rechazados (2)
+        supplier=supplier,
+        status__in=[0, 2]
     )
 
-    # Buscar el proveedor asociado a la factura
-    proveedor = Supplier.objects.filter(id=factura.supplier_id).first()
-    
-    if not proveedor:
-        proveedor_data = {"error": "Proveedor no encontrado"}
-    else:
-        proveedor_data = {
-            "id": proveedor.id,
-            "rut": proveedor.rutsupplier,
-            "nombre": proveedor.namesupplier
-        }
-
-    # Leer el archivo JSON desde el campo `urlJson`
     try:
-        with open(factura.urljson, 'r') as json_file:
+        with open(factura.urljson, 'r', encoding='utf-8') as json_file:
             data = json.load(json_file)
 
-        # Agregar datos del proveedor a la respuesta
-        data["proveedor"] = proveedor_data
-        
+        # Si no hay headers o detalles en el JSON, devuelve un error
+        if "headers" not in data or "details" not in data:
+            return JsonResponse({'error': 'JSON mal formado en la factura'}, status=400)
+
         return JsonResponse(data, safe=False)
+
     except FileNotFoundError:
         return JsonResponse({'error': 'El archivo JSON no existe.'}, status=404)
     
