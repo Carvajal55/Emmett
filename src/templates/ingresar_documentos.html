@@ -799,15 +799,15 @@
                 }
             },
             async buscarFactura() {
-                if (!this.form.proveedor || !this.form.numeroDocumento || !this.form.tipoDocumento) {
-                    Swal.fire("Error", "Debes seleccionar un proveedor, tipo de documento y escribir un número de folio.", "error");
-                    return;
-                }
+                console.log("📌 Parámetros enviados a la API:");
+                console.log("Proveedor:", this.form.proveedor);
+                console.log("Número de Documento:", this.form.numeroDocumento);
+                console.log("Tipo de Documento:", this.form.tipoDocumento);
 
                 try {
                     const response = await axios.get('/api/get-factura/', {
                         params: {
-                            supplier: this.form.proveedor,  
+                            supplier: this.form.proveedor,
                             type: this.form.tipoDocumento,
                             number: this.form.numeroDocumento,
                         },
