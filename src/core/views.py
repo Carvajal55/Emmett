@@ -5697,16 +5697,11 @@ def bulk_upload_products(request):
         existing_skus = set(Products.objects.values_list('sku', flat=True))
         print(f"SKUs existentes en la base de datos: {len(existing_skus)}")
 
-        # Procesar e insertar productos
+        # Procesar e insertar o actualizar productos
         new_products = []
-        duplicate_skus = []
+        updated_products = []
         for record in tqdm(products_data, desc="Cargando productos", unit="producto"):
             sku = record.get("sku")
-
-            # Verificar si el SKU ya existe
-            if sku in existing_skus:
-                duplicate_skus.append(sku)
-                continue  # Saltar al siguiente registro
 
             # Convertir fecha correctamente
             createdate = record.get("createdate")
@@ -5725,10 +5720,9 @@ def bulk_upload_products(request):
             else:
                 uniquecodebar = None  # Si es un número o texto, convertirlo en None
 
-            # Crear objeto de producto
-            new_products.append(
-                Products(
-                    sku=sku,
+            # Si el SKU ya existe, actualizar el producto
+            if sku in existing_skus:
+                Products.objects.filter(sku=sku).update(
                     nameproduct=record.get("nameproduct"),
                     brands=record.get("brand"),
                     codebar=record.get("codebar"),
@@ -5738,9 +5732,24 @@ def bulk_upload_products(request):
                     createdate=createdate,
                     uniquecodebar=uniquecodebar,
                 )
-            )
+                updated_products.append(sku)
+            else:
+                # Crear objeto de producto
+                new_products.append(
+                    Products(
+                        sku=sku,
+                        nameproduct=record.get("nameproduct"),
+                        brands=record.get("brand"),
+                        codebar=record.get("codebar"),
+                        lastcost=record.get("lastcost") or 0,
+                        lastprice=record.get("lastprice") or 0,
+                        currentstock=record.get("currentstock", 0),
+                        createdate=createdate,
+                        uniquecodebar=uniquecodebar,
+                    )
+                )
 
-        # Insertar en la base de datos
+        # Insertar en la base de datos los nuevos productos
         if new_products:
             Products.objects.bulk_create(new_products)
             print(f"Se han insertado {len(new_products)} nuevos productos.")
@@ -5748,8 +5757,8 @@ def bulk_upload_products(request):
         # Respuesta con resumen
         return JsonResponse({
             "status": "success",
-            "message": f"Se insertaron {len(new_products)} productos nuevos.",
-            "duplicates": duplicate_skus
+            "message": f"Se insertaron {len(new_products)} productos nuevos y se actualizaron {len(updated_products)} productos existentes.",
+            "updated": updated_products
         })
 
     except Exception as e:
