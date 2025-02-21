@@ -4461,67 +4461,56 @@ def procesar_producto_worker():
                 break  # Si recibe None, finaliza el worker
 
             index, producto, total_productos = item
-            print(f"⚙️ Procesando SKU {producto.sku} ({index + 1}/{total_productos})")
-            
             resultado = procesar_producto(producto, total_productos, index)
             
             with lock:
                 resultados.append(resultado)  # Guardamos el resultado para el Excel
             
+            queue.task_done()
         except Exception as e:
-            print(f"❌ Error en worker para SKU {producto.sku}: {str(e)}")
-        finally:
-            queue.task_done()  # 🔥 Se asegura de siempre marcar el trabajo como terminado
+            print(f"❌ Error en worker: {str(e)}")
 
 def procesar_producto(producto, total_productos, index, retry=False):
     """Procesa cada producto, compara stock local con Bsale y ajusta si es necesario."""
-    try:
-        sku = producto.sku
-        iderp = producto.iderp
-        cost = producto.lastcost
-        stock_bsale, stock_data = get_stock_bsale(iderp, retry)
+    sku = producto.sku
+    iderp = producto.iderp
+    cost = producto.lastcost
+    stock_bsale, stock_data = get_stock_bsale(iderp, retry)
 
-        if stock_bsale is None:
-            return {
-                "sku": sku,
-                "nombre": producto.nameproduct,
-                "error": "Error crítico en la consulta a Bsale",
-                "stock_bsale_data": json.dumps(stock_data, indent=2)
-            }
-
-        stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
-        diferencia = stock_local - stock_bsale
-
-        ajuste_resultado = "No ajuste necesario"
-        ajuste_respuesta = {}
-
-        if diferencia > 0:
-            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
-        elif diferencia < 0:
-            if abs(diferencia) <= stock_bsale:
-                ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
-            else:
-                ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
-
-        print(f"✅ SKU {sku} procesado correctamente.")
+    if stock_bsale is None:
         return {
             "sku": sku,
             "nombre": producto.nameproduct,
-            "stock_local": stock_local,
-            "stock_bsale": stock_bsale,
-            "diferencia": diferencia,
-            "ajuste": ajuste_resultado,
-            "stock_bsale_data": json.dumps(stock_data, indent=2),
-            "ajuste_respuesta": ajuste_respuesta
+            "error": "Error crítico en la consulta a Bsale",
+            "stock_bsale_data": json.dumps(stock_data, indent=2)  # Guardamos JSON como string en Excel
         }
-    
-    except Exception as e:
-        print(f"❌ Error crítico al procesar SKU {producto.sku}: {str(e)}")
-        return {
-            "sku": producto.sku,
-            "nombre": producto.nameproduct,
-            "error": f"Error crítico: {str(e)}"
-        }
+
+    stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
+    diferencia = stock_local - stock_bsale
+
+    ajuste_resultado = "No ajuste necesario"
+    ajuste_respuesta = {}
+
+    if diferencia > 0:
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
+    elif diferencia < 0:
+        if abs(diferencia) <= stock_bsale:
+            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
+        else:
+            ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
+
+    print(f"🔄 Procesando SKU {sku} ({index + 1}/{total_productos})")
+
+    return {
+        "sku": sku,
+        "nombre": producto.nameproduct,
+        "stock_local": stock_local,
+        "stock_bsale": stock_bsale,
+        "diferencia": diferencia,
+        "ajuste": ajuste_resultado,
+        "stock_bsale_data": json.dumps(stock_data, indent=2),
+        "ajuste_respuesta": ajuste_respuesta
+    }
 
 @csrf_exempt
 def ajustar_stock_bsale(request):
@@ -4530,46 +4519,22 @@ def ajustar_stock_bsale(request):
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
     productos = list(Products.objects.all())
-    #productos = list(Products.objects.all()[:100])
 
-    batch_size = 100  # 🔥 Procesar en bloques de 50
-    total_productos = len(productos)
-    resultados_globales = []  # 🔥 Lista para acumular todos los resultados
+    for index, producto in enumerate(productos):
+        queue.put((index, producto, len(productos)))
 
-    # 🔄 Procesar en bloques
-    for start in range(0, total_productos, batch_size):
-        end = min(start + batch_size, total_productos)
-        batch_productos = productos[start:end]
+    for _ in range(3):
+        Thread(target=procesar_producto_worker).start()
 
-        # Reiniciar la cola y los resultados
-        global resultados
-        resultados = []  # Reiniciar resultados para cada batch
-        queue.queue.clear()  # Vacía la cola
+    queue.join()
 
-        # Añadir el batch a la cola
-        for index, producto in enumerate(batch_productos):
-            queue.put((index, producto, len(batch_productos)))
+    df = pd.DataFrame(resultados)
+    print("📊 Resultados obtenidos:", resultados)
 
-        # Iniciar los hilos
-        for _ in range(3):
-            Thread(target=procesar_producto_worker).start()
-
-        queue.join()
-
-        # Acumular los resultados del batch
-        resultados_globales.extend(resultados)
-
-        # 🔥 Guardar parcialmente después de cada batch
-        df = pd.DataFrame(resultados_globales)
-        df.to_excel(os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx"), index=False)
-        print(f"📁 Excel parcial guardado con {len(resultados_globales)} productos procesados")
-
-    # 🔥 Generar el Excel final
-    df = pd.DataFrame(resultados_globales)
     df.to_excel(os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx"), index=False)
 
-    print("📁 Excel final guardado")
     return JsonResponse({"archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"})
+
 
 REQUEST_TIMEOUT = 5
 #---------------------------------

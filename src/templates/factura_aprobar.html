@@ -668,7 +668,7 @@
                 const valorIngresado = parseFloat(precio.valor) || precio.valorSugerido || 0;
 
                 // Sumar despacho al costo total
-                const costoTotal = costo + despacho;
+                const costoTotal = costo - despacho;
 
                 // Si el valor ingresado es mayor a 0, recalcular el margen
                 if (valorIngresado > 0) {
