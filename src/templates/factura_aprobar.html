@@ -150,7 +150,10 @@
                 
                                 <div class="row">
                                     <div class="col-4">
-                                        <label for="fee" style="font-size: 0.8rem; font-weight: bold;">Comisión (Fee)</label>
+                                        <label for="fee" style="font-size: 0.8rem; font-weight: bold;">
+                                            Comisión (Fee) 
+                                            <span style="color: gray;">[[ calcularPorcentaje(precio.fee) ]]%</span>
+                                        </label>
                                         <input
                                             type="number"
                                             class="form-control form-control-sm"
@@ -162,7 +165,10 @@
                                     </div>
                                     
                                     <div class="col-4">
-                                        <label for="n" style="font-size: 0.8rem; font-weight: bold;">Margen (N)</label>
+                                        <label for="n" style="font-size: 0.8rem; font-weight: bold;">
+                                            Margen (N) 
+                                            <span style="color: gray;">[[ calcularPorcentaje(precio.n) ]]%</span>
+                                        </label>
                                         <input
                                             type="number"
                                             class="form-control form-control-sm"
@@ -174,7 +180,10 @@
                                     </div>
                                     
                                     <div class="col-4">
-                                        <label for="despacho" style="font-size: 0.8rem; font-weight: bold;">Despacho (CLP)</label>
+                                        <label for="despacho" style="font-size: 0.8rem; font-weight: bold;">
+                                            Despacho (CLP) 
+                                            <span style="color: gray;">[[ precio.despacho]]%</span>
+                                        </label>
                                         <input
                                             type="number"
                                             class="form-control form-control-sm"
@@ -185,15 +194,7 @@
                                         />
                                     </div>
                                     
-                                    <input
-                                        type="number"
-                                        class="form-control"
-                                        v-model.number="precio.valor"
-                                        @input="actualizarMargenYValorSugerido(precio)"
-                                        :id="'precio-' + precio.id"
-                                        placeholder="Ingrese precio"
-                                        style="margin-bottom: 10px;"
-                                    />
+                                   
                                 </div>
                 
                                 <!-- Botón para guardar individual -->
@@ -330,6 +331,12 @@
             
         },
         methods: {
+            calcularPorcentaje(valor) {
+                if (valor && valor > 0) {
+                    return ((valor - 1) * 100).toFixed(2);
+                }
+                return 0;
+            },
             asignarPrecioGlobal() {
                 // Verificar que el precio global sea válido y el input esté habilitado
                 if (this.habilitarInputGlobal && this.precioGlobal !== null && this.precioGlobal >= 0) {
