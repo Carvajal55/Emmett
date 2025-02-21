@@ -4518,7 +4518,8 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    productos = list(Products.objects.all())
+    #productos = list(Products.objects.all())
+    productos = list(Products.objects.all()[:10])  # 🔥 Procesa solo 10 productos para pruebas
 
     for index, producto in enumerate(productos):
         queue.put((index, producto, len(productos)))
@@ -4529,6 +4530,7 @@ def ajustar_stock_bsale(request):
     queue.join()
 
     df = pd.DataFrame(resultados)
+    print("📊 Resultados obtenidos:", resultados)
     df.to_excel(os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx"), index=False)
 
     return JsonResponse({"archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"})
