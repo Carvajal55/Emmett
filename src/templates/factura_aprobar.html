@@ -567,9 +567,12 @@
                 const fee = parseFloat(precio.fee) || 1.25;
                 const iva = parseFloat(precio.iva) || 1.19;
                 const despacho = parseFloat(precio.despacho) || 0;
-                const margenDeseado = 0.25; // 25% de margen deseado
+                const n = parseFloat(precio.n) || 1; // Tomar el valor de N
 
-                // Calcular Valor Sugerido considerando el despacho
+                // Calcular Margen Deseado usando la fórmula dada
+                const margenDeseado = (100 - (100 / n)) / 100;
+
+                // Calcular Valor Sugerido considerando el despacho y el margen calculado
                 const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
                 precio.valorSugerido = valorSugerido;
             },
