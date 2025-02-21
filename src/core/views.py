@@ -4529,8 +4529,8 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    #productos = list(Products.objects.all())
-    productos = list(Products.objects.all()[:100])
+    productos = list(Products.objects.all())
+    #productos = list(Products.objects.all()[:100])
 
     batch_size = 100  # 🔥 Procesar en bloques de 50
     total_productos = len(productos)
