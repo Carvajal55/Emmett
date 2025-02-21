@@ -555,7 +555,7 @@
                 // Obtener los valores actuales y calcular sugeridos para cada lista de precios
                 this.listasPrecios.forEach(precio => {
                     this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
-                    this.calcularValorSugerido(precio); // Calcula el valor sugerido
+                    this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
                     precio.margen = 0; // Inicializa el margen en 0%
                 });
 
@@ -569,8 +569,11 @@
                 const despacho = parseFloat(precio.despacho) || 0;
                 const margenDeseado = 0.25; // 25% de margen deseado
 
+                // Sumar despacho al costo total
+                const costoTotal = costo + despacho;
+
                 // Calcular Valor Sugerido para un 25% de margen
-                const valorSugerido = Math.ceil(((costo * fee * iva) + despacho) / (1 - margenDeseado));
+                const valorSugerido = Math.ceil((costoTotal * fee * iva) / (1 - margenDeseado));
                 precio.valorSugerido = valorSugerido;
             },
 
@@ -651,17 +654,20 @@
                 }
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
-            recalcularMargen(precio) {
+           recalcularMargen(precio) {
                 const costo = parseFloat(precio.costo) || 0;
                 const fee = parseFloat(precio.fee) || 1.25;
                 const iva = parseFloat(precio.iva) || 1.19;
                 const despacho = parseFloat(precio.despacho) || 0;
-                const valorIngresado = parseFloat(precio.valor) || 0;
+                const valorIngresado = parseFloat(precio.valor) || precio.valorSugerido || 0;
+
+                // Sumar despacho al costo total
+                const costoTotal = costo + despacho;
 
                 // Si el valor ingresado es mayor a 0, recalcular el margen
                 if (valorIngresado > 0) {
-                    const xIngresado = (valorIngresado - despacho) / (fee * iva);
-                    const margenIngresado = (1 - (costo / xIngresado)) * 100;
+                    const valorNeto = valorIngresado / (fee * iva);
+                    const margenIngresado = (1 - (costoTotal / valorNeto)) * 100;
                     precio.margen = margenIngresado.toFixed(2);
                 } else {
                     precio.margen = 0; // Inicializa en 0 si no hay valor ingresado
