@@ -551,19 +551,9 @@
                 // Inicializar las listas de precios con valores por defecto
                 this.listasPrecios = this.initializeListasPrecios(detalle);
 
-                // Llamar a la API para obtener los valores actuales
+                // Llamar a la API para cada lista de precios y obtener valores actuales
                 this.listasPrecios.forEach(precio => {
-                    this.obtenerValorActual(precio);
-                });
-
-                // Recalcular el margen y asignar el valor sugerido SOLO si no hay un valor previo
-                this.listasPrecios.forEach(precio => {
-                    this.recalcularMargen(precio);
-                    
-                    // Solo asigna el valor sugerido si no hay un valor previo
-                    if (!precio.valor) {
-                        precio.valor = precio.valorSugerido;
-                    }
+                    this.obtenerValorActual(precio); 
                 });
 
                 // Mostrar el modal después de cargar los datos
@@ -647,7 +637,7 @@
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
             recalcularMargen(precio) {
-                console.log(precio, "PRECIO");
+                console.log(precio,"PRECIO")
                 const costo = parseFloat(precio.costo) || 0;
                 const fee = parseFloat(precio.fee) || 1.25;
                 const iva = parseFloat(precio.iva) || 1.19;
@@ -661,30 +651,19 @@
                     return;
                 }
 
-                // Cálculo del Costo Total considerando IVA, Fee, N y Despacho
-                const costoTotal = (costo * fee * iva * n) + despacho;
-                const valorSugerido = Math.ceil(costoTotal);
+                // Calcular Valor Sugerido y redondear hacia arriba
+                const valorSugerido = Math.ceil((costo * fee * iva * n) + despacho);
                 precio.valorSugerido = valorSugerido;
 
-                // Si no hay un valor ingresado, se asigna el valor sugerido
-                if (!valorIngresado) {
-                    precio.valor = valorSugerido;
-                }
-
-                // Cálculo del Margen
-                let margenCalculado = 0;
+                // Calcular Margen basado en el Valor Ingresado
+                let margenIngresado = 0;
                 if (valorIngresado > 0) {
-                    margenCalculado = ((valorIngresado - costoTotal) / valorIngresado) * 100;
-                } else {
-                    margenCalculado = ((valorSugerido - costoTotal) / valorSugerido) * 100;
+                    const xIngresado = (valorIngresado / (fee * iva)) - despacho;
+                    margenIngresado = (1 - (costo / xIngresado)) * 100;
                 }
 
-                precio.margen = margenCalculado.toFixed(2);
-
-                console.log(`Cálculo del margen para ${precio.label}:`);
-                console.log(`Costo: ${costo}, Fee: ${fee}, IVA: ${iva}, N: ${n}, Despacho: ${despacho}`);
-                console.log(`Costo Total: ${costoTotal}`);
-                console.log(`Valor Sugerido: ${valorSugerido}, Margen: ${precio.margen}%`);
+                // Asignar valores calculados
+                precio.margen = margenIngresado.toFixed(2);
             },
             updateFee(precio) {
                 // Convertir porcentaje a formato decimal y recalcular margen
