@@ -406,8 +406,8 @@
             },
             obtenerValorActual(precio) {
                 const data = {
-                    price_list_id: precio.id, // ID de la lista de precios (ej: MercadoLibre, Paris, etc.)
-                    sku: this.skuSeleccionado // SKU del producto seleccionado
+                    price_list_id: precio.id,
+                    sku: this.skuSeleccionado
                 };
 
                 axios.post('/api/obtener_valor_actual/', data)
@@ -417,14 +417,14 @@
                         // Verificar si se recibió un valor válido y sumar el IVA
                         if (valorRecibido) {
                             const valorConIva = Math.floor(valorRecibido * 1.19); // Sumar IVA y redondear
-                            precio.valorActual = valorConIva;
+                            this.$set(precio, 'valorActual', valorConIva); // Reactivo
                         } else {
-                            precio.valorActual = 'Pendiente';
+                            this.$set(precio, 'valorActual', 'Pendiente');
                         }
                     })
                     .catch(error => {
                         console.error('Error al obtener el valor actual:', error);
-                        precio.valorActual = 'Error';
+                        this.$set(precio, 'valorActual', 'Error');
                     });
             },
             initializeListasPrecios(detalle) {
