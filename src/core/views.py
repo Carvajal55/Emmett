@@ -4996,7 +4996,7 @@ def obtener_datos_producto(request):
         sectores = {sector.idsectoroffice: sector for sector in Sectoroffice.objects.all()}
         stock_total = sum(
             1 for unique_product in producto.unique_products.filter(state=0)
-            if sectores.get(unique_product.location) and sectores[unique_product.location].idoffice in valid_bodega_ids
+            
         )
 
         # Consultar precio en Bsale
