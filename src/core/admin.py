@@ -4,6 +4,8 @@ from openpyxl import Workbook
 from django.http import HttpResponse
 from django.db.models.functions import Cast, Substr
 from django.db.models import IntegerField
+from datetime import datetime
+
 
 @admin.register(Products)
 class ProductsAdmin(admin.ModelAdmin):
@@ -36,7 +38,14 @@ class ProductsAdmin(admin.ModelAdmin):
 
         # Escribir los datos
         for obj in queryset:
-            row = [getattr(obj, field) for field in field_names]
+            row = []
+            for field in field_names:
+                value = getattr(obj, field)
+                
+                # Verifica si es un campo DateTime y remueve la zona horaria
+                if isinstance(value, datetime):
+                    value = value.replace(tzinfo=None)  # Remueve el timezone
+                row.append(value)
             ws.append(row)
 
         # Configurar la respuesta HTTP para devolver el archivo Excel
