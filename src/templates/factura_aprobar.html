@@ -325,6 +325,7 @@
                 if (this.habilitarInputGlobal && this.precioGlobal !== null && this.precioGlobal >= 0) {
                     this.listasPrecios.forEach(precio => {
                         precio.valor = this.precioGlobal; // Actualizar cada valor
+                        this.recalcularMargen(precio); // Solo recalcula el margen cuando hay un valor en el input
                     });
                 }
             },
@@ -553,9 +554,9 @@
 
                 // Obtener los valores actuales y calcular sugeridos para cada lista de precios
                 this.listasPrecios.forEach(precio => {
-                    this.obtenerValorActual(precio);
+                    this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
                     this.calcularValorSugerido(precio); // Calcula el valor sugerido
-                    this.recalcularMargen(precio); // Calcula el margen basado en el valor sugerido
+                    precio.margen = 0; // Inicializa el margen en 0%
                 });
 
                 // Mostrar el modal después de cargar los datos
@@ -656,22 +657,16 @@
                 const fee = parseFloat(precio.fee) || 1.25;
                 const iva = parseFloat(precio.iva) || 1.19;
                 const despacho = parseFloat(precio.despacho) || 0;
-                const valorIngresado = parseFloat(precio.valor) || precio.valorSugerido || 0;
+                const valorIngresado = parseFloat(precio.valor) || 0;
 
-                if (!costo || !fee || !iva) {
-                    precio.margen = 0;
-                    return;
-                }
-
-                // Calcular Margen basado en el Valor Ingresado
-                let margenIngresado = 0;
+                // Si el valor ingresado es mayor a 0, recalcular el margen
                 if (valorIngresado > 0) {
                     const xIngresado = (valorIngresado - despacho) / (fee * iva);
-                    margenIngresado = (1 - (costo / xIngresado)) * 100;
+                    const margenIngresado = (1 - (costo / xIngresado)) * 100;
+                    precio.margen = margenIngresado.toFixed(2);
+                } else {
+                    precio.margen = 0; // Inicializa en 0 si no hay valor ingresado
                 }
-
-                // Asignar valores calculados
-                precio.margen = margenIngresado.toFixed(2);
             },
             updateFee(precio) {
                 // Convertir porcentaje a formato decimal y recalcular margen
