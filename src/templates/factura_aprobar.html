@@ -660,7 +660,7 @@
 
                 // Si el valor ingresado es mayor a 0, recalcular el margen
                 if (valorIngresado > 0) {
-                    const valorNeto = (valorIngresado - despacho) / (fee * iva);
+                    const valorNeto = ((valorIngresado - despacho) / (iva))/fee;
                     const margenIngresado = (1 - (costo / valorNeto)) * 100;
                     precio.margen = margenIngresado.toFixed(2);
                 } else {
