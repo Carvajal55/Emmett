@@ -4511,7 +4511,8 @@ def procesar_producto(producto, total_productos, index, retry=False):
         "stock_bsale_data": json.dumps(stock_data, indent=2),
         "ajuste_respuesta": ajuste_respuesta
     }
-
+ #productos = list(Products.objects.all())
+    productos = list(Products.objects.all()[:100])
 @csrf_exempt
 def ajustar_stock_bsale(request):
     """Endpoint para comparar y ajustar stock en Bsale."""
@@ -4519,22 +4520,46 @@ def ajustar_stock_bsale(request):
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
     #productos = list(Products.objects.all())
-    productos = list(Products.objects.all()[:100])  # 🔥 Procesa solo 10 productos para pruebas
+    productos = list(Products.objects.all()[:100])
 
-    for index, producto in enumerate(productos):
-        queue.put((index, producto, len(productos)))
+    batch_size = 100  # 🔥 Procesar en bloques de 50
+    total_productos = len(productos)
+    resultados_globales = []  # 🔥 Lista para acumular todos los resultados
 
-    for _ in range(3):
-        Thread(target=procesar_producto_worker).start()
+    # 🔄 Procesar en bloques
+    for start in range(0, total_productos, batch_size):
+        end = min(start + batch_size, total_productos)
+        batch_productos = productos[start:end]
 
-    queue.join()
+        # Reiniciar la cola y los resultados
+        global resultados
+        resultados = []  # Reiniciar resultados para cada batch
+        queue.queue.clear()  # Vacía la cola
 
-    df = pd.DataFrame(resultados)
-    print("📊 Resultados obtenidos:", resultados)
+        # Añadir el batch a la cola
+        for index, producto in enumerate(batch_productos):
+            queue.put((index, producto, len(batch_productos)))
+
+        # Iniciar los hilos
+        for _ in range(3):
+            Thread(target=procesar_producto_worker).start()
+
+        queue.join()
+
+        # Acumular los resultados del batch
+        resultados_globales.extend(resultados)
+
+        # 🔥 Guardar parcialmente después de cada batch
+        df = pd.DataFrame(resultados_globales)
+        df.to_excel(os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx"), index=False)
+        print(f"📁 Excel parcial guardado con {len(resultados_globales)} productos procesados")
+
+    # 🔥 Generar el Excel final
+    df = pd.DataFrame(resultados_globales)
     df.to_excel(os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx"), index=False)
 
+    print("📁 Excel final guardado")
     return JsonResponse({"archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"})
-
 
 REQUEST_TIMEOUT = 5
 #---------------------------------
