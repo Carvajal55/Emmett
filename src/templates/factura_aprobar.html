@@ -268,7 +268,13 @@
                     <td style="text-align: right;">[[ formatCurrency(detalle.bsalePrice || 0) ]]</td>
                     <td style="text-align: right;">[[ formatCurrency(calcularTotal(detalle.cost_with_discount, detalle.qty)) ]]</td>
                     <td>
-                        <input type="text" class="form-control" v-model="detalle.precioBase" placeholder="Precio Base">
+                        <input 
+                            type="number" 
+                            class="form-control" 
+                            v-model.number="detalle.precioBase" 
+                            placeholder="Precio Base"
+                            @input="calcularMargen(detalle)"
+                        >
                     </td>
                     <td style="text-align: center;">[[ detalle.margen ]]%</td>
                     <td style="text-align: center;">[[ detalle.totalStock ]]</td>
