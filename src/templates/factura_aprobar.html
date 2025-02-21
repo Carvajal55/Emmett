@@ -551,14 +551,29 @@
                 // Inicializar las listas de precios con valores por defecto
                 this.listasPrecios = this.initializeListasPrecios(detalle);
 
-                // Llamar a la API para cada lista de precios y obtener valores actuales
+                // Obtener los valores actuales y calcular sugeridos para cada lista de precios
                 this.listasPrecios.forEach(precio => {
-                    this.obtenerValorActual(precio); 
+                    this.obtenerValorActual(precio);
+                    this.calcularValorSugerido(precio); // Calcula el valor sugerido
+                    this.recalcularMargen(precio); // Calcula el margen basado en el valor sugerido
                 });
 
                 // Mostrar el modal después de cargar los datos
                 $('#modalPrecios').modal('show');
             },
+            calcularValorSugerido(precio) {
+                const costo = parseFloat(precio.costo) || 0;
+                const fee = parseFloat(precio.fee) || 1.25;
+                const iva = parseFloat(precio.iva) || 1.19;
+                const n = parseFloat(precio.n) || 1.35;
+                const despacho = parseFloat(precio.despacho) || 0;
+
+                // Calcular Valor Sugerido para un 25% de margen
+                const margenDeseado = 0.25; // 25% de margen
+                const valorSugerido = Math.ceil(((costo * fee * iva * (1 + margenDeseado)) / (1 - margenDeseado)) + despacho);
+                precio.valorSugerido = valorSugerido;
+            },
+
             actualizarListasPrecios() {
                 console.log("Actualizando listas de precios para SKU:", this.skuSeleccionado);
                 console.log("Nuevos precios:", this.listasPrecios);
@@ -637,28 +652,21 @@
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
             recalcularMargen(precio) {
-                console.log(precio,"PRECIO")
                 const costo = parseFloat(precio.costo) || 0;
                 const fee = parseFloat(precio.fee) || 1.25;
                 const iva = parseFloat(precio.iva) || 1.19;
-                const n = parseFloat(precio.n) || 1.35;
                 const despacho = parseFloat(precio.despacho) || 0;
-                const valorIngresado = parseFloat(precio.valor) || 0;
+                const valorIngresado = parseFloat(precio.valor) || precio.valorSugerido || 0;
 
-                if (!costo || !fee || !iva || !n) {
-                    precio.valorSugerido = null;
+                if (!costo || !fee || !iva) {
                     precio.margen = 0;
                     return;
                 }
 
-                // Calcular Valor Sugerido y redondear hacia arriba
-                const valorSugerido = Math.ceil((costo * fee * iva * n) + despacho);
-                precio.valorSugerido = valorSugerido;
-
                 // Calcular Margen basado en el Valor Ingresado
                 let margenIngresado = 0;
                 if (valorIngresado > 0) {
-                    const xIngresado = (valorIngresado / (fee * iva)) - despacho;
+                    const xIngresado = (valorIngresado - despacho) / (fee * iva);
                     margenIngresado = (1 - (costo / xIngresado)) * 100;
                 }
 
