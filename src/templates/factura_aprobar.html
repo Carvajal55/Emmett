@@ -303,7 +303,7 @@
             errorMsg: '',    // Mensaje de error
             idFactura: null,
             listasPrecios: [
-                { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4900, margen: null, valor: null, valorSugerido: null },
+                { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, margen: null, valor: null, valorSugerido: null },
                 { label: 'Paris', id: 12,  fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
                 { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
                 { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
@@ -468,7 +468,7 @@
             },
             initializeListasPrecios(detalle) {
                 return [
-                    { label: 'MercadoLibre', id: 10, fee: 1.25, iva: 1.19, n: 1.35, despacho: 4900, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
+                    { label: 'MercadoLibre', id: 10, fee: 1.25, iva: 1.19, n: 1.35, despacho: 4990, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
                     { label: 'Paris', id: 12, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
                     { label: 'Ripley', id: 13, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
                     { label: 'Walmart', id: 14, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
@@ -582,7 +582,7 @@
                 if (valorIngresado > 0) {
                     const valorNeto = ((valorIngresado - despacho) / (iva)) / fee;
                     const margenIngresado = (1 - (costo / valorNeto)) * 100;
-                    precio.margen = margenIngresado.toFixed(5);
+                    precio.margen = margenIngresado.toFixed(2);
                 } else {
                     precio.margen = 0;
                 }
