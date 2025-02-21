@@ -105,6 +105,11 @@
                             :disabled="!habilitarInputGlobal"
                         />
                     </div>
+                    <div class="col-12  mt-4">
+                        <button class="btn btn-primary" @click="actualizarPreciosBaseMasivo">
+                            Actualizar Todos los Precios Base
+                        </button>
+                    </div>
                     <div class="row">
                         <div v-for="(precio, index) in listasPrecios" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
                             <div class="form-group">
