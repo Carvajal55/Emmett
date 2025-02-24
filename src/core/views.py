@@ -3577,12 +3577,14 @@ def fetch_product_details(request):
             'name': None,
             'description': None,
             'exists': False,
+            'force': True,  # Indica que el producto debe ser forzado
         }, status=200)
 
     return JsonResponse({
         'name': product.nameproduct or 'Sin nombre',
         'description': product.prefixed or 'Sin descripción',
         'exists': True,
+        'force': False,
     }, status=200)
     
 @csrf_exempt

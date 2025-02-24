@@ -73,7 +73,7 @@
                 <td>[[ product.description || 'Sin detalles' ]]</td>
                 <td>[[ product.quantityScanned ]] / [[ product.quantity ]]</td>
                 <td>
-                    <div v-if="product.name === 'Nombre no encontrado' && product.description === 'Descripción no encontrada'">
+                    <div v-if="product.force">
                         <input 
                             type="text" 
                             v-model="product.forceSuperid" 
@@ -267,7 +267,7 @@
                 }).then(async response => {
                     console.log('📌 Productos obtenidos del modelo:', response.data.products);
 
-                    // 🔥 Guardar si el documento está completamente despachado
+                    // Guardar si el documento está completamente despachado
                     this.invoiceComplete = response.data.invoice_dispatched;
 
                     // Mapear productos y obtener detalles adicionales
@@ -283,6 +283,8 @@
                                 code: cleanSku,
                                 name: details.name || null,
                                 description: details.description || null,
+                                exists: details.exists,  // Flag de existencia enviado desde el backend
+                                force: details.force,    // Flag que indica si se debe forzar el producto
                                 quantity: product.total_quantity,
                                 quantityScanned: product.dispatched_quantity,
                                 superids: [],
@@ -294,6 +296,8 @@
                                 code: cleanSku,
                                 name: null,
                                 description: null,
+                                exists: false,
+                                force: true, // En caso de error, asumimos que se debe forzar
                                 quantity: product.total_quantity,
                                 quantityScanned: product.dispatched_quantity,
                                 superids: [],
