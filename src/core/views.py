@@ -4518,23 +4518,41 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
+    # Obtenemos la lista de productos
     productos = list(Products.objects.all())
 
+    # Encolamos cada producto
     for index, producto in enumerate(productos):
         queue.put((index, producto, len(productos)))
 
-    for _ in range(3):
-        Thread(target=procesar_producto_worker).start()
+    # Número de workers que vamos a usar
+    num_workers = 3
+    threads = []
 
+    # Creamos e iniciamos los threads
+    for _ in range(num_workers):
+        t = Thread(target=procesar_producto_worker)
+        t.start()
+        threads.append(t)
+
+    # Encolamos una señal de terminación (None) para cada worker
+    for _ in range(num_workers):
+        queue.put(None)
+
+    # Esperamos que todos los elementos de la cola se hayan procesado
     queue.join()
 
+    # Esperamos que todos los threads finalicen
+    for t in threads:
+        t.join()
+
+    # Creamos el DataFrame y exportamos a Excel
     df = pd.DataFrame(resultados)
     print("📊 Resultados obtenidos:", resultados)
-
-    df.to_excel(os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx"), index=False)
+    excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
+    df.to_excel(excel_path, index=False)
 
     return JsonResponse({"archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"})
-
 
 REQUEST_TIMEOUT = 5
 #---------------------------------
