@@ -73,7 +73,7 @@
                 <td>[[ product.description || 'Sin detalles' ]]</td>
                 <td>[[ product.quantityScanned ]] / [[ product.quantity ]]</td>
                 <td>
-                    <div>
+                    <div v-if="product.name === 'Nombre no encontrado' && product.description === 'Descripción no encontrada'">
                         <input 
                             type="text" 
                             v-model="product.forceSuperid" 
@@ -86,6 +86,7 @@
                         </button>
                     </div>
                 </td>
+                
             </tr>
         </tbody>
     </table>
