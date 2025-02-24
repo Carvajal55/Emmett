@@ -3573,13 +3573,17 @@ def fetch_product_details(request):
     product = Products.objects.filter(sku=sku).first()
 
     if not product:
-        return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
+        return JsonResponse({
+            'name': None,
+            'description': None,
+            'exists': False,
+        }, status=200)
 
     return JsonResponse({
         'name': product.nameproduct or 'Sin nombre',
         'description': product.prefixed or 'Sin descripción',
+        'exists': True,
     }, status=200)
-
     
 @csrf_exempt
 def validate_superid(request):
