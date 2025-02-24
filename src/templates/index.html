@@ -20,6 +20,10 @@
                     <h4>Bienvenido al ERP de Emmett</h4>
                     <h6>Usa el menú del costado para navegar</h6>
                 </div>
+                <div class="card-body">
+                    <button @click="descargarBackupExcel" class="btn btn-primary mt-3">Descargar Excel de productos y Bodegas</button>
+
+                </div>
             </div>
         </div>
     </div>
@@ -100,7 +104,7 @@
 
                     <button @click="hacerRespaldo" class="d-none btn btn-primary mt-3">Hacer Respaldo</button>
                     <button @click="descargarBackup" class="d-none btn btn-primary mt-3">Descargar Respaldo</button>
-                    <button @click="descargarBackupExcel" class="btn btn-primary mt-3">Descargar Excel</button>
+                    <button @click="descargarBackupExcel" class="btn btn-primary mt-3">Descargar Excel de productos y Bodegas</button>
 
                    <!-- Cargar respaldo -->
                     <div class="d-none card-header mt-4">
