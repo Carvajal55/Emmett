@@ -278,8 +278,8 @@
 
                             return {
                                 code: cleanSku,
-                                name: details.name || 'Nombre no encontrado',
-                                description: details.description || 'Descripción no encontrada',
+                                name: details.name || null,
+                                description: details.description || null,
                                 quantity: product.total_quantity,
                                 quantityScanned: product.dispatched_quantity,
                                 superids: [],
@@ -289,8 +289,8 @@
                             console.error(`❌ Error al obtener detalles para SKU: ${cleanSku}`, error);
                             return {
                                 code: cleanSku,
-                                name: 'Error al obtener nombre',
-                                description: 'Error al obtener descripción',
+                                name: null,
+                                description: null,
                                 quantity: product.total_quantity,
                                 quantityScanned: product.dispatched_quantity,
                                 superids: [],
