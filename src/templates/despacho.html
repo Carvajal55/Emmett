@@ -153,8 +153,10 @@
 
                     if (response.data.icon === 'success') {
                         Swal.fire('Éxito', `Producto ${product.code} despachado correctamente.`, 'success');
-                        product.quantityScanned = product.quantity;
-                        product.is_complete = true;
+                        product.quantityScanned += 1; // Incrementa de a 1
+                        if (product.quantityScanned >= product.quantity) {
+                            product.is_complete = true;
+                        }
                         if (superid) product.superids.push(superid);
                     } else {
                         Swal.fire('Error', response.data.error || 'Error al forzar el despacho.', 'error');
