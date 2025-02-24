@@ -58,7 +58,22 @@
                 </div>
             </div>
         </div>
-
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h6>Generar Clave Dinámica</h6>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-primary" @click="generateDynamicKey" :disabled="loadingDynamic">
+                        [[ loadingDynamic ? 'Generando...' : 'Generar Clave' ]]
+                    </button>
+                    <div v-if="dynamicKey" class="mt-3">
+                        <p><strong>Clave:</strong> [[ dynamicKey ]]</p>
+                        <p><strong>Expira:</strong> [[ dynamicKeyExpiration ]]</p>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Gestión de Respaldo de Productos -->
         <div class="col-md-6 mb-4">
             <div>
@@ -147,8 +162,26 @@
             progressMessage: "Esperando inicio...",
             comparacionResultado: [],
             archivoExcel: null,  // Ruta del archivo Excel
+             // Nuevas propiedades para la clave dinámica
+            dynamicKey: '',
+            dynamicKeyExpiration: '',
+            loadingDynamic: false,
         },
         methods: {
+            async generateDynamicKey() {
+                try {
+                    this.loadingDynamic = true;
+                    const response = await axios.post('/api/generate-dynamic-key/');
+                    // Actualiza las propiedades con la respuesta de la API
+                    this.dynamicKey = response.data.key;
+                    this.dynamicKeyExpiration = response.data.expiration_time;
+                } catch (error) {
+                    console.error("Error al generar la clave dinámica:", error);
+                    Swal.fire('Error', 'No se pudo generar la clave dinámica.', 'error');
+                } finally {
+                    this.loadingDynamic = false;
+                }
+            },
 
             async eliminarProductos() {
                 if (!this.file) {
