@@ -910,6 +910,40 @@ def calcular_stock_bodegas(request):
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
 
+def enviar_correo_factura_aprobada(productos_actualizados, factura_id):
+    """
+    Envía un correo notificando la aprobación de una factura.
+    
+    Detalles incluidos en el correo:
+    - Cantidad total de productos actualizados.
+    - Para cada producto: SKU, nombre y precio.
+    
+    Se espera que cada diccionario en 'productos_actualizados' contenga las claves:
+    'sku', 'name' y 'lastcost'.
+    """
+    cantidad = len(productos_actualizados)
+    lista_productos = "\n".join([
+        f"SKU: {p['sku']}, Nombre: {p.get('name', 'Sin nombre')}, Precio: {p['lastcost']}"
+        for p in productos_actualizados
+    ])
+    fecha_actual = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+    subject = f"Factura Aprobada: {factura_id} - {cantidad} productos actualizados"
+    message = (
+        f"Fecha: {fecha_actual}\n\n"
+        f"La factura con ID {factura_id} ha sido aprobada.\n\n"
+        f"Cantidad de productos actualizados: {cantidad}\n\n"
+        "Detalle de productos:\n"
+        f"{lista_productos}"
+    )
+
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        ['pfarias@emmett.cl'],  # Cambia o agrega destinatarios según sea necesario
+        fail_silently=False,
+    )
+
 @csrf_exempt
 def aprobar_factura(request):
     if request.method == 'POST':
@@ -943,7 +977,11 @@ def aprobar_factura(request):
                     producto.save()
 
                     # Agregar el producto a la lista de actualizados
-                    productos_actualizados.append({'sku': producto.sku, 'lastcost': producto.lastcost})
+                    productos_actualizados.append({
+                        'sku': producto.sku,
+                        'name': producto.name,  # Se incluye el nombre del producto
+                        'lastcost': producto.lastcost
+                    })
                 except Products.DoesNotExist:
                     # Agregar los SKUs no encontrados a una lista separada
                     productos_no_encontrados.append(sku)
