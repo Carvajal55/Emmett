@@ -119,7 +119,7 @@
             // Determinar si mostrar el control de acceso según el rol
             const userRole = '{{ request.user.usuario.rol }}';
             if (userRole === 'BODEGA') {
-                this.showAccessControl = true;
+                this.showAccessControl = false;
             }
         },
         methods: {
