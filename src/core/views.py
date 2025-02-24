@@ -959,7 +959,7 @@ def aprobar_factura(request):
             if not detalles:
                 return JsonResponse({'error': 'No se proporcionaron detalles para actualizar.'}, status=400)
 
-            # Lista para almacenar los resultados
+            # Listas para almacenar los resultados
             productos_actualizados = []
             productos_no_encontrados = []
 
@@ -976,10 +976,10 @@ def aprobar_factura(request):
                     producto.lastcost = float(costo)
                     producto.save()
 
-                    # Agregar el producto a la lista de actualizados
+                    # Agregar el producto a la lista de actualizados usando el nombre enviado desde el frontend
                     productos_actualizados.append({
                         'sku': producto.sku,
-                        'name': producto.name,  # Se incluye el nombre del producto
+                        'name': detalle.get('name', ''),  # Se utiliza el nombre enviado desde el frontend
                         'lastcost': producto.lastcost
                     })
                 except Products.DoesNotExist:
@@ -1008,6 +1008,7 @@ def aprobar_factura(request):
             return JsonResponse({'error': str(e)}, status=500)
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
 
 @csrf_exempt
 def obtener_factura(request):

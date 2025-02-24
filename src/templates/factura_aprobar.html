@@ -837,12 +837,12 @@
                 const detalles = this.detalles.map(detalle => ({
                     sku: detalle.sku,
                     cost: detalle.cost,
-                    name: detalle.model  // Se agrega el nombre del producto
+                    name: detalle.model  // Se asume que 'detalle.model' contiene el nombre del producto
                 }));
 
                 const data = {
-                    factura_id: this.idFactura, // Incluye el ID de la factura
-                    detalles: detalles          // Detalles de la factura
+                    factura_id: this.idFactura, // ID de la factura
+                    detalles: detalles          // Detalles con SKU, costo y nombre
                 };
 
                 axios.post('/api/aprobar-factura/', data)
