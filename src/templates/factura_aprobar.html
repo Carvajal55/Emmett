@@ -836,7 +836,8 @@
             aprobarFactura() {
                 const detalles = this.detalles.map(detalle => ({
                     sku: detalle.sku,
-                    cost: detalle.cost
+                    cost: detalle.cost,
+                    name: detalle.model  // Se agrega el nombre del producto
                 }));
 
                 const data = {
