@@ -3841,7 +3841,10 @@ def imprimir_etiqueta_qr(request):
 
         # Obtener el correlativo actual
         last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
+        print(f"✅ last_unique_product: {last_unique_product}")
         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
+        print(f"✅ current_correlative: {current_correlative}")
+
         base_numeric_sku = ''.join(filter(str.isdigit, sku))
         if not base_numeric_sku:
             return JsonResponse({'error': 'El SKU no contiene números válidos.'}, status=400)
