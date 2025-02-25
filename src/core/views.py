@@ -3840,7 +3840,13 @@ def imprimir_etiqueta_qr(request):
         os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
         # Obtener el correlativo actual
-        last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
+        # Filtrar los productos que NO están en estado rechazado y que no pertenecen a facturas rechazadas
+        last_unique_product = Uniqueproducts.objects.filter(
+            product=producto,
+            state__in=[0, 1],  # Ajusta los estados según tu lógica (ej: 0: disponible, 1: usado)
+        ).exclude(
+            iddocumentincome__in=Purchase.objects.filter(status=2).values_list('id', flat=True)
+        ).order_by('-correlative').first()
         print(f"✅ last_unique_product: {last_unique_product}")
         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
         print(f"✅ current_correlative: {current_correlative}")
