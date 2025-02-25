@@ -116,13 +116,18 @@
                         </button>
                     </div>
                     <div class="row">
-                        <div v-for="(precio, index) in listasPrecios" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
+                        <div v-for="(precio, index) in listasPrecios" 
+                             :key="index" 
+                             class="col-md-6 mb-3" 
+                             style="padding: 10px;"
+                             v-if="precio.mostrar"> <!-- Solo se muestran los precios con mostrar: true -->
+                             
                             <div class="form-group">
                                 <!-- Mostrar el label con el Valor Sugerido -->
                                 <label :for="'precio-' + precio.id" style="font-weight: bold; margin-bottom: 5px; display: block;">
                                     [[ precio.label ]]
                                 </label>
-                
+                    
                                 <!-- Mostrar el Valor Sugerido -->
                                 <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
                                     Valor Sugerido: [[ precio.valorSugerido || 'Pendiente' ]] CLP
@@ -130,8 +135,7 @@
                                 <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
                                     Valor Actual: [[ precio.valorActual || 'Pendiente' ]] CLP
                                 </p>
-                               
-                
+                    
                                 <!-- Input para ingresar el valor -->
                                 <input
                                     type="number"
@@ -142,12 +146,12 @@
                                     placeholder="Ingrese precio"
                                     style="margin-bottom: 10px;"
                                 />
-                
+                    
                                 <!-- Mostrar el margen calculado -->
                                 <p style="margin-top: 10px; font-size: 1rem;">
                                     <strong>Margen:</strong> [[ precio.margen || 0 ]]%
                                 </p>
-                
+                    
                                 <div class="row">
                                     <div class="col-4">
                                         <label for="fee" style="font-size: 0.8rem; font-weight: bold;">
@@ -192,10 +196,8 @@
                                             placeholder="Ej: 4990"
                                         />
                                     </div>
-                                    
-                                   
                                 </div>
-                
+                    
                                 <!-- Botón para guardar individual -->
                                 <button
                                     class="btn btn-primary mt-2 w-100"
@@ -279,8 +281,9 @@
                     <td style="text-align: center;">[[ detalle.margen ]]%</td>
                     <td style="text-align: center;">[[ detalle.totalStock ]]</td>
                     <td>
-                        <button class="btn btn-info btn-sm" @click="abrirModal(detalle)">P.MarketPlace</button>
+                        <button class="btn btn-info btn-sm" @click="abrirModal(detalle,true)">P.MarketPlace</button>
                         <button class="btn btn-primary btn-sm mt-1" @click="actualizarPrecioBase(detalle)">P.Base</button>
+                        <button class="btn btn-secondary" @click="abrirModal(detalle, false)">Precios.G&M</button>
                     </td>
                 </tr>
             </tbody>
@@ -309,11 +312,13 @@
             errorMsg: '',    // Mensaje de error
             idFactura: null,
             listasPrecios: [
-                { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, margen: null, valor: null, valorSugerido: null },
-                { label: 'Paris', id: 12,  fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                
+                { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, margen: null, valor: null, valorSugerido: null, mostrar: true },
+                { label: 'Paris', id: 12,  fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
+                { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
+                { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
+                { label: 'Falabella', id: 11, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
+                { label: 'Groben', id: 15, fee: 1.10, feePercentage: 1.10, iva: 1.19, n: 1.25, nPercentage: 1.25, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false },
+                { label: 'Mayorista', id: 16, fee: 1.05, feePercentage: 1.05, iva: 1.19, n: 1.20, nPercentage: 1.20, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false }
             ],
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
@@ -600,7 +605,7 @@
                 const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
                 precio.valorSugerido = valorSugerido;
             },
-            abrirModal(detalle) {
+            abrirModal(detalle, mostrar) {
                 this.skuSeleccionado = detalle.sku;
                 this.nombreSeleccionado = detalle.model;
                 this.precioSeleccionado = detalle.precioBase;
@@ -611,11 +616,18 @@
                 // Inicializar las listas de precios con valores por defecto
                 this.listasPrecios = this.initializeListasPrecios(detalle);
 
-                // Obtener los valores actuales y calcular sugeridos para cada lista de precios
+                // Mostrar solo los valores de 'mostrar' que coincidan con el parámetro recibido
                 this.listasPrecios.forEach(precio => {
-                    this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
-                    this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
-                    precio.margen = 0; // Inicializa el margen en 0%
+                    precio.mostrar = (precio.mostrar === mostrar);
+                });
+
+                // Obtener los valores actuales y calcular sugeridos solo para los que se muestran
+                this.listasPrecios.forEach(precio => {
+                    if (precio.mostrar) {
+                        this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
+                        this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
+                        precio.margen = 0; // Inicializa el margen en 0%
+                    }
                 });
 
                 // Mostrar el modal después de cargar los datos
