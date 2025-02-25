@@ -230,24 +230,13 @@
             },
             // Buscar productos con paginación
             async fetchProducts(page = 1) {
-                // Restablecer el producto seleccionado cuando se realiza una nueva búsqueda
-                this.selectedProduct = null;
-
-                if (!this.searchQuery) {
-                    this.products = [];
-                    this.isLoading = false;
-                    return;
-                }
-
-                // Generar un identificador único para esta solicitud
-                const requestId = Date.now();
-                this.currentRequestId = requestId;
+                // Guardamos el id del producto seleccionado (si existe)
+                const currentSelectedId = this.selectedProduct ? this.selectedProduct.id : null;
 
                 // Cancelar solicitudes anteriores si existen
                 if (this.cancelTokenSource) {
                     this.cancelTokenSource.cancel("Cancelando solicitud anterior");
                 }
-
                 this.cancelTokenSource = axios.CancelToken.source();
                 this.isLoading = true; // Mostrar indicador de carga
 
@@ -257,24 +246,22 @@
                         cancelToken: this.cancelTokenSource.token,
                     });
 
-                    // Solo procesar la respuesta si corresponde a la solicitud más reciente
-                    if (this.currentRequestId === requestId) {
-                        this.products = response.data.products;
-                        this.totalPages = response.data.total_pages;
-                        this.currentPage = response.data.current_page;
-                        this.isLoading = false; // Ocultar indicador de carga
+                    this.products = response.data.products;
+                    this.totalPages = response.data.total_pages;
+                    this.currentPage = response.data.current_page;
+
+                    // Solo reiniciamos selectedProduct si el producto seleccionado ya no está en la lista
+                    if (currentSelectedId && !this.products.some(product => product.id === currentSelectedId)) {
+                        this.selectedProduct = null;
                     }
+                    this.isLoading = false;
                 } catch (error) {
                     if (axios.isCancel(error)) {
                         console.log("Solicitud cancelada:", error.message);
                     } else {
                         console.error("Error al cargar productos:", error);
                     }
-
-                    // Solo ocultar el indicador si corresponde a la solicitud más reciente
-                    if (this.currentRequestId === requestId) {
-                        this.isLoading = false;
-                    }
+                    this.isLoading = false;
                 }
             },
 
