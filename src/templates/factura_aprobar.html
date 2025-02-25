@@ -283,7 +283,7 @@
                     <td>
                         <button class="btn btn-info btn-sm" @click="abrirModal(detalle,true)">P.MarketPlace</button>
                         <button class="btn btn-primary btn-sm mt-1" @click="actualizarPrecioBase(detalle)">P.Base</button>
-                        <button class="btn btn-secondary" @click="abrirModal(detalle, false)">Precios.G&M</button>
+                        <button class="btn btn-secondary btn-sm" @click="abrirModal(detalle, false)">Precios.G&M</button>
                     </td>
                 </tr>
             </tbody>
@@ -463,11 +463,9 @@
                 axios.post('/api/obtener_valor_actual/', data)
                     .then(response => {
                         const valorRecibido = response.data.valor_actual;
-
-                        // Verificar si se recibió un valor válido y sumar el IVA
                         if (valorRecibido) {
-                            const valorConIva = Math.floor(valorRecibido * 1.19); // Sumar IVA y redondear
-                            this.$set(precio, 'valorActual', valorConIva); // Reactivo
+                            const valorConIva = Math.floor(valorRecibido * 1.19);
+                            this.$set(precio, 'valorActual', valorConIva);
                         } else {
                             this.$set(precio, 'valorActual', 'Pendiente');
                         }
@@ -479,12 +477,13 @@
             },
             initializeListasPrecios(detalle) {
                 return [
-                    { label: 'MercadoLibre', id: 10, fee: 1.25, iva: 1.19, n: 1.35, despacho: 4990, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
-                    { label: 'Paris', id: 12, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
-                    { label: 'Ripley', id: 13, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
-                    { label: 'Walmart', id: 14, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
-                    { label: 'Falabella', id: 11, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null }
-
+                    { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, costo: detalle.cost || 0, margen: 0, valor: detalle.precioBase || null, valorSugerido: null, mostrar: true },
+                    { label: 'Paris', id: 12, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, costo: detalle.cost || 0, margen: 0, valor: detalle.precioBase || null, valorSugerido: null, mostrar: true },
+                    { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, costo: detalle.cost || 0, margen: 0, valor: detalle.precioBase || null, valorSugerido: null, mostrar: true },
+                    { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, costo: detalle.cost || 0, margen: 0, valor: detalle.precioBase || null, valorSugerido: null, mostrar: true },
+                    { label: 'Falabella', id: 11, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, costo: detalle.cost || 0, margen: 0, valor: detalle.precioBase || null, valorSugerido: null, mostrar: true },
+                    { label: 'Groben', id: 15, fee: 1.10, feePercentage: 1.10, iva: 1.19, n: 1.25, nPercentage: 1.25, despacho: 0, costo: detalle.cost || 0, margen: 0, valor: detalle.precioBase || null, valorSugerido: null, mostrar: false },
+                    { label: 'Mayorista', id: 16, fee: 1.05, feePercentage: 1.05, iva: 1.19, n: 1.20, nPercentage: 1.20, despacho: 0, costo: detalle.cost || 0, margen: 0, valor: detalle.precioBase || null, valorSugerido: null, mostrar: false }
                 ];
             },
             recalcularTodos() {
@@ -626,7 +625,7 @@
                     if (precio.mostrar) {
                         this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
                         this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
-                        precio.margen = 0; // Inicializa el margen en 0%
+                        this.recalcularMargen(precio); // Recalcula el margen
                     }
                 });
 
@@ -638,7 +637,7 @@
                 const fee = parseFloat(precio.fee) || 1.25;
                 const iva = parseFloat(precio.iva) || 1.19;
                 const despacho = parseFloat(precio.despacho) || 0;
-                const n = parseFloat(precio.n) || 1; // Tomar el valor de N
+                const n = parseFloat(precio.n) || 1;
 
                 // Calcular Margen Deseado usando la fórmula dada
                 const margenDeseado = (100 - (100 / n)) / 100;
