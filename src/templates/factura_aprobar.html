@@ -66,159 +66,46 @@
     </div>
    <!-- Modal -->
    <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog" aria-labelledby="modalPreciosLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl custom-modal-width" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div>
-                        <h4 class="modal-title" id="modalPreciosLabel" style="font-size: 1.5rem; font-weight: bold;">
-                            Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]
-                        </h4>
-                        <p style="font-size: 1.2rem; font-weight: bold;">
-                            Nombre: [[ nombreSeleccionado ]]
-                        </p>
-                        <p style="font-size: 1.2rem; font-weight: bold;">
-                            Precio Base Bsale: [[ precioSeleccionado ]]
-                        </p>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="modal-dialog modal-xl custom-modal-width" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h4 class="modal-title" id="modalPreciosLabel" style="font-size: 1.5rem; font-weight: bold;">
+                        Actualizar Listas de Precios para SKU: [[ skuSeleccionado ]]
+                    </h4>
+                    <p style="font-size: 1.2rem; font-weight: bold;">
+                        Nombre: [[ nombreSeleccionado ]]
+                    </p>
+                    <p style="font-size: 1.2rem; font-weight: bold;">
+                        Precio Base Bsale: [[ precioSeleccionado ]]
+                    </p>
                 </div>
-                <div class="modal-body">
-                    <div class="form-group col-6 mb-3">
-                        <div class="form-check">
-                            <input 
-                                type="checkbox" 
-                                id="toggleGlobalInput" 
-                                class="form-check-input" 
-                                v-model="habilitarInputGlobal"
-                            />
-                            <label for="toggleGlobalInput" class="form-check-label" style="font-weight: bold;">Habilitar Precio Global</label>
-                        </div>
-                    
-                        <label for="inputGlobal" style="font-weight: bold; font-size: 1rem;">Precio Global</label>
-                        <input
-                            type="number"
-                            id="inputGlobal"
-                            class="form-control"
-                            v-model.number="precioGlobal"
-                            @input="asignarPrecioGlobal"
-                            placeholder="Ingrese un precio global"
-                            :disabled="!habilitarInputGlobal"
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group col-6 mb-3">
+                    <div class="form-check">
+                        <input 
+                            type="checkbox" 
+                            id="toggleGlobalInput" 
+                            class="form-check-input" 
+                            v-model="habilitarInputGlobal"
                         />
+                        <label for="toggleGlobalInput" class="form-check-label" style="font-weight: bold;">Habilitar Precio Global</label>
                     </div>
-                    <div class="col-12  mt-4">
-                        <button
-                            type="button"
-                            class="btn btn-success"
-                            @click="actualizarTodosLosPrecios"
-                            style="padding: 10px 20px; font-size: 1rem;"
-                        >
-                            Actualizar Todos
-                        </button>
-                    </div>
-                    <div class="row">
-                        <div v-for="(precio, index) in listasPrecios" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
-                            <div class="form-group">
-                                <!-- Mostrar el label con el Valor Sugerido -->
-                                <label :for="'precio-' + precio.id" style="font-weight: bold; margin-bottom: 5px; display: block;">
-                                    [[ precio.label ]]
-                                </label>
                 
-                                <!-- Mostrar el Valor Sugerido -->
-                                <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
-                                    Valor Sugerido: [[ precio.valorSugerido || 'Pendiente' ]] CLP
-                                </p>
-                                <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
-                                    Valor Actual: [[ precio.valorActual || 'Pendiente' ]] CLP
-                                </p>
-                               
-                
-                                <!-- Input para ingresar el valor -->
-                                <input
-                                    type="number"
-                                    class="form-control"
-                                    v-model.number="precio.valor"
-                                    @input="recalcularMargen(precio)"
-                                    :id="'precio-' + precio.id"
-                                    placeholder="Ingrese precio"
-                                    style="margin-bottom: 10px;"
-                                />
-                
-                                <!-- Mostrar el margen calculado -->
-                                <p style="margin-top: 10px; font-size: 1rem;">
-                                    <strong>Margen:</strong> [[ precio.margen || 0 ]]%
-                                </p>
-                
-                                <div class="row">
-                                    <div class="col-4">
-                                        <label for="fee" style="font-size: 0.8rem; font-weight: bold;">
-                                            Comisión (Fee)
-                                            <span style="color: gray;">[[ calcularPorcentajeFee(precio.fee) ]]%</span>
-                                        </label>
-                                        <input
-                                            type="number"
-                                            class="form-control form-control-sm"
-                                            v-model.number="precio.fee"
-                                            @input="actualizarMargenYValorSugerido(precio)"
-                                            id="fee"
-                                            placeholder="Ej: 1.25"
-                                        />
-                                    </div>
-                                    
-                                    <div class="col-4">
-                                        <label for="n" style="font-size: 0.8rem; font-weight: bold;">
-                                            Margen (N)
-                                            <span style="color: gray;">[[ calcularPorcentajeMargen(precio.n) ]]%</span>
-                                        </label>
-                                        <input
-                                            type="number"
-                                            class="form-control form-control-sm"
-                                            v-model.number="precio.n"
-                                            @input="actualizarMargenYValorSugerido(precio)"
-                                            id="n"
-                                            placeholder="Ej: 1.35"
-                                        />
-                                    </div>
-                                    
-                                    <div class="col-4">
-                                        <label for="despacho" style="font-size: 0.8rem; font-weight: bold;">
-                                            Despacho (CLP)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            class="form-control form-control-sm"
-                                            v-model.number="precio.despacho"
-                                            @input="actualizarMargenYValorSugerido(precio)"
-                                            id="despacho"
-                                            placeholder="Ej: 4990"
-                                        />
-                                    </div>
-                                    
-                                   
-                                </div>
-                
-                                <!-- Botón para guardar individual -->
-                                <button
-                                    class="btn btn-primary mt-2 w-100"
-                                    @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)"
-                                    :style="getButtonStyle(precio.label)"
-                                >
-                                    Guardar para [[ precio.label ]]
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <label for="inputGlobal" style="font-weight: bold; font-size: 1rem;">Precio Global</label>
+                    <input
+                        type="number"
+                        id="inputGlobal"
+                        class="form-control"
+                        v-model.number="precioGlobal"
+                        @input="asignarPrecioGlobal"
+                        placeholder="Ingrese un precio global"
+                        :disabled="!habilitarInputGlobal"
+                    />
                 </div>
-                <div class="modal-footer">
-                    <!-- Botón para cerrar -->
-                    <button
-                        type="button"
-                        class="btn btn-secondary"
-                        data-bs-dismiss="modal"
-                        style="padding: 10px 20px; font-size: 1rem;"
-                    >
-                        Cerrar
-                    </button>
-                    <!-- Botón para actualizar todos los precios -->
+                <div class="col-12 mt-4">
                     <button
                         type="button"
                         class="btn btn-success"
@@ -228,9 +115,135 @@
                         Actualizar Todos
                     </button>
                 </div>
+                <div class="row">
+                    <!-- Aquí se muestran las listas filtradas según modalType -->
+                    <div v-for="(precio, index) in listasPreciosFiltradas" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
+                        <div class="form-group">
+                            <label :for="'precio-' + precio.id" style="font-weight: bold; margin-bottom: 5px; display: block;">
+                                [[ precio.label ]]
+                            </label>
+                            <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
+                                Valor Sugerido: [[ precio.valorSugerido || 'Pendiente' ]] CLP
+                            </p>
+                            <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
+                                Valor Actual: [[ precio.valorActual || 'Pendiente' ]] CLP
+                            </p>
+                            <input
+                                type="number"
+                                class="form-control"
+                                v-model.number="precio.valor"
+                                @input="recalcularMargen(precio)"
+                                :id="'precio-' + precio.id"
+                                placeholder="Ingrese precio"
+                                style="margin-bottom: 10px;"
+                            />
+                            <p style="margin-top: 10px; font-size: 1rem;">
+                                <strong>Margen:</strong> [[ precio.margen || 0 ]]%
+                            </p>
+                            <div class="row">
+                                <div class="col-4">
+                                    <label for="fee" style="font-size: 0.8rem; font-weight: bold;">
+                                        Comisión (Fee)
+                                        <span style="color: gray;">[[ calcularPorcentajeFee(precio.fee) ]]%</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        class="form-control form-control-sm"
+                                        v-model.number="precio.fee"
+                                        @input="actualizarMargenYValorSugerido(precio)"
+                                        id="fee"
+                                        placeholder="Ej: 1.25"
+                                    />
+                                </div>
+                                <div class="col-4">
+                                    <label for="n" style="font-size: 0.8rem; font-weight: bold;">
+                                        Margen (N)
+                                        <span style="color: gray;">[[ calcularPorcentajeMargen(precio.n) ]]%</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        class="form-control form-control-sm"
+                                        v-model.number="precio.n"
+                                        @input="actualizarMargenYValorSugerido(precio)"
+                                        id="n"
+                                        placeholder="Ej: 1.35"
+                                    />
+                                </div>
+                                <div class="col-4">
+                                    <label for="despacho" style="font-size: 0.8rem; font-weight: bold;">
+                                        Despacho (CLP)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        class="form-control form-control-sm"
+                                        v-model.number="precio.despacho"
+                                        @input="actualizarMargenYValorSugerido(precio)"
+                                        id="despacho"
+                                        placeholder="Ej: 4990"
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                class="btn btn-primary mt-2 w-100"
+                                @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)"
+                                :style="getButtonStyle(precio.label)"
+                            >
+                                Guardar para [[ precio.label ]]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-bs-dismiss="modal"
+                    style="padding: 10px 20px; font-size: 1rem;"
+                >
+                    Cerrar
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-success"
+                    @click="actualizarTodosLosPrecios"
+                    style="padding: 10px 20px; font-size: 1rem;"
+                >
+                    Actualizar Todos
+                </button>
             </div>
         </div>
     </div>
+</div>
+
+    <div class="modal fade" id="modalMayoristaGroben" tabindex="-1" role="dialog" aria-labelledby="modalMayoristaGrobenLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl custom-modal-width" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h4 class="modal-title" id="modalMayoristaGrobenLabel" style="font-size: 1.5rem; font-weight: bold;">
+                Actualizar Listas de Precios (Mayorista y Groben) para SKU: [[ skuSeleccionado ]]
+              </h4>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row">
+                <div v-for="(precio, index) in listasPreciosModalMayoristaGroben" :key="index" class="col-md-6 mb-3">
+                  <label :for="'precio-mg-' + precio.id" style="font-weight: bold;">[[ precio.label ]]</label>
+                  <input type="number" class="form-control" v-model.number="precio.valor" @input="recalcularMargen(precio)" placeholder="Ingrese precio" />
+                  <p><strong>Margen:</strong> [[ precio.margen || 0 ]]%</p>
+                  <button class="btn btn-primary mt-2 w-100" @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)">
+                    Guardar para [[ precio.label ]]
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+              <button type="button" class="btn btn-success" @click="actualizarTodosLosPreciosMayoristaGroben">Actualizar Todos</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
 
 
@@ -279,8 +292,9 @@
                     <td style="text-align: center;">[[ detalle.margen ]]%</td>
                     <td style="text-align: center;">[[ detalle.totalStock ]]</td>
                     <td>
-                        <button class="btn btn-info btn-sm" @click="abrirModal(detalle)">P.MarketPlace</button>
+                        <button class="btn btn-info btn-sm" @click="abrirModalMarketplace(detalle)">P.MarketPlace</button>
                         <button class="btn btn-primary btn-sm mt-1" @click="actualizarPrecioBase(detalle)">P.Base</button>
+                        <button class="btn btn-secondary btn-sm mt-1" @click="abrirModalMayoristaGroben(detalle)">P.Mayorista/Groben</button>
                     </td>
                 </tr>
             </tbody>
@@ -310,11 +324,14 @@
             idFactura: null,
             listasPrecios: [
                 { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, margen: null, valor: null, valorSugerido: null },
-                { label: 'Paris', id: 12,  fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Paris', id: 12, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
                 { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
                 { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
-                
+                { label: 'Mayorista', id: 15, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Groben', id: 16, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null }
             ],
+            modalType: 'resto',
+            //------------------------
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
             precioSeleccionado: null,
@@ -324,6 +341,7 @@
         },
         mounted() {
             console.log("Componente montado"); // Verificar que el mounted se ejecuta
+            
 
             this.idFactura = this.getFacturaIdFromURL(); // Guardar el ID de la URL en la variable de Vue
             if (this.idFactura) {
@@ -334,8 +352,39 @@
             this.recalcularTodos();
 
             
+
+            
         },
+        computed: {
+            listasPreciosFiltradas() {
+                if (this.modalType === 'grobenMayorista') {
+                    return this.listasPrecios.filter(item => item.label === 'Mayorista' || item.label === 'Groben');
+                } else if (this.modalType === 'resto') {
+                    return this.listasPrecios.filter(item => item.label !== 'Mayorista' && item.label !== 'Groben');
+                }
+                // Si no se especifica, retornamos la lista completa
+                return this.listasPrecios;
+            }
+            },
         methods: {
+            // Modal Marketplace: se mostrarán todas menos Mayorista y Groben
+                abrirModalMarketplace(detalle) {
+                    this.skuSeleccionado = detalle.sku;
+                    this.nombreSeleccionado = detalle.model;
+                    this.precioSeleccionado = detalle.precioBase;
+                    this.detalleSeleccionado = detalle;
+                    // Aquí puedes, si lo deseas, actualizar valores o recalcular márgenes
+                    $('#modalPrecios').modal('show');
+                },
+                // Modal Mayorista/Groben: se mostrarán solo esas dos listas
+                abrirModalMayoristaGroben(detalle) {
+                    this.skuSeleccionado = detalle.sku;
+                    this.nombreSeleccionado = detalle.model;
+                    this.precioSeleccionado = detalle.precioBase;
+                    this.detalleSeleccionado = detalle;
+                    // Aquí también puedes actualizar los valores específicos para este modal
+                    $('#modalMayoristaGroben').modal('show');
+                },
             calcularPorcentaje(valor) {
                 if (valor && valor > 0) {
                     return ((valor - 1) * 100).toFixed(2);
