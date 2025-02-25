@@ -231,93 +231,6 @@
             </div>
         </div>
     </div>
-    <!-- Nuevo Modal para Mayorista y Groben -->
-    <div class="modal fade" id="modalMayorista" tabindex="-1" role="dialog" aria-labelledby="modalMayoristaLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl custom-modal-width" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div>
-                        <h4 class="modal-title" id="modalMayoristaLabel" style="font-size: 1.5rem; font-weight: bold;">
-                            Actualizar Listas de Precios Mayorista y Groben para SKU: [[ skuSeleccionado ]]
-                        </h4>
-                        <p style="font-size: 1.2rem; font-weight: bold;">
-                            Nombre: [[ nombreSeleccionado ]]
-                        </p>
-                        <p style="font-size: 1.2rem; font-weight: bold;">
-                            Precio Base Bsale: [[ precioSeleccionado ]]
-                        </p>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- Input para precio global (opcional) -->
-                    <div class="form-group col-6 mb-3">
-                        <label for="inputGlobalMayorista" style="font-weight: bold; font-size: 1rem;">Precio Global (Mayorista/Groben)</label>
-                        <input
-                            type="number"
-                            id="inputGlobalMayorista"
-                            class="form-control"
-                            v-model.number="precioGlobalMayorista"
-                            @input="asignarPrecioGlobalMayorista"
-                            placeholder="Ingrese un precio global"
-                        />
-                    </div>
-                    <!-- Tabla de las 2 listas de precio (Mayorista y Groben) -->
-                    <div class="row">
-                        <div v-for="(precio, index) in listasPreciosMayorista" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
-                            <div class="form-group">
-                                <label :for="'precio-mayorista-' + precio.id" style="font-weight: bold; margin-bottom: 5px; display: block;">
-                                    [[ precio.label ]]
-                                </label>
-                                <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
-                                    Valor Sugerido: [[ precio.valorSugerido || 'Pendiente' ]] CLP
-                                </p>
-                                <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
-                                    Valor Actual: [[ precio.valorActual || 'Pendiente' ]] CLP
-                                </p>
-                                <input
-                                    type="number"
-                                    class="form-control"
-                                    v-model.number="precio.valor"
-                                    @input="recalcularMargen(precio)"
-                                    :id="'precio-mayorista-' + precio.id"
-                                    placeholder="Ingrese precio"
-                                    style="margin-bottom: 10px;"
-                                />
-                                <p style="margin-top: 10px; font-size: 1rem;">
-                                    <strong>Margen:</strong> [[ precio.margen || 0 ]]%
-                                </p>
-                                <button
-                                    class="btn btn-primary mt-2 w-100"
-                                    @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)"
-                                >
-                                    Guardar para [[ precio.label ]]
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button
-                        type="button"
-                        class="btn btn-secondary"
-                        data-bs-dismiss="modal"
-                        style="padding: 10px 20px; font-size: 1rem;"
-                    >
-                        Cerrar
-                    </button>
-                    <button
-                        type="button"
-                        class="btn btn-success"
-                        @click="actualizarTodosLosPreciosMayorista"
-                        style="padding: 10px 20px; font-size: 1rem;"
-                    >
-                        Actualizar Todos
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 
 
 
@@ -368,7 +281,6 @@
                     <td>
                         <button class="btn btn-info btn-sm" @click="abrirModal(detalle)">P.MarketPlace</button>
                         <button class="btn btn-primary btn-sm mt-1" @click="actualizarPrecioBase(detalle)">P.Base</button>
-                        <button class="btn btn-secondary btn-sm mt-1" @click="abrirModalMayorista(detalle)">P.Mayorista/Groben</button>
                     </td>
                 </tr>
             </tbody>
