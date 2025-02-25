@@ -216,34 +216,7 @@
     </div>
 </div>
 
-    <div class="modal fade" id="modalMayoristaGroben" tabindex="-1" role="dialog" aria-labelledby="modalMayoristaGrobenLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl custom-modal-width" role="document">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h4 class="modal-title" id="modalMayoristaGrobenLabel" style="font-size: 1.5rem; font-weight: bold;">
-                Actualizar Listas de Precios (Mayorista y Groben) para SKU: [[ skuSeleccionado ]]
-              </h4>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              <div class="row">
-                <div v-for="(precio, index) in listasPreciosModalMayoristaGroben" :key="index" class="col-md-6 mb-3">
-                  <label :for="'precio-mg-' + precio.id" style="font-weight: bold;">[[ precio.label ]]</label>
-                  <input type="number" class="form-control" v-model.number="precio.valor" @input="recalcularMargen(precio)" placeholder="Ingrese precio" />
-                  <p><strong>Margen:</strong> [[ precio.margen || 0 ]]%</p>
-                  <button class="btn btn-primary mt-2 w-100" @click="actualizarListaPrecio(detalleSeleccionado, precio.id, precio.valor)">
-                    Guardar para [[ precio.label ]]
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-              <button type="button" class="btn btn-success" @click="actualizarTodosLosPreciosMayoristaGroben">Actualizar Todos</button>
-            </div>
-          </div>
-        </div>
-      </div>
+   
 
 
 
