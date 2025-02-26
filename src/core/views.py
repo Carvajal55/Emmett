@@ -4639,6 +4639,11 @@ def guardar_resultados_json():
     json_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.json")
 
     try:
+        # Intentar eliminar un archivo previo
+        if os.path.exists(json_path):
+            os.remove(json_path)
+            print("🗑️ JSON previo eliminado.")
+
         with open(json_path, 'w') as json_file:
             json.dump(resultados, json_file, indent=4)
         
@@ -4702,52 +4707,51 @@ def guardar_resultados_en_excel(resultados):
     excel_thread = Thread(target=_guardar_excel)
     excel_thread.start()
 
-@csrf_exempt
 def ajustar_stock_bsale(request):
     """Endpoint para comparar y ajustar stock en Bsale."""
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    # Limitar a 400 productos
-    productos = list(Products.objects.all()[:40])
+    productos = list(Products.objects.all()[:40])  # Solo 40 para pruebas
 
-    # Limpiar resultados previos
-    resultados.clear()
+    print("🔄 Iniciando procesamiento de productos...")
 
-    # Encolamos los productos
     for index, producto in enumerate(productos):
+        print(f"🔄 Encolando SKU {producto.sku} ({index + 1}/{len(productos)})")
         queue.put((index, producto, len(productos)))
 
-    # Número de workers
     num_workers = 3
     threads = []
 
-    # Iniciar threads para procesamiento
-    for _ in range(num_workers):
+    print("🔄 Iniciando workers...")
+
+    for i in range(num_workers):
         t = Thread(target=procesar_producto_worker)
         t.start()
         threads.append(t)
+        print(f"✅ Worker {i+1} iniciado")
 
-    # Añadir señal de terminación a la cola
+    print("🔄 Encolando señales de finalización...")
     for _ in range(num_workers):
         queue.put(None)
 
-    # Esperar a que todos los productos sean procesados
+    print("🔄 Esperando a que la cola se vacíe...")
     queue.join()
+    print("✅ Cola vaciada.")
 
-    # Esperar a que todos los threads finalicen
+    print("🔄 Esperando a que todos los threads finalicen...")
     for t in threads:
         t.join()
+    print("✅ Todos los threads han finalizado.")
 
-    # ✅ Liberar la respuesta a la API
-    response = JsonResponse({"message": "Procesamiento completado. Generando Excel..."})
-    print("✅ Respuesta enviada al frontend.")
-    
-    # 🧵 Generar Excel en un hilo separado
-    excel_thread = Thread(target=guardar_resultados_json)
-    excel_thread.start()
-
-    return response
+    # Generar el JSON final al terminar
+    excel_url = guardar_resultados_json()
+    if excel_url:
+        print(f"✅ JSON generado en: {excel_url}")
+        return JsonResponse({"archivo": excel_url})
+    else:
+        print("❌ Error al generar el JSON.")
+        return JsonResponse({"error": "No se pudo generar el JSON"}, status=500)
 
 REQUEST_TIMEOUT = 5
 #---------------------------------
