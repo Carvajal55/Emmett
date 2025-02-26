@@ -4464,60 +4464,58 @@ def get_stock_bsale(iderp, retry=False):
     return None, {"error": "Error crítico en la solicitud a Bsale"}
 
 def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost, stock_data):
-    """Ajusta el stock en Bsale distribuyendo el consumo entre oficinas disponibles."""
-    if cantidad == 0:
-        return "No ajuste necesario", {}
-
-    payloads = []  # Lista de payloads para múltiples oficinas
+    """Ajusta el stock en Bsale para un SKU específico."""
     url = BSALE_CONSUME_URL if tipo == "consumption" else BSALE_RECEIVE_URL
+    cantidad_restante = abs(cantidad)
+    payloads = []
 
     # Obtener oficinas con stock disponible
     oficinas = sorted(
         stock_data.get("items", []),
-        key=lambda x: x["quantityAvailable"],  # Ordenar por cantidad disponible
-        reverse=True  # Primero las oficinas con más stock
+        key=lambda x: x["quantityAvailable"],
+        reverse=True
     )
 
-    cantidad_restante = abs(cantidad)  # Lo que necesitamos restar
+    print(f"🔍 SKU: {sku} | Tipo: {tipo} | Cantidad a ajustar: {cantidad_restante}")
 
+    # Construir payloads para ajustar stock
     for oficina in oficinas:
         office_id = oficina["office"]["id"]
         disponible = oficina["quantityAvailable"]
 
-        if disponible > 0:
-            ajustar = min(cantidad_restante, disponible)  # No restar más de lo disponible
-            payload = {
-                "officeId": office_id,
-                "details": [{
-                    "quantity": ajustar,
-                    "variantId": iderp
-                }]
-            }
+        if tipo == "consumption" and disponible <= 0:
+            continue  # No consumir en oficinas sin stock
 
-            payloads.append(payload)
-            cantidad_restante -= ajustar
+        ajustar = min(cantidad_restante, disponible if tipo == "consumption" else cantidad_restante)
+        payload = {
+            "officeId": office_id,
+            "details": [{
+                "quantity": ajustar,
+                "variantId": iderp
+            }]
+        }
 
-            if cantidad_restante <= 0:
-                break  # Ya ajustamos todo
+        payloads.append(payload)
+        cantidad_restante -= ajustar
 
-    # Si aún hay cantidad por descontar, significa que no hay suficiente stock
-    if cantidad_restante > 0 and tipo == "consumption":
-        return f"❌ Error: No se puede restar {abs(cantidad)} porque el stock total en Bsale es insuficiente", {}
+        if cantidad_restante <= 0:
+            break
+
+    if cantidad_restante > 0:
+        print(f"❌ No se pudo ajustar todo el stock para SKU {sku}. Cantidad restante: {cantidad_restante}")
+        return f"Error: No se pudo ajustar todo el stock para SKU {sku}", {}
 
     # Enviar ajustes a Bsale
     resultados = []
     for payload in payloads:
-        try:
-            response = requests.post(url, headers=HEADERS, json=payload, timeout=10)
-            if response.status_code == 201:
-                resultados.append(f"✅ Ajuste realizado en oficina {payload['officeId']}")
-            else:
-                resultados.append(f"❌ Error en ajuste en oficina {payload['officeId']}: {response.status_code} - {response.text}")
-                print(f"❌ Error en ajuste: Payload: {payload} - Respuesta: {response.text}")
-        except requests.Timeout:
-            resultados.append(f"⏳ Timeout en ajuste en oficina {payload['officeId']}")
-        except Exception as e:
-            resultados.append(f"❌ Error inesperado: {str(e)}")
+        print(f"📤 Enviando ajuste a Bsale: {payload}")
+        response = requests.post(url, headers=HEADERS, json=payload)
+        if response.status_code == 201:
+            resultados.append(f"✅ Ajuste realizado en oficina {payload['officeId']}")
+            print(f"✅ Ajuste exitoso en oficina {payload['officeId']}")
+        else:
+            resultados.append(f"❌ Error en ajuste en oficina {payload['officeId']}: {response.status_code} - {response.text}")
+            print(f"❌ Error en ajuste en oficina {payload['officeId']}: {response.status_code} - {response.text}")
 
     return " | ".join(resultados), payloads
 
@@ -4575,34 +4573,34 @@ def guardar_resultados_incremental(resultado):
             print(f"❌ Error al guardar resultado incremental: {str(e)}")
 
 def procesar_producto(producto, total_productos, index, retry=False):
-    """Procesa cada producto, compara stock local con Bsale y ajusta si es necesario."""
+    """Procesa un SKU comparando stock local y Bsale, ajustando si es necesario."""
     sku = producto.sku
     iderp = producto.iderp
     cost = producto.lastcost
     stock_bsale, stock_data = get_stock_bsale(iderp, retry)
-
+    
     if stock_bsale is None:
+        print(f"❌ Error crítico al obtener stock de Bsale para SKU {sku}")
         return {
             "sku": sku,
             "nombre": producto.nameproduct,
-            "error": "Error crítico en la consulta a Bsale",
-            "stock_bsale_data": json.dumps(stock_data, indent=2)  # Guardamos JSON como string en Excel
+            "error": "Error crítico en la consulta a Bsale"
         }
 
     stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
     diferencia = stock_local - stock_bsale
-    print(f"🔍 SKU: {sku} | Stock Local: {stock_local} | Stock Bsale: {stock_bsale} | Diferencia: {diferencia}")
 
     ajuste_resultado = "No ajuste necesario"
     ajuste_respuesta = {}
 
+    print(f"🔄 Procesando SKU {sku} ({index + 1}/{total_productos}) | Local: {stock_local} | Bsale: {stock_bsale} | Diferencia: {diferencia}")
+
+    # Comparación y Ajuste
     if diferencia > 0:
-        # Si el stock local es mayor que el de Bsale, se necesita hacer recepción en Bsale
         print(f"📥 Recepción en Bsale para SKU: {sku} | Diferencia: {diferencia}")
         ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost, stock_data)
 
     elif diferencia < 0:
-        # Si el stock local es menor que el de Bsale, se necesita hacer consumo en Bsale
         if abs(diferencia) <= stock_bsale:
             print(f"📦 Consumo en Bsale para SKU: {sku} | Diferencia: {diferencia}")
             ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost, stock_data)
@@ -4611,31 +4609,20 @@ def procesar_producto(producto, total_productos, index, retry=False):
             print(ajuste_resultado)
 
     elif stock_local == 0 and stock_bsale > 0:
-        # Si el stock local es 0 pero en Bsale hay stock, se debe forzar el consumo en Bsale
-        print(f"❌ Stock local 0 pero en Bsale hay {stock_bsale} - Ajustando a 0 en Bsale para SKU: {sku}")
+        print(f"🚫 Stock local 0 pero en Bsale hay {stock_bsale} - Poniendo en 0 en Bsale para SKU: {sku}")
         ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, -stock_bsale, "consumption", iderp, cost, stock_data)
 
-    else:
-        # Si no hay diferencias, no hay ajustes
-        ajuste_resultado = "No ajuste necesario"
-        print(f"✅ No ajuste necesario para SKU: {sku} | Stock Local: {stock_local} | Stock Bsale: {stock_bsale}")
+    print(f"✅ Resultado para SKU {sku}: {ajuste_resultado}")
 
-    print(f"🔄 Procesando SKU {sku} ({index + 1}/{total_productos}) | Resultado: {ajuste_resultado}")
-
-
-    resultado = {
+    return {
         "sku": sku,
         "nombre": producto.nameproduct,
         "stock_local": stock_local,
         "stock_bsale": stock_bsale,
         "diferencia": diferencia,
         "ajuste": ajuste_resultado,
-        "stock_bsale_data": json.dumps(stock_data, indent=2),
         "ajuste_respuesta": ajuste_respuesta
     }
-
-    guardar_resultados_incremental(resultado)
-    return resultado  # Retorno forzado para asegurar que termine
 
 def guardar_resultados_final():
     """Genera el archivo Excel consolidado con los resultados finales."""
