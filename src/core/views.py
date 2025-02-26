@@ -4706,7 +4706,7 @@ def guardar_resultados_en_excel(resultados):
     # Ejecuta la función en un hilo separado
     excel_thread = Thread(target=_guardar_excel)
     excel_thread.start()
-
+@csrf_exempt
 def ajustar_stock_bsale(request):
     """Endpoint para comparar y ajustar stock en Bsale."""
     if request.method != "POST":
