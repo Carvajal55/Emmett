@@ -3843,7 +3843,7 @@ def imprimir_etiqueta_qr(request):
         # Filtrar los productos que NO están en estado rechazado y que no pertenecen a facturas rechazadas
         last_unique_product = Uniqueproducts.objects.filter(
             product=producto,
-            state__in=[0, 1],  # Ajusta los estados según tu lógica (ej: 0: disponible, 1: usado)
+            state__in=[0],  # Ajusta los estados según tu lógica (ej: 0: disponible, 1: usado)
         ).exclude(
             iddocumentincome__in=Purchase.objects.filter(status=2).values_list('id', flat=True)
         ).order_by('-correlative').first()
