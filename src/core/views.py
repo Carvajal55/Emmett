@@ -4591,23 +4591,37 @@ def procesar_producto(producto, total_productos, index, retry=False):
 
     stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
     diferencia = stock_local - stock_bsale
+    print(f"🔍 SKU: {sku} | Stock Local: {stock_local} | Stock Bsale: {stock_bsale} | Diferencia: {diferencia}")
 
     ajuste_resultado = "No ajuste necesario"
     ajuste_respuesta = {}
 
     if diferencia > 0:
+        # Si el stock local es mayor que el de Bsale, se necesita hacer recepción en Bsale
+        print(f"📥 Recepción en Bsale para SKU: {sku} | Diferencia: {diferencia}")
         ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
+
     elif diferencia < 0:
+        # Si el stock local es menor que el de Bsale, se necesita hacer consumo en Bsale
         if abs(diferencia) <= stock_bsale:
+            print(f"📦 Consumo en Bsale para SKU: {sku} | Diferencia: {diferencia}")
             ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
         else:
             ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
+            print(ajuste_resultado)
 
     elif stock_local == 0 and stock_bsale > 0:
-        # Forzar el ajuste a 0 en Bsale
+        # Si el stock local es 0 pero en Bsale hay stock, se debe forzar el consumo en Bsale
+        print(f"❌ Stock local 0 pero en Bsale hay {stock_bsale} - Ajustando a 0 en Bsale para SKU: {sku}")
         ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, -stock_bsale, "consumption", iderp, cost)
 
-    print(f"🔄 Procesando SKU {sku} ({index + 1}/{total_productos})")
+    else:
+        # Si no hay diferencias, no hay ajustes
+        ajuste_resultado = "No ajuste necesario"
+        print(f"✅ No ajuste necesario para SKU: {sku} | Stock Local: {stock_local} | Stock Bsale: {stock_bsale}")
+
+    print(f"🔄 Procesando SKU {sku} ({index + 1}/{total_productos}) | Resultado: {ajuste_resultado}")
+
 
     resultado = {
         "sku": sku,
