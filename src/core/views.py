@@ -4533,6 +4533,25 @@ def procesar_producto_worker():
         except Exception as e:
             print(f"❌ Error en worker: {str(e)}")
 
+def guardar_resultados_incremental(resultado):
+    """Guarda los resultados de forma incremental en un archivo temporal."""
+    temp_file = os.path.join(settings.MEDIA_ROOT, "temp_stock_resultados.json")
+    
+    try:
+        # Si el archivo existe, leer y agregar el nuevo resultado
+        if os.path.exists(temp_file):
+            with open(temp_file, 'r') as file:
+                data = json.load(file)
+        else:
+            data = []
+
+        # Añadir el nuevo resultado y guardar
+        data.append(resultado)
+        with open(temp_file, 'w') as file:
+            json.dump(data, file, indent=4)
+    except Exception as e:
+        print(f"❌ Error al guardar resultado incremental: {str(e)}")
+
 def procesar_producto(producto, total_productos, index, retry=False):
     """Procesa cada producto, compara stock local con Bsale y ajusta si es necesario."""
     sku = producto.sku
@@ -4541,12 +4560,14 @@ def procesar_producto(producto, total_productos, index, retry=False):
     stock_bsale, stock_data = get_stock_bsale(iderp, retry)
 
     if stock_bsale is None:
-        return {
+        resultado = {
             "sku": sku,
             "nombre": producto.nameproduct,
             "error": "Error crítico en la consulta a Bsale",
-            "stock_bsale_data": json.dumps(stock_data, indent=2)  # Guardamos JSON como string en Excel
+            "stock_bsale_data": json.dumps(stock_data, indent=2)
         }
+        guardar_resultados_incremental(resultado)  # Guardado incremental
+        return resultado
 
     stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
     diferencia = stock_local - stock_bsale
@@ -4555,16 +4576,16 @@ def procesar_producto(producto, total_productos, index, retry=False):
     ajuste_respuesta = {}
 
     if diferencia > 0:
-        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost, stock_data)
     elif diferencia < 0:
         if abs(diferencia) <= stock_bsale:
-            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
+            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost, stock_data)
         else:
             ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
 
     print(f"🔄 Procesando SKU {sku} ({index + 1}/{total_productos})")
 
-    return {
+    resultado = {
         "sku": sku,
         "nombre": producto.nameproduct,
         "stock_local": stock_local,
@@ -4575,7 +4596,30 @@ def procesar_producto(producto, total_productos, index, retry=False):
         "ajuste_respuesta": ajuste_respuesta
     }
 
+    guardar_resultados_incremental(resultado)  # Guardado incremental
+    return resultado
 
+def guardar_resultados_final():
+    """Genera el archivo Excel consolidado con los resultados finales."""
+    temp_file = os.path.join(settings.MEDIA_ROOT, "temp_stock_resultados.json")
+    excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
+
+    try:
+        # Verificar si hay datos temporales
+        if os.path.exists(temp_file):
+            with open(temp_file, 'r') as file:
+                data = json.load(file)
+            df = pd.DataFrame(data)
+            df.to_excel(excel_path, index=False)
+            print(f"📊 Excel generado exitosamente en: {excel_path}")
+            return settings.MEDIA_URL + "stock_comparacion.xlsx"
+        else:
+            print("⚠️ No se encontraron datos temporales para generar el Excel.")
+            return None
+    except Exception as e:
+        print(f"❌ Error al generar el Excel final: {str(e)}")
+        return None
+    
 def guardar_resultados_en_excel(resultados):
     """Guarda los resultados en un archivo Excel."""
     try:
@@ -4597,50 +4641,33 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    # Reiniciamos la lista de resultados para evitar datos duplicados en el Excel
-    resultados.clear()
-
-    # Obtenemos la lista de productos
     productos = list(Products.objects.all())
 
-    # Encolamos cada producto
     for index, producto in enumerate(productos):
         queue.put((index, producto, len(productos)))
 
-    # Número de workers que vamos a usar
     num_workers = 3
     threads = []
 
-    # Creamos e iniciamos los threads
     for _ in range(num_workers):
         t = Thread(target=procesar_producto_worker)
         t.start()
         threads.append(t)
 
-    # Encolamos una señal de terminación (None) para cada worker
     for _ in range(num_workers):
         queue.put(None)
 
-    # Esperamos que todos los elementos de la cola se hayan procesado
     queue.join()
 
-    # Esperamos que todos los threads finalicen
     for t in threads:
-        t.join(timeout=30)  # Timeout de 30 segundos para evitar que se queden colgados
+        t.join()
 
-        # Si el thread sigue vivo después del timeout, forzamos su terminación
-        if t.is_alive():
-            print(f"⚠️ Thread {t.name} sigue activo, forzando su terminación...")
-            continue
-
-    # Verificamos que haya resultados para exportar
-    if resultados:
-        guardar_resultados_en_excel(resultados)
-
-    # Generamos la URL del archivo Excel para descargar
-    archivo_excel_url = settings.MEDIA_URL + "stock_comparacion.xlsx"
-
-    return JsonResponse({"archivo": archivo_excel_url})
+    # Generar el Excel final al terminar
+    excel_url = guardar_resultados_final()
+    if excel_url:
+        return JsonResponse({"archivo": excel_url})
+    else:
+        return JsonResponse({"error": "No se pudo generar el Excel"}, status=500)
 
 REQUEST_TIMEOUT = 5
 #---------------------------------
