@@ -4599,13 +4599,13 @@ def procesar_producto(producto, total_productos, index, retry=False):
     if diferencia > 0:
         # Si el stock local es mayor que el de Bsale, se necesita hacer recepción en Bsale
         print(f"📥 Recepción en Bsale para SKU: {sku} | Diferencia: {diferencia}")
-        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost, stock_data)
 
     elif diferencia < 0:
         # Si el stock local es menor que el de Bsale, se necesita hacer consumo en Bsale
         if abs(diferencia) <= stock_bsale:
             print(f"📦 Consumo en Bsale para SKU: {sku} | Diferencia: {diferencia}")
-            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
+            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost, stock_data)
         else:
             ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
             print(ajuste_resultado)
@@ -4613,7 +4613,7 @@ def procesar_producto(producto, total_productos, index, retry=False):
     elif stock_local == 0 and stock_bsale > 0:
         # Si el stock local es 0 pero en Bsale hay stock, se debe forzar el consumo en Bsale
         print(f"❌ Stock local 0 pero en Bsale hay {stock_bsale} - Ajustando a 0 en Bsale para SKU: {sku}")
-        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, -stock_bsale, "consumption", iderp, cost)
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, -stock_bsale, "consumption", iderp, cost, stock_data)
 
     else:
         # Si no hay diferencias, no hay ajustes
@@ -4679,7 +4679,7 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    productos = list(Products.objects.all()[:2000])
+    productos = list(Products.objects.all()[:200])
 
     for index, producto in enumerate(productos):
         queue.put((index, producto, len(productos)))
