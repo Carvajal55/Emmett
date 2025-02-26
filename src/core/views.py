@@ -4533,24 +4533,40 @@ def procesar_producto_worker():
         except Exception as e:
             print(f"❌ Error en worker: {str(e)}")
 
+# Crear un lock global para sincronizar la escritura
+lock = Lock()
+
 def guardar_resultados_incremental(resultado):
     """Guarda los resultados de forma incremental en un archivo temporal."""
     temp_file = os.path.join(settings.MEDIA_ROOT, "temp_stock_resultados.json")
     
+    # Sanear y convertir el resultado a string JSON
     try:
-        # Si el archivo existe, leer y agregar el nuevo resultado
-        if os.path.exists(temp_file):
-            with open(temp_file, 'r') as file:
-                data = json.load(file)
-        else:
-            data = []
+        resultado_saneado = json.loads(json.dumps(resultado, ensure_ascii=False))
+    except json.JSONDecodeError as e:
+        print(f"❌ Error al sanear resultado: {str(e)}")
+        return
 
-        # Añadir el nuevo resultado y guardar
-        data.append(resultado)
-        with open(temp_file, 'w') as file:
-            json.dump(data, file, indent=4)
-    except Exception as e:
-        print(f"❌ Error al guardar resultado incremental: {str(e)}")
+    with lock:
+        try:
+            # Si el archivo existe, leer y agregar el nuevo resultado
+            if os.path.exists(temp_file):
+                with open(temp_file, 'r') as file:
+                    try:
+                        data = json.load(file)
+                    except json.JSONDecodeError:
+                        print("⚠️ Archivo JSON corrupto. Se creará uno nuevo.")
+                        data = []
+            else:
+                data = []
+
+            # Añadir el nuevo resultado y guardar
+            data.append(resultado_saneado)
+            with open(temp_file, 'w', encoding='utf-8') as file:
+                json.dump(data, file, ensure_ascii=False, indent=4)
+
+        except Exception as e:
+            print(f"❌ Error al guardar resultado incremental: {str(e)}")
 
 def procesar_producto(producto, total_productos, index, retry=False):
     """Procesa cada producto, compara stock local con Bsale y ajusta si es necesario."""
