@@ -926,7 +926,7 @@ def enviar_correo_factura_aprobada(productos_actualizados, factura_id):
         f"SKU: {p['sku']}, Nombre: {p.get('name', 'Sin nombre')}, Precio: {p['lastcost']}"
         for p in productos_actualizados
     ])
-    fecha_actual = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+    fecha_actual = (timezone.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')
     subject = f"Factura Aprobada: {factura_id} - {cantidad} productos actualizados"
     message = (
         f"Fecha: {fecha_actual}\n\n"
@@ -940,7 +940,7 @@ def enviar_correo_factura_aprobada(productos_actualizados, factura_id):
         subject,
         message,
         settings.DEFAULT_FROM_EMAIL,
-        ['pfarias@emmett.cl'],  # Cambia o agrega destinatarios según sea necesario
+        ['nuevosproductos@emmett.cl'],  # Cambia o agrega destinatarios según sea necesario
         fail_silently=False,
     )
 
