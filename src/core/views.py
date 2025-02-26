@@ -4507,11 +4507,17 @@ def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost, stock_data):
     # Enviar ajustes a Bsale
     resultados = []
     for payload in payloads:
-        response = requests.post(url, headers=HEADERS, json=payload)
-        if response.status_code == 201:
-            resultados.append(f"✅ Ajuste realizado en oficina {payload['officeId']}")
-        else:
-            resultados.append(f"❌ Error en ajuste en oficina {payload['officeId']}: {response.status_code} - {response.text}")
+        try:
+            response = requests.post(url, headers=HEADERS, json=payload, timeout=10)
+            if response.status_code == 201:
+                resultados.append(f"✅ Ajuste realizado en oficina {payload['officeId']}")
+            else:
+                resultados.append(f"❌ Error en ajuste en oficina {payload['officeId']}: {response.status_code} - {response.text}")
+                print(f"❌ Error en ajuste: Payload: {payload} - Respuesta: {response.text}")
+        except requests.Timeout:
+            resultados.append(f"⏳ Timeout en ajuste en oficina {payload['officeId']}")
+        except Exception as e:
+            resultados.append(f"❌ Error inesperado: {str(e)}")
 
     return " | ".join(resultados), payloads
 
@@ -4576,14 +4582,12 @@ def procesar_producto(producto, total_productos, index, retry=False):
     stock_bsale, stock_data = get_stock_bsale(iderp, retry)
 
     if stock_bsale is None:
-        resultado = {
+        return {
             "sku": sku,
             "nombre": producto.nameproduct,
             "error": "Error crítico en la consulta a Bsale",
-            "stock_bsale_data": json.dumps(stock_data, indent=2)
+            "stock_bsale_data": json.dumps(stock_data, indent=2)  # Guardamos JSON como string en Excel
         }
-        guardar_resultados_incremental(resultado)  # Guardado incremental
-        return resultado
 
     stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
     diferencia = stock_local - stock_bsale
@@ -4592,10 +4596,10 @@ def procesar_producto(producto, total_productos, index, retry=False):
     ajuste_respuesta = {}
 
     if diferencia > 0:
-        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost, stock_data)
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost)
     elif diferencia < 0:
         if abs(diferencia) <= stock_bsale:
-            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost, stock_data)
+            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost)
         else:
             ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
 
@@ -4612,8 +4616,8 @@ def procesar_producto(producto, total_productos, index, retry=False):
         "ajuste_respuesta": ajuste_respuesta
     }
 
-    guardar_resultados_incremental(resultado)  # Guardado incremental
-    return resultado
+    guardar_resultados_incremental(resultado)
+    return resultado  # Retorno forzado para asegurar que termine
 
 def guardar_resultados_final():
     """Genera el archivo Excel consolidado con los resultados finales."""
