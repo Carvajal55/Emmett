@@ -991,6 +991,10 @@ def aprobar_factura(request):
                 factura = Purchase.objects.get(id=factura_id)
                 factura.status = 1  # Estado "Aprobada"
                 factura.save()
+
+                # ✅ Llamada a la función para enviar el correo
+                enviar_correo_factura_aprobada(productos_actualizados, factura_id)
+
             except Purchase.DoesNotExist:
                 return JsonResponse({'error': 'Factura no encontrada.'}, status=404)
 
