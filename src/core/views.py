@@ -4510,23 +4510,14 @@ def ajustar_stock_en_bsale(sku, cantidad, tipo, iderp, cost, stock_data):
 
     return " | ".join(resultados), payloads
 
-def procesar_producto_worker():
-    """Función que ejecuta los trabajos de la cola de manera controlada."""
-    while True:
-        try:
-            item = queue.get()
-            if item is None:
-                break  # Si recibe None, finaliza el worker
-
-            index, producto, total_productos = item
-            resultado = procesar_producto(producto, total_productos, index)
-            
-            with lock:
-                resultados.append(resultado)  # Guardamos el resultado para el Excel
-            
-            queue.task_done()
-        except Exception as e:
-            print(f"❌ Error en worker: {str(e)}")
+def procesar_producto_worker(producto, total_productos, index):
+    """Función que ejecuta los trabajos de manera más eficiente usando multiprocessing."""
+    try:
+        resultado = procesar_producto(producto, total_productos, index)
+        return resultado  # Se devuelve el resultado para ser guardado más adelante
+    except Exception as e:
+        print(f"❌ Error en worker: {str(e)}")
+        return None
 
 def procesar_producto(producto, total_productos, index, retry=False):
     """Procesa cada producto, compara stock local con Bsale y ajusta si es necesario."""
@@ -4570,47 +4561,53 @@ def procesar_producto(producto, total_productos, index, retry=False):
         "ajuste_respuesta": ajuste_respuesta
     }
 
+from multiprocessing import Pool, Manager
+
 @csrf_exempt
 def ajustar_stock_bsale(request):
     """Endpoint para comparar y ajustar stock en Bsale."""
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    # Obtenemos la lista de productos
     productos = list(Products.objects.all())
+    total_productos = len(productos)
 
-    # Encolamos cada producto
-    for index, producto in enumerate(productos):
-        queue.put((index, producto, len(productos)))
+    with Manager() as manager:
+        resultados = manager.list()  # Se utiliza manager para lista compartida
 
-    # Número de workers que vamos a usar
-    num_workers = 3
-    threads = []
+        # Utilizando 4 procesos (ajusta según la cantidad de núcleos disponibles)
+        with Pool(processes=4) as pool:
+            jobs = []
 
-    # Creamos e iniciamos los threads
-    for _ in range(num_workers):
-        t = Thread(target=procesar_producto_worker)
-        t.start()
-        threads.append(t)
+            for index, producto in enumerate(productos):
+                job = pool.apply_async(procesar_producto_worker, (producto, total_productos, index))
+                jobs.append(job)
 
-    # Encolamos una señal de terminación (None) para cada worker
-    for _ in range(num_workers):
-        queue.put(None)
+            # Recogiendo resultados
+            for job in jobs:
+                resultado = job.get()
+                if resultado:
+                    resultados.append(resultado)
 
-    # Esperamos que todos los elementos de la cola se hayan procesado
-    queue.join()
-
-    # Esperamos que todos los threads finalicen
-    for t in threads:
-        t.join()
-
-    # Creamos el DataFrame y exportamos a Excel
-    df = pd.DataFrame(resultados)
-    print("📊 Resultados obtenidos:", resultados)
-    excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
-    df.to_excel(excel_path, index=False)
+        # Guardando en Excel en lotes para evitar saturación de memoria
+        guardar_resultados_en_excel(list(resultados))
 
     return JsonResponse({"archivo": settings.MEDIA_URL + "stock_comparacion.xlsx"})
+
+def guardar_resultados_en_excel(resultados):
+    batch_size = 1000  # Tamaño del lote para guardar en Excel
+
+    # Ruta para guardar el Excel
+    excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
+
+    # Guardando en lotes para no sobrecargar la memoria
+    with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+        for i in range(0, len(resultados), batch_size):
+            batch = resultados[i:i + batch_size]
+            df = pd.DataFrame(batch)
+            df.to_excel(writer, sheet_name=f'Lote_{i//batch_size + 1}', index=False)
+
+    print(f"📊 Excel guardado en: {excel_path}")
 
 REQUEST_TIMEOUT = 5
 #---------------------------------
