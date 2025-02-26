@@ -4431,11 +4431,12 @@ def rate_limiter():
 def get_stock_bsale(iderp, retry=False):
     retries = 5 if not retry else 7
     delay = 2  # Tiempo inicial de espera para evitar bloqueos
+    timeout_seconds = 10  # Timeout de 10 segundos para cada request
 
     for attempt in range(retries):
         try:
             rate_limiter()  # Se asegura de no superar el límite
-            response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS)
+            response = requests.get(BSALE_URL.format(iderp=iderp), headers=HEADERS, timeout=timeout_seconds)
 
             if response.status_code == 200:
                 stock_data = response.json()
@@ -4452,6 +4453,10 @@ def get_stock_bsale(iderp, retry=False):
 
             else:
                 return 0, {"status_code": response.status_code, "response": response.text}
+
+        except requests.Timeout:
+            print(f"⚠️ Timeout en la solicitud a Bsale para iderp: {iderp}")
+            return 0, {"error": "Timeout", "iderp": iderp}
 
         except requests.RequestException as e:
             return 0, {"error": "RequestException", "message": str(e)}
@@ -4621,7 +4626,12 @@ def ajustar_stock_bsale(request):
 
     # Esperamos que todos los threads finalicen
     for t in threads:
-        t.join()
+        t.join(timeout=30)  # Timeout de 30 segundos para evitar que se queden colgados
+
+        # Si el thread sigue vivo después del timeout, forzamos su terminación
+        if t.is_alive():
+            print(f"⚠️ Thread {t.name} sigue activo, forzando su terminación...")
+            continue
 
     # Verificamos que haya resultados para exportar
     if resultados:
