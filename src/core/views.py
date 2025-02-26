@@ -4633,6 +4633,21 @@ def procesar_producto(producto, total_productos, index, retry=False):
         "ajuste_respuesta": ajuste_respuesta
     }
 
+
+def guardar_resultados_json():
+    """Guarda los resultados en un archivo JSON y retorna la URL"""
+    json_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.json")
+
+    try:
+        with open(json_path, 'w') as json_file:
+            json.dump(resultados, json_file, indent=4)
+        
+        print("✅ JSON guardado en:", json_path)
+        return settings.MEDIA_URL + "stock_comparacion.json"
+    except Exception as e:
+        print(f"❌ Error al guardar el JSON: {str(e)}")
+        return None
+
 def guardar_resultados_final():
     """
     Guarda el informe final en Excel en un hilo separado.
@@ -4729,7 +4744,7 @@ def ajustar_stock_bsale(request):
     print("✅ Respuesta enviada al frontend.")
     
     # 🧵 Generar Excel en un hilo separado
-    excel_thread = Thread(target=guardar_resultados_final)
+    excel_thread = Thread(target=guardar_resultados_json)
     excel_thread.start()
 
     return response
