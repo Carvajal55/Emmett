@@ -4758,6 +4758,8 @@ def guardar_resultados_en_excel(resultados):
     # Ejecuta la función en un hilo separado
     excel_thread = Thread(target=_guardar_excel)
     excel_thread.start()
+
+    
 @csrf_exempt
 def ajustar_stock_bsale(request):
     """Endpoint para comparar y ajustar stock en Bsale y enviar resultados por correo."""
@@ -4791,16 +4793,17 @@ def ajustar_stock_bsale(request):
     for _ in range(num_workers):
         queue.put(None)
 
-    # Esperando a que la cola se vacíe
-    print("🔄 Esperando a que la cola se vacíe...")
-    queue.join()
-    print("✅ Cola vaciada.")
-
     # Esperando a que todos los threads finalicen
     print("🔄 Esperando a que todos los threads finalicen...")
     for t in threads:
-        t.join()
+        t.join(timeout=15)  # Timeout seguro para evitar bloqueos
     print("✅ Todos los threads han finalizado.")
+
+    # Verificar si hay resultados
+    if resultados:
+        print(f"📊 Se han acumulado {len(resultados)} resultados.")
+    else:
+        print("❌ No se han acumulado resultados.")
 
     # Enviar el correo con los resultados
     print("🔄 Enviando resultados por correo...")
