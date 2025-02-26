@@ -4603,6 +4603,10 @@ def procesar_producto(producto, total_productos, index, retry=False):
         else:
             ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
 
+    elif stock_local == 0 and stock_bsale > 0:
+        # Forzar el ajuste a 0 en Bsale
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, -stock_bsale, "consumption", iderp, cost)
+
     print(f"🔄 Procesando SKU {sku} ({index + 1}/{total_productos})")
 
     resultado = {
@@ -4661,7 +4665,7 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    productos = list(Products.objects.all())
+    productos = list(Products.objects.all()[:200])
 
     for index, producto in enumerate(productos):
         queue.put((index, producto, len(productos)))
