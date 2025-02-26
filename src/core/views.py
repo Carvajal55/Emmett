@@ -4679,7 +4679,7 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    productos = list(Products.objects.all()[:200])
+    productos = list(Products.objects.all()[:2000])
 
     for index, producto in enumerate(productos):
         queue.put((index, producto, len(productos)))
