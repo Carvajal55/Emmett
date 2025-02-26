@@ -4709,7 +4709,7 @@ def ajustar_stock_bsale(request):
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
     # Limitar a 400 productos
-    productos = list(Products.objects.all()[:400])
+    productos = list(Products.objects.all()[:40])
 
     # Limpiar resultados previos
     resultados.clear()
