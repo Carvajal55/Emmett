@@ -4683,7 +4683,59 @@ def guardar_resultados_final():
     # 🧵 Ejecuta la generación del Excel en un hilo separado
     excel_thread = Thread(target=_guardar_excel)
     excel_thread.start()
-    
+
+def enviar_correo_resultados(resultados):
+    """
+    Envía un correo con los resultados del ajuste de stock.
+    """
+    if not resultados:
+        print("❌ No hay resultados para enviar por correo.")
+        return
+
+    # Construir el cuerpo del correo en formato de tabla
+    mensaje = """
+    <h3>Resultados del Ajuste de Stock en Bsale</h3>
+    <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse;">
+        <tr>
+            <th>SKU</th>
+            <th>Nombre</th>
+            <th>Stock Local</th>
+            <th>Stock Bsale</th>
+            <th>Diferencia</th>
+            <th>Ajuste</th>
+        </tr>
+    """
+
+    for r in resultados:
+        mensaje += f"""
+            <tr>
+                <td>{r['sku']}</td>
+                <td>{r['nombre']}</td>
+                <td>{r['stock_local']}</td>
+                <td>{r['stock_bsale']}</td>
+                <td>{r['diferencia']}</td>
+                <td>{r['ajuste']}</td>
+            </tr>
+        """
+
+    mensaje += "</table>"
+    fecha_actual = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    subject = f"Resultados Ajuste Stock Bsale - {fecha_actual}"
+    from_email = settings.DEFAULT_FROM_EMAIL
+    to_email = ['erp@emmett.cl']  # Cambia o agrega destinatarios según sea necesario
+
+    send_mail(
+        subject,
+        '',  # Dejar el cuerpo vacío ya que estamos enviando en HTML
+        from_email,
+        to_email,
+        fail_silently=False,
+        html_message=mensaje  # Enviar como HTML
+    )
+
+    print("✅ Correo enviado con los resultados.")
+
 def guardar_resultados_en_excel(resultados):
     """
     Guarda los resultados en un archivo Excel en un hilo separado.
@@ -4708,14 +4760,16 @@ def guardar_resultados_en_excel(resultados):
     excel_thread.start()
 @csrf_exempt
 def ajustar_stock_bsale(request):
-    """Endpoint para comparar y ajustar stock en Bsale."""
+    """Endpoint para comparar y ajustar stock en Bsale y enviar resultados por correo."""
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    productos = list(Products.objects.all()[:40])  # Solo 40 para pruebas
+    # Limitar a 40 productos para pruebas
+    productos = list(Products.objects.all()[:40])  
 
     print("🔄 Iniciando procesamiento de productos...")
 
+    # Encolar productos
     for index, producto in enumerate(productos):
         print(f"🔄 Encolando SKU {producto.sku} ({index + 1}/{len(productos)})")
         queue.put((index, producto, len(productos)))
@@ -4725,33 +4779,36 @@ def ajustar_stock_bsale(request):
 
     print("🔄 Iniciando workers...")
 
+    # Iniciar workers
     for i in range(num_workers):
         t = Thread(target=procesar_producto_worker)
         t.start()
         threads.append(t)
         print(f"✅ Worker {i+1} iniciado")
 
+    # Encolando señales de finalización
     print("🔄 Encolando señales de finalización...")
     for _ in range(num_workers):
         queue.put(None)
 
+    # Esperando a que la cola se vacíe
     print("🔄 Esperando a que la cola se vacíe...")
     queue.join()
     print("✅ Cola vaciada.")
 
+    # Esperando a que todos los threads finalicen
     print("🔄 Esperando a que todos los threads finalicen...")
     for t in threads:
         t.join()
     print("✅ Todos los threads han finalizado.")
 
-    # Generar el JSON final al terminar
-    excel_url = guardar_resultados_json()
-    if excel_url:
-        print(f"✅ JSON generado en: {excel_url}")
-        return JsonResponse({"archivo": excel_url})
-    else:
-        print("❌ Error al generar el JSON.")
-        return JsonResponse({"error": "No se pudo generar el JSON"}, status=500)
+    # Enviar el correo con los resultados
+    print("🔄 Enviando resultados por correo...")
+    enviar_correo_resultados(resultados)
+    print("✅ Resultados enviados por correo.")
+
+    # Retornar una respuesta exitosa al frontend
+    return JsonResponse({"message": "El proceso se completó y los resultados fueron enviados por correo."})
 
 REQUEST_TIMEOUT = 5
 #---------------------------------
