@@ -4759,7 +4759,7 @@ def guardar_resultados_en_excel(resultados):
     excel_thread = Thread(target=_guardar_excel)
     excel_thread.start()
 
-    
+
 @csrf_exempt
 def ajustar_stock_bsale(request):
     """Endpoint para comparar y ajustar stock en Bsale y enviar resultados por correo."""
@@ -4767,7 +4767,7 @@ def ajustar_stock_bsale(request):
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
     # Limitar a 40 productos para pruebas
-    productos = list(Products.objects.all()[:40])  
+    productos = list(Products.objects.all())  
 
     print("🔄 Iniciando procesamiento de productos...")
 
