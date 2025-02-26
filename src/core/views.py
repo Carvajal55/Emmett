@@ -4612,7 +4612,16 @@ def procesar_producto(producto, total_productos, index, retry=False):
         print(f"🚫 Stock local 0 pero en Bsale hay {stock_bsale} - Poniendo en 0 en Bsale para SKU: {sku}")
         ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, -stock_bsale, "consumption", iderp, cost, stock_data)
 
-    print(f"✅ Resultado para SKU {sku}: {ajuste_resultado}")
+    if "No ajuste necesario" in ajuste_resultado:
+        print(f"🟡 Resultado para SKU {sku}: No ajuste necesario")
+    elif "Recepción realizada" in ajuste_resultado:
+        print(f"✅ Resultado para SKU {sku}: Stock sumado en Bsale")
+    elif "Consumo realizado" in ajuste_resultado:
+        print(f"🔴 Resultado para SKU {sku}: Stock restado en Bsale")
+    elif "Error" in ajuste_resultado:
+        print(f"❌ Resultado para SKU {sku}: {ajuste_resultado}")
+    else:
+        print(f"🟡 Resultado para SKU {sku}: {ajuste_resultado}")
 
     return {
         "sku": sku,
@@ -4625,40 +4634,58 @@ def procesar_producto(producto, total_productos, index, retry=False):
     }
 
 def guardar_resultados_final():
-    """Genera el archivo Excel consolidado con los resultados finales."""
-    temp_file = os.path.join(settings.MEDIA_ROOT, "temp_stock_resultados.json")
-    excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
-
-    try:
-        # Verificar si hay datos temporales
-        if os.path.exists(temp_file):
-            with open(temp_file, 'r') as file:
-                data = json.load(file)
-            df = pd.DataFrame(data)
+    """
+    Guarda el informe final en Excel en un hilo separado.
+    """
+    def _guardar_excel():
+        try:
+            if not resultados:
+                print("⚠️ No hay resultados para guardar en Excel.")
+                return None
+            
+            # Convertir resultados en DataFrame
+            df = pd.DataFrame(resultados)
+            
+            # Ruta para guardar el Excel
+            excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
+            
+            # Guardar DataFrame en Excel
             df.to_excel(excel_path, index=False)
-            print(f"📊 Excel generado exitosamente en: {excel_path}")
-            return settings.MEDIA_URL + "stock_comparacion.xlsx"
-        else:
-            print("⚠️ No se encontraron datos temporales para generar el Excel.")
+            excel_url = settings.MEDIA_URL + "stock_comparacion.xlsx"
+            print(f"📊 Informe Excel guardado en: {excel_url}")
+            
+            return excel_url
+        
+        except Exception as e:
+            print(f"❌ Error al guardar el informe en Excel: {str(e)}")
             return None
-    except Exception as e:
-        print(f"❌ Error al generar el Excel final: {str(e)}")
-        return None
+
+    # 🧵 Ejecuta la generación del Excel en un hilo separado
+    excel_thread = Thread(target=_guardar_excel)
+    excel_thread.start()
     
 def guardar_resultados_en_excel(resultados):
-    """Guarda los resultados en un archivo Excel."""
-    try:
-        # Convertimos los resultados a un DataFrame de pandas
-        df = pd.DataFrame(resultados)
+    """
+    Guarda los resultados en un archivo Excel en un hilo separado.
+    """
+    def _guardar_excel():
+        try:
+            # Convertir resultados en DataFrame
+            df = pd.DataFrame(resultados)
+            
+            # Ruta para guardar el Excel
+            excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
+            
+            # Guardar DataFrame en Excel
+            df.to_excel(excel_path, index=False)
+            
+            print(f"📊 Informe Excel guardado en: {excel_path}")
+        except Exception as e:
+            print(f"❌ Error al guardar el informe en Excel: {str(e)}")
 
-        # Ruta del archivo Excel
-        excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
-
-        # Guardamos el DataFrame en Excel
-        df.to_excel(excel_path, index=False)
-        print("📊 Archivo Excel generado correctamente:", excel_path)
-    except Exception as e:
-        print(f"❌ Error al generar el archivo Excel: {str(e)}")
+    # Ejecuta la función en un hilo separado
+    excel_thread = Thread(target=_guardar_excel)
+    excel_thread.start()
 
 @csrf_exempt
 def ajustar_stock_bsale(request):
@@ -4666,33 +4693,46 @@ def ajustar_stock_bsale(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
+    # Limitar a 400 productos
     productos = list(Products.objects.all()[:400])
 
+    # Limpiar resultados previos
+    resultados.clear()
+
+    # Encolamos los productos
     for index, producto in enumerate(productos):
         queue.put((index, producto, len(productos)))
 
+    # Número de workers
     num_workers = 3
     threads = []
 
+    # Iniciar threads para procesamiento
     for _ in range(num_workers):
         t = Thread(target=procesar_producto_worker)
         t.start()
         threads.append(t)
 
+    # Añadir señal de terminación a la cola
     for _ in range(num_workers):
         queue.put(None)
 
+    # Esperar a que todos los productos sean procesados
     queue.join()
 
+    # Esperar a que todos los threads finalicen
     for t in threads:
         t.join()
 
-    # Generar el Excel final al terminar
-    excel_url = guardar_resultados_final()
-    if excel_url:
-        return JsonResponse({"archivo": excel_url})
-    else:
-        return JsonResponse({"error": "No se pudo generar el Excel"}, status=500)
+    # ✅ Liberar la respuesta a la API
+    response = JsonResponse({"message": "Procesamiento completado. Generando Excel..."})
+    print("✅ Respuesta enviada al frontend.")
+    
+    # 🧵 Generar Excel en un hilo separado
+    excel_thread = Thread(target=guardar_resultados_final)
+    excel_thread.start()
+
+    return response
 
 REQUEST_TIMEOUT = 5
 #---------------------------------
