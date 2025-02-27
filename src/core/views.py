@@ -5204,10 +5204,10 @@ def get_bsale_document(request, document_number, document_type):
 
                     # 🔥 Si hay 2 items, se verifica el tipo de documento
                     elif len(items) == 2:
-                        if document_type == 33:
+                        if document_type == 39:
                             print("✅ Se selecciona el primer item (Boleta)")
                             selected_document = items[0]
-                        elif document_type == 39:
+                        elif document_type == 33:
                             print("✅ Se selecciona el segundo item (Factura)")
                             selected_document = items[1]
                         else:
