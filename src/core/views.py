@@ -4794,22 +4794,29 @@ def ajustar_stock_bsale(request):
     for _ in range(num_workers):
         queue.put(None)
 
+    # Esperando a que la cola se vacíe
+    print("🔄 Esperando a que la cola se vacíe...")
+    queue.join()
+    print("✅ Cola vaciada.")
+
     # Esperando a que todos los threads finalicen
     print("🔄 Esperando a que todos los threads finalicen...")
     for t in threads:
-        t.join(timeout=15)  # Timeout seguro para evitar bloqueos
+        t.join()
     print("✅ Todos los threads han finalizado.")
 
-    # Verificar si hay resultados
-    if resultados:
-        print(f"📊 Se han acumulado {len(resultados)} resultados.")
-    else:
-        print("❌ No se han acumulado resultados.")
+    # 🔥 NUEVO: Confirmar que todos los productos fueron procesados
+    total_procesados = len(resultados)
+    total_productos = len(productos)
+    print(f"✅ Procesados: {total_procesados} de {total_productos}")
 
-    # Enviar el correo con los resultados
-    print("🔄 Enviando resultados por correo...")
-    enviar_correo_resultados(resultados)
-    print("✅ Resultados enviados por correo.")
+    # 🔥 NUEVO: Verificar si todos los productos fueron procesados
+    if total_procesados == total_productos:
+        print("✅ Todos los productos fueron procesados. Enviando resultados por correo...")
+        enviar_correo_resultados(resultados)
+        print("✅ Resultados enviados por correo.")
+    else:
+        print("❌ No se procesaron todos los productos. Verificar posibles errores.")
 
     # Retornar una respuesta exitosa al frontend
     return JsonResponse({"message": "El proceso se completó y los resultados fueron enviados por correo."})
