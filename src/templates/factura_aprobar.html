@@ -657,6 +657,10 @@
 
                 console.log("Detalle seleccionado:", detalle);
 
+                // Reiniciar el estado del Precio Global
+                this.habilitarInputGlobal = false;
+                this.precioGlobal = null;
+
                 // Inicializar las listas de precios con valores por defecto
                 this.listasPrecios = this.initializeListasPrecios(detalle);
 
