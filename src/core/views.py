@@ -5157,8 +5157,20 @@ def get_bsale_document(request, document_number, document_type):
                 "Content-Type": "application/json"
             }
             
+            # 🔥 Imprimir la URL y los headers
+            print("=== URL de Bsale ===")
+            print(bsale_api_url)
+            print("=== Headers ===")
+            print(headers)
+            
             # Realizamos la petición a la API
             response = requests.get(bsale_api_url, headers=headers)
+            
+            # 🔥 Imprimir el estado y el contenido de la respuesta
+            print("=== Estado de la respuesta ===")
+            print(response.status_code)
+            print("=== Contenido de la respuesta ===")
+            print(response.text)
             
             # Verificamos si la respuesta es exitosa
             if response.status_code == 200:
@@ -5172,16 +5184,25 @@ def get_bsale_document(request, document_number, document_type):
                         "urlPublicView": document.get("urlPublicView"),
                         "urlPdf": document.get("urlPdf"),
                         "number": document.get("number"),
-                        "totalAmount": document.get("totalAmount")
+                        "totalAmount": document.get("totalAmount"),
+                        "full_response": data  # 🔥 Enviar la respuesta completa al frontend
                     })
                 else:
-                    # Si no se encuentran documentos
-                    return JsonResponse({"error": "Documento no encontrado."}, status=404)
+                    # 🔥 Imprimir detalles si no se encuentra el documento
+                    print("=== Documento no encontrado en la respuesta ===")
+                    print(data)
+                    return JsonResponse({"error": "Documento no encontrado.", "full_response": data}, status=404)
             else:
-                return JsonResponse({"error": "Error en la solicitud a Bsale."}, status=response.status_code)
+                # 🔥 Imprimir detalles si hay un error en la solicitud
+                print("=== Error en la solicitud a Bsale ===")
+                print(response.status_code)
+                print(response.text)
+                return JsonResponse({"error": "Error en la solicitud a Bsale.", "full_response": response.text}, status=response.status_code)
         
         except Exception as e:
-            # Manejo de errores inesperados
+            # 🔥 Imprimir errores inesperados
+            print("=== Error inesperado ===")
+            print(str(e))
             return JsonResponse({"error": str(e)}, status=500)
 
     # Respuesta para métodos no permitidos

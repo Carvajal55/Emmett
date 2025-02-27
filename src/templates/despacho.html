@@ -168,18 +168,23 @@
                 axios
                     .get(`/api/get-document/${nDocument}/${this.typeDocument}/`)
                     .then(response => {
+                        console.log("✅ Respuesta completa del backend:", response.data);
                         if (response.data.urlPublicView) {
                             // 🔥 Abrir la URL en una nueva pestaña
                             window.open(response.data.urlPublicView, '_blank');
                         } else {
                             this.playSound('error');
                             Swal.fire('Error', 'No se encontró un enlace para el documento.', 'error');
+                            console.error("❌ Detalles de la respuesta sin enlace:", response.data);
                         }
                     })
                     .catch(error => {
                         Swal.fire('Error', 'No se pudo obtener los detalles del documento.', 'error');
                         this.playSound('error');
-                        console.error(error);
+                        console.error("❌ Error en la petición:", error);
+                        if (error.response && error.response.data) {
+                            console.error("❌ Detalles del error:", error.response.data);
+                        }
                     });
             },
             validateAndLinkSuperid() {
