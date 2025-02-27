@@ -278,6 +278,23 @@
                         const cleanSku = product.code.trim();  // 🔥 Eliminar espacios en el SKU
                         console.log(`🛠 Buscando detalles para SKU: ${cleanSku}`);
 
+                        // ✅ Marcar automáticamente como completo si el SKU es OTR15062
+                        if (cleanSku === 'OTR15062') {
+                            console.log('🔥 OTR15062 detectado, marcando como completo automáticamente.');
+                            return {
+                                code: cleanSku,
+                                name: 'Producto OTR15062',
+                                description: 'Despacho automático',
+                                exists: true,
+                                force: false,
+                                quantity: product.total_quantity,
+                                quantityScanned: product.total_quantity, // 🔥 Se iguala para marcar como completo
+                                superids: [], // No hay SuperID
+                                is_complete: true // 🔥 Marcado como completo
+                            };
+                        }
+
+                        // Si no es OTR15062, proceder con la lógica normal
                         try {
                             const details = await this.fetchProductDetails(cleanSku);
                             console.log(`✅ Detalles obtenidos para ${cleanSku}:`, details);
@@ -286,8 +303,8 @@
                                 code: cleanSku,
                                 name: details.name || null,
                                 description: details.description || null,
-                                exists: details.exists,  // Flag de existencia enviado desde el backend
-                                force: details.force,    // Flag que indica si se debe forzar el producto
+                                exists: details.exists,
+                                force: details.force,
                                 quantity: product.total_quantity,
                                 quantityScanned: product.dispatched_quantity,
                                 superids: [],
