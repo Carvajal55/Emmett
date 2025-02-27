@@ -5159,7 +5159,7 @@ def get_bsale_document(request, document_number, document_type):
                 print("❌ Tipo de documento inválido:", document_type)
                 return JsonResponse({"error": "Tipo de documento inválido."}, status=400)
 
-            # ✅ Construir URL correcta (sin expand)
+            # ✅ Construir URL correcta
             bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}"
             headers = {
                 "access_token": BSALE_API_TOKEN,
@@ -5187,29 +5187,47 @@ def get_bsale_document(request, document_number, document_type):
 
                 # Verificar si se encontraron documentos
                 if "items" in data and len(data["items"]) > 0:
-                    # 🔥 Filtrar los items por document_type
-                    matching_document = next(
-                        (item for item in data["items"] if str(item["document_type"]["id"]) == str(document_type)), 
-                        None
-                    )
+                    items = data["items"]
+                    print("=== Items obtenidos ===")
+                    print(items)
 
-                    # Verificar si encontramos el documento correcto
-                    if matching_document:
-                        print("✅ Documento encontrado:", matching_document)
+                    # 🔥 Si hay solo un item, devolver ese item
+                    if len(items) == 1:
+                        print("✅ Solo hay un item. Se retorna directamente.")
                         return JsonResponse({
-                            "urlPublicView": matching_document.get("urlPublicView"),
-                            "urlPdf": matching_document.get("urlPdf"),
-                            "number": matching_document.get("number"),
-                            "totalAmount": matching_document.get("totalAmount"),
-                            "full_response": matching_document  # 🔥 Enviar el documento encontrado
+                            "urlPublicView": items[0].get("urlPublicView"),
+                            "urlPdf": items[0].get("urlPdf"),
+                            "number": items[0].get("number"),
+                            "totalAmount": items[0].get("totalAmount"),
+                            "full_response": items[0]  # 🔥 Enviar el documento encontrado
                         })
-                    else:
-                        # 🔥 Si no hay coincidencia
-                        print("❌ Documento no encontrado con el tipo especificado.")
+
+                    # 🔥 Si hay 2 items, se verifica el tipo de documento
+                    elif len(items) == 2:
+                        if document_type == 33:
+                            print("✅ Se selecciona el primer item (Boleta)")
+                            selected_document = items[0]
+                        elif document_type == 39:
+                            print("✅ Se selecciona el segundo item (Factura)")
+                            selected_document = items[1]
+                        else:
+                            print("❌ Tipo de documento no soportado para múltiples items.")
+                            return JsonResponse({"error": "Tipo de documento no soportado."}, status=400)
+
+                        # Retornar el documento seleccionado
                         return JsonResponse({
-                            "error": "Documento no encontrado con el tipo especificado.",
-                            "full_response": data
-                        }, status=404)
+                            "urlPublicView": selected_document.get("urlPublicView"),
+                            "urlPdf": selected_document.get("urlPdf"),
+                            "number": selected_document.get("number"),
+                            "totalAmount": selected_document.get("totalAmount"),
+                            "full_response": selected_document  # 🔥 Enviar el documento encontrado
+                        })
+
+                    else:
+                        # 🔥 Si hay más de 2 items (caso raro)
+                        print("❌ Se encontraron más de 2 items, lo cual no es esperado.")
+                        return JsonResponse({"error": "Se encontraron más de 2 documentos."}, status=400)
+                
                 else:
                     # 🔥 Imprimir detalles si no se encuentra el documento
                     print("=== Documento no encontrado en la respuesta ===")
