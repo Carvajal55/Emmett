@@ -5147,29 +5147,42 @@ def actualizar_stock_local(request):
     print("Actualización de stock local completada.")
     return JsonResponse({'message': 'Actualización de stock local completada.'}, status=200)
 
-def get_bsale_document(request, document_number):
+def get_bsale_document(request, document_number, document_type):
     if request.method == "GET":
         try:
             # Construcción de la URL para la API de Bsale
-            bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}"
+            bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}&expand=[document_type]"
             headers = {
-                "access_token": BSALE_API_TOKEN  # Reemplaza con tu token de acceso
+                "access_token": BSALE_API_TOKEN
             }
-            
-            
             
             # Realizamos la petición a la API
             response = requests.get(bsale_api_url, headers=headers)
-            
-            
-            
             data = response.json()
 
             # Verificar si se encontraron documentos
             if "items" in data and len(data["items"]) > 0:
                 document = data["items"][0]
+
+                # Obtener el tipo de documento
+                document_type_id = document.get("document_type", {}).get("id")
+                document_type_name = "Desconocido"
+                
+                # Asignar nombre del tipo de documento
+                if document_type_id == "39":
+                    document_type_name = "Boleta"
+                elif document_type_id == "33":
+                    document_type_name = "Factura"
+                else:
+                    document_type_name = "Desconocido"
+
+                # Validar que el tipo de documento coincida con lo que se envió desde el front
+                if str(document_type) != document_type_id:
+                    return JsonResponse({"error": "El tipo de documento no coincide con el número proporcionado."}, status=400)
+
                 # Retornamos información útil del documento
                 return JsonResponse({
+                    "document_type": document_type_name,
                     "urlPublicView": document.get("urlPublicView"),
                     "urlPdf": document.get("urlPdf"),
                     "number": document.get("number"),

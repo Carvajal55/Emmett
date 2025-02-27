@@ -166,13 +166,13 @@
             },
             fetchDocumentDetails(nDocument) {
                 axios
-                    .get(`/api/get-document/${nDocument}/`)
+                    .get(`/api/get-document/${nDocument}/${this.typeDocument}/`)
                     .then(response => {
                         if (response.data.urlPublicView) {
                             window.open(response.data.urlPublicView, '_blank');
                         } else {
                             this.playSound('error');
-                            Swal.fire('Error', 'No se encontró un enlace para la boleta.', 'error');
+                            Swal.fire('Error', 'No se encontró un enlace para el documento.', 'error');
                         }
                     })
                     .catch(error => {
