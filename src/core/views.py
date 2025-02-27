@@ -4698,32 +4698,77 @@ def guardar_resultados_final():
     excel_thread = Thread(target=_guardar_excel)
     excel_thread.start()
 
+from django.core.mail import send_mail
+from django.utils.html import format_html
+
 def enviar_correo_resultados(resultados):
-    """Envía un correo con los resultados del ajuste de stock."""
+    """Envía un correo con los resultados del ajuste de stock en formato de tabla HTML."""
     if not resultados:
         print("❌ No hay resultados para enviar por correo.")
         return
 
-    # Formatear el cuerpo del correo
-    mensaje = "Resultados del ajuste de stock en Bsale:\n\n"
-    for res in resultados:
-        mensaje += f"SKU: {res['sku']}\n"
-        mensaje += f"Nombre: {res['nombre']}\n"
-        mensaje += f"Stock Local: {res['stock_local']} | Stock Bsale: {res['stock_bsale']}\n"
-        mensaje += f"Diferencia: {res['diferencia']}\n"
-        mensaje += f"Ajuste: {res['ajuste']}\n"
-        mensaje += "-" * 50 + "\n"
+    # 🔥 Definir colores para los ajustes
+    def obtener_color(ajuste):
+        if "Recepción" in ajuste:
+            return "#4CAF50"  # Verde
+        elif "Consumo" in ajuste:
+            return "#F44336"  # Rojo
+        else:
+            return "#FFC107"  # Amarillo
 
-    subject = "Resultados del Ajuste de Stock en Bsale"
+    # 🔥 Construir el cuerpo del correo en HTML
+    mensaje_html = """
+    <html>
+    <body>
+        <h2>📊 Resultados del Ajuste de Stock en Bsale</h2>
+        <table style="border-collapse: collapse; width: 100%; text-align: left;">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid #dddddd; padding: 8px; background-color: #f2f2f2;">SKU</th>
+                    <th style="border: 1px solid #dddddd; padding: 8px; background-color: #f2f2f2;">Nombre</th>
+                    <th style="border: 1px solid #dddddd; padding: 8px; background-color: #f2f2f2;">Stock Local</th>
+                    <th style="border: 1px solid #dddddd; padding: 8px; background-color: #f2f2f2;">Stock Bsale</th>
+                    <th style="border: 1px solid #dddddd; padding: 8px; background-color: #f2f2f2;">Diferencia</th>
+                    <th style="border: 1px solid #dddddd; padding: 8px; background-color: #f2f2f2;">Ajuste</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+
+    for res in resultados:
+        color = obtener_color(res['ajuste'])
+        mensaje_html += f"""
+        <tr>
+            <td style="border: 1px solid #dddddd; padding: 8px;">{res['sku']}</td>
+            <td style="border: 1px solid #dddddd; padding: 8px;">{res['nombre']}</td>
+            <td style="border: 1px solid #dddddd; padding: 8px; text-align: center;">{res['stock_local']}</td>
+            <td style="border: 1px solid #dddddd; padding: 8px; text-align: center;">{res['stock_bsale']}</td>
+            <td style="border: 1px solid #dddddd; padding: 8px; text-align: center;">{res['diferencia']}</td>
+            <td style="border: 1px solid #dddddd; padding: 8px; text-align: center; color: {color}; font-weight: bold;">{res['ajuste']}</td>
+        </tr>
+        """
+
+    mensaje_html += """
+            </tbody>
+        </table>
+        <p>Este es un informe automático. Por favor, no responda a este correo.</p>
+    </body>
+    </html>
+    """
+
+    subject = "📊 Resultados del Ajuste de Stock en Bsale"
+    
     send_mail(
         subject,
-        mensaje,
+        '',
         settings.DEFAULT_FROM_EMAIL,
-        ['pfarias@emmett.cl'],  # Cambia el destinatario si es necesario
+        ['erp@emmett.cl'],  # Cambia el destinatario si es necesario
         fail_silently=False,
+        html_message=mensaje_html  # Se envía como HTML
     )
 
-    print("✅ Correo enviado con los resultados.")
+    print("✅ Correo enviado con los resultados en formato HTML.")
+
 
 def guardar_resultados_en_excel(resultados):
     """
@@ -4759,7 +4804,7 @@ def ajustar_stock_bsale(request):
     resultados.clear()
 
     # 🔥 Obtener todos los productos (puedes cambiar el límite para pruebas)
-    productos = list(Products.objects.all()[:400])  # Ajusta el límite aquí
+    productos = list(Products.objects.all())  # Ajusta el límite aquí
 
     # 🔄 Procesar cada producto secuencialmente
     print("🔄 Iniciando procesamiento de productos...")
