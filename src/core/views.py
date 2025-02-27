@@ -5160,7 +5160,7 @@ def get_bsale_document(request, document_number, document_type):
                 return JsonResponse({"error": "Tipo de documento inválido."}, status=400)
 
             # Construir URL
-            bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}&documenttypeid={document_type}"
+            bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}&expand={document_type}"
             headers = {
                 "access_token": BSALE_API_TOKEN,
                 "Content-Type": "application/json"
