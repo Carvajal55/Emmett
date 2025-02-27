@@ -169,6 +169,7 @@
                     .get(`/api/get-document/${nDocument}/${this.typeDocument}/`)
                     .then(response => {
                         if (response.data.urlPublicView) {
+                            // 🔥 Abrir la URL en una nueva pestaña
                             window.open(response.data.urlPublicView, '_blank');
                         } else {
                             this.playSound('error');
