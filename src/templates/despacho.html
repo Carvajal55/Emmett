@@ -175,31 +175,39 @@
             onTypeDocumentChange() {
                 console.log("📌 Type Document cambiado a:", this.typeDocument);
                 this.typeDocument = parseInt(this.typeDocument); // Forzar número
+
+                // 🔥 Sincroniza el valor y luego llama a fetchDocumentDetails si es necesario
+                this.$nextTick(() => {
+                    console.log("📌 Type Document sincronizado:", this.typeDocument);
+                });
             },
             fetchDocumentDetails(nDocument) {
-                console.log("📌 Número de Documento:", nDocument);
-                console.log("📌 Tipo de Documento:", this.typeDocument);  // 🔥 Confirmar el tipo antes de enviar
+                // 🔥 Sincroniza el valor de typeDocument antes de hacer la llamada
+                this.$nextTick(() => {
+                    console.log("📌 Número de Documento:", nDocument);
+                    console.log("📌 Tipo de Documento (sincronizado):", this.typeDocument);  // 🔥 Confirmar el tipo antes de enviar
 
-                axios
-                    .get(`/api/get-document/${nDocument}/${this.typeDocument}/`)
-                    .then(response => {
-                        console.log("✅ Respuesta completa del backend:", response.data);
-                        if (response.data.urlPublicView) {
-                            window.open(response.data.urlPublicView, '_blank');
-                        } else {
+                    axios
+                        .get(`/api/get-document/${nDocument}/${this.typeDocument}/`)
+                        .then(response => {
+                            console.log("✅ Respuesta completa del backend:", response.data);
+                            if (response.data.urlPublicView) {
+                                window.open(response.data.urlPublicView, '_blank');
+                            } else {
+                                this.playSound('error');
+                                Swal.fire('Error', 'No se encontró un enlace para el documento.', 'error');
+                                console.error("❌ Detalles de la respuesta sin enlace:", response.data);
+                            }
+                        })
+                        .catch(error => {
+                            Swal.fire('Error', 'No se pudo obtener los detalles del documento.', 'error');
                             this.playSound('error');
-                            Swal.fire('Error', 'No se encontró un enlace para el documento.', 'error');
-                            console.error("❌ Detalles de la respuesta sin enlace:", response.data);
-                        }
-                    })
-                    .catch(error => {
-                        Swal.fire('Error', 'No se pudo obtener los detalles del documento.', 'error');
-                        this.playSound('error');
-                        console.error("❌ Error en la petición:", error);
-                        if (error.response && error.response.data) {
-                            console.error("❌ Detalles del error:", error.response.data);
-                        }
-                    });
+                            console.error("❌ Error en la petición:", error);
+                            if (error.response && error.response.data) {
+                                console.error("❌ Detalles del error:", error.response.data);
+                            }
+                        });
+                });
             },
             validateAndLinkSuperid() {
                 if (!this.sid) return;
