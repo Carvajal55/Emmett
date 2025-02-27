@@ -5159,8 +5159,8 @@ def get_bsale_document(request, document_number, document_type):
                 print("❌ Tipo de documento inválido:", document_type)
                 return JsonResponse({"error": "Tipo de documento inválido."}, status=400)
 
-            # Construir URL
-            bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}&expand={document_type}"
+            # ✅ Construir URL correcta (sin expand)
+            bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}"
             headers = {
                 "access_token": BSALE_API_TOKEN,
                 "Content-Type": "application/json"
@@ -5187,15 +5187,29 @@ def get_bsale_document(request, document_number, document_type):
 
                 # Verificar si se encontraron documentos
                 if "items" in data and len(data["items"]) > 0:
-                    document = data["items"][0]
-                    # Retornar la URL para abrir el documento en una nueva pestaña
-                    return JsonResponse({
-                        "urlPublicView": document.get("urlPublicView"),
-                        "urlPdf": document.get("urlPdf"),
-                        "number": document.get("number"),
-                        "totalAmount": document.get("totalAmount"),
-                        "full_response": data  # 🔥 Enviar la respuesta completa al frontend
-                    })
+                    # 🔥 Filtrar los items por document_type
+                    matching_document = next(
+                        (item for item in data["items"] if str(item["document_type"]["id"]) == str(document_type)), 
+                        None
+                    )
+
+                    # Verificar si encontramos el documento correcto
+                    if matching_document:
+                        print("✅ Documento encontrado:", matching_document)
+                        return JsonResponse({
+                            "urlPublicView": matching_document.get("urlPublicView"),
+                            "urlPdf": matching_document.get("urlPdf"),
+                            "number": matching_document.get("number"),
+                            "totalAmount": matching_document.get("totalAmount"),
+                            "full_response": matching_document  # 🔥 Enviar el documento encontrado
+                        })
+                    else:
+                        # 🔥 Si no hay coincidencia
+                        print("❌ Documento no encontrado con el tipo especificado.")
+                        return JsonResponse({
+                            "error": "Documento no encontrado con el tipo especificado.",
+                            "full_response": data
+                        }, status=404)
                 else:
                     # 🔥 Imprimir detalles si no se encuentra el documento
                     print("=== Documento no encontrado en la respuesta ===")
