@@ -226,6 +226,7 @@
                         class="btn btn-success"
                         @click="actualizarTodosLosPrecios"
                         style="padding: 10px 20px; font-size: 1rem;"
+                        v-if="mostrarActualizarTodos"
                     >
                         Actualizar Todos
                     </button>
@@ -317,8 +318,8 @@
                 { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
                 { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
                 { label: 'Falabella', id: 11, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                { label: 'Groben', id: 20, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false },
-                { label: 'Mayorista', id: 21, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false }
+                { label: 'Groben', id: 20, fee: 1.031, feePercentage: 1.25, iva: 1.19, n: 1, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false },
+                { label: 'Mayorista', id: 21, fee: 1, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false }
             ],
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
@@ -326,6 +327,20 @@
             nombreSeleccionado: null,
             stockProductos: {},
             precioGlobal: null,
+        },
+        computed: {
+            mostrarActualizarTodos() {
+                // Filtrar las listas que están visibles
+                const listasVisibles = this.listasPrecios.filter(precio => precio.mostrar);
+                
+                // Verificar si todas las listas visibles son Groben y/o Mayorista
+                const soloGrobenOMayorista = listasVisibles.every(precio => 
+                    precio.label === 'Groben' || precio.label === 'Mayorista'
+                );
+
+                // Mostrar el botón solo si hay listas visibles y no son solo Groben y Mayorista
+                return listasVisibles.length > 0 && !soloGrobenOMayorista;
+            }
         },
         mounted() {
             console.log("Componente montado"); // Verificar que el mounted se ejecuta
@@ -379,9 +394,24 @@
                     return;
                 }
 
+                // 🔥 Filtrar Groben y Mayorista para que NO se actualicen masivamente
+                const preciosAActualizar = this.listasPrecios.filter(precio => 
+                    precio.label !== 'Groben' && precio.label !== 'Mayorista' && precio.mostrar
+                );
+
+                // Verificar si hay precios para actualizar después del filtro
+                if (preciosAActualizar.length === 0) {
+                    Swal.fire({
+                        title: 'Información',
+                        text: 'No hay precios para actualizar.',
+                        icon: 'info',
+                        confirmButtonText: 'OK'
+                    });
+                    return;
+                }
+
                 // Mapear todas las actualizaciones de precios
-                const actualizaciones = this.listasPrecios.map(precio => {
-                    // Validar que se ingresó un valor
+                const actualizaciones = preciosAActualizar.map(precio => {
                     if (!precio.valor || precio.valor <= 0) {
                         return Promise.resolve({
                             label: precio.label,
@@ -396,7 +426,6 @@
                         'Content-Type': 'application/json'
                     };
 
-                    // Obtener el detalle del precio (id_detalle)
                     return axios.get(url, { headers })
                         .then(response => {
                             const items = response.data.items || [];
@@ -405,10 +434,9 @@
                             }
                             const idDetalle = items[0].id;
 
-                            // Actualizar el precio en Bsale
                             const urlUpdate = `https://api.bsale.io/v1/price_lists/${precio.id}/details/${idDetalle}.json`;
                             const dataUpdate = {
-                                variantValue: Math.ceil(precio.valor / 1.19), // Convertir el valor con IVA a neto
+                                variantValue: Math.ceil(precio.valor / 1.19),
                                 id: idDetalle
                             };
 
@@ -432,7 +460,6 @@
                         const errores = results.filter(result => result.status === 'error');
                         const exitos = results.filter(result => result.status === 'success');
 
-                        // Mostrar un resumen de los resultados
                         Swal.fire({
                             title: 'Resultados de la Actualización',
                             html: `
