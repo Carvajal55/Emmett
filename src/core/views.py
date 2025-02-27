@@ -2406,11 +2406,12 @@ def reingresar_producto(request):
             return JsonResponse({'error': 'Cantidad inválida, debe ser un número positivo.'}, status=400)
 
         with transaction.atomic():
-            unique_product = Uniqueproducts.objects.filter(superid=superid, state=1).select_related('product').first()
+            # 🔥 Cambio aquí para permitir state 1 o 3
+            unique_product = Uniqueproducts.objects.filter(superid=superid, state__in=[1, 3]).select_related('product').first()
 
             if not unique_product:
                 return JsonResponse({
-                    'error': f"El SuperID {superid} no se encuentra registrado como despachado."
+                    'error': f"El SuperID {superid} no se encuentra registrado como despachado o en un estado permitido."
                 }, status=404)
 
             if not n_document:
