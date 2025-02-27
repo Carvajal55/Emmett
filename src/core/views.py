@@ -5150,30 +5150,36 @@ def actualizar_stock_local(request):
 def get_bsale_document(request, document_number, document_type):
     if request.method == "GET":
         try:
-            # Construcción de la URL para la API de Bsale
+            # Construcción de la URL correcta para la API de Bsale
             bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}&documenttypeid={document_type}"
             headers = {
-                "access_token": BSALE_API_TOKEN
+                "access_token": BSALE_API_TOKEN,
+                "Content-Type": "application/json"
             }
             
             # Realizamos la petición a la API
             response = requests.get(bsale_api_url, headers=headers)
-            data = response.json()
+            
+            # Verificamos si la respuesta es exitosa
+            if response.status_code == 200:
+                data = response.json()
 
-            # Verificar si se encontraron documentos
-            if "items" in data and len(data["items"]) > 0:
-                document = data["items"][0]
-
-                # Retornamos información útil del documento
-                return JsonResponse({
-                    "urlPublicView": document.get("urlPublicView"),
-                    "urlPdf": document.get("urlPdf"),
-                    "number": document.get("number"),
-                    "totalAmount": document.get("totalAmount")
-                })
+                # Verificar si se encontraron documentos
+                if "items" in data and len(data["items"]) > 0:
+                    document = data["items"][0]
+                    # Retornamos la URL para abrir el documento en una nueva pestaña
+                    return JsonResponse({
+                        "urlPublicView": document.get("urlPublicView"),
+                        "urlPdf": document.get("urlPdf"),
+                        "number": document.get("number"),
+                        "totalAmount": document.get("totalAmount")
+                    })
+                else:
+                    # Si no se encuentran documentos
+                    return JsonResponse({"error": "Documento no encontrado."}, status=404)
             else:
-                # Si no se encuentran documentos
-                return JsonResponse({"error": "Documento no encontrado."}, status=404)
+                return JsonResponse({"error": "Error en la solicitud a Bsale."}, status=response.status_code)
+        
         except Exception as e:
             # Manejo de errores inesperados
             return JsonResponse({"error": str(e)}, status=500)
