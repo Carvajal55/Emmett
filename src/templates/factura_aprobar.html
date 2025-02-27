@@ -329,6 +329,18 @@
             precioGlobal: null,
         },
         computed: {
+            mostrarActualizarTodos() {
+                // Filtrar las listas que están visibles
+                const listasVisibles = this.listasPrecios.filter(precio => precio.mostrar);
+                
+                // Verificar si todas las listas visibles son Groben y/o Mayorista
+                const soloGrobenOMayorista = listasVisibles.every(precio => 
+                    precio.label === 'Groben' || precio.label === 'Mayorista'
+                );
+
+                // Mostrar el botón solo si hay listas visibles y no son solo Groben y Mayorista
+                return listasVisibles.length > 0 && !soloGrobenOMayorista;
+            },
             mostrarPrecioGlobal() {
                 // Filtrar las listas que están visibles
                 const listasVisibles = this.listasPrecios.filter(precio => precio.mostrar);
