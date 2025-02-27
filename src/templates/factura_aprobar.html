@@ -83,7 +83,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group col-6 mb-3">
+                    <div class="form-group col-6 mb-3" v-if="mostrarPrecioGlobal">
                         <div class="form-check">
                             <input 
                                 type="checkbox" 
@@ -329,7 +329,7 @@
             precioGlobal: null,
         },
         computed: {
-            mostrarActualizarTodos() {
+            mostrarPrecioGlobal() {
                 // Filtrar las listas que están visibles
                 const listasVisibles = this.listasPrecios.filter(precio => precio.mostrar);
                 
@@ -338,7 +338,7 @@
                     precio.label === 'Groben' || precio.label === 'Mayorista'
                 );
 
-                // Mostrar el botón solo si hay listas visibles y no son solo Groben y Mayorista
+                // Mostrar el input global solo si hay listas visibles y no son solo Groben y Mayorista
                 return listasVisibles.length > 0 && !soloGrobenOMayorista;
             }
         },
