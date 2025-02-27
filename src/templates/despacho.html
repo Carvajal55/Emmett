@@ -167,6 +167,7 @@
             fetchDocumentDetails(nDocument) {
                 axios
                     .get(`/api/get-document/${nDocument}/${this.typeDocument}/`)
+                    console.log(this.typeDocument,"TIPO DOCU")
                     .then(response => {
                         console.log("✅ Respuesta completa del backend:", response.data);
                         if (response.data.urlPublicView) {
