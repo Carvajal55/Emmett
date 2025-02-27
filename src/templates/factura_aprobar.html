@@ -103,6 +103,7 @@
                             @input="asignarPrecioGlobal"
                             placeholder="Ingrese un precio global"
                             :disabled="!habilitarInputGlobal"
+                            v-if="mostrarActualizarTodos"
                         />
                     </div>
                     <div class="col-12  mt-4">
@@ -111,6 +112,7 @@
                             class="btn btn-success"
                             @click="actualizarTodosLosPrecios"
                             style="padding: 10px 20px; font-size: 1rem;"
+                            v-if="mostrarActualizarTodos"
                         >
                             Actualizar Todos
                         </button>
