@@ -107,12 +107,13 @@
         delimiters: ['[[', ']]'],
         data: {
             company: 1,
-            typeDocument: 33,
+            typeDocument: 39,
             nDocument: null,
             sid: '',
             products: [],
             dispatchReady: true, // Control para evitar disparo automático de completeDispatch
             invoiceComplete: false, // 🔥 Nuevo estado para mostrar si el documento está completo
+            dispatchInProgress: false,  // 🔥 Nuevo flag para controlar despacho
         },
         computed: {
             allProductsComplete() {
@@ -125,21 +126,22 @@
                 console.log(`📌 Cambió typeDocument de ${oldVal} a ${newVal}`);
             },
             allProductsComplete(value) {
-                // ✅ Solo despacha si está listo y no se ha disparado antes
-                if (value && this.dispatchReady) {
-                    this.dispatchReady = false; // 🔥 Evita múltiples despachos
+                if (value && this.dispatchReady && !this.dispatchInProgress) {
+                    this.dispatchInProgress = true; // 🔥 Bloquea despachos adicionales
+                    this.dispatchReady = false; 
 
                     Swal.fire({
                         title: '¡Despacho completo!',
-                        text: 'Todos los productos han sido despachados y la boleta está lista.',
+                        text: 'Todos los productos han sido despachados.',
                         icon: 'success',
                         confirmButtonText: 'Aceptar'
                     }).then(() => {
-                        // Intentar completar el despacho
-                        this.completeDispatch();
+                        this.completeDispatch().then(() => {
+                            this.dispatchInProgress = false; // 🔥 Libera el bloqueo al terminar
+                        });
                     });
                 }
-            },
+            }
         },
         methods: {
             async forceCompleteWithSuperid(index) {
@@ -491,13 +493,13 @@
 
             async completeDispatch() {
                 try {
-                    // Verificar si todos los productos están completos antes de enviar
-                    if (!this.allProductsComplete) {
-                        Swal.fire('Error', 'No todos los productos están despachados.', 'error');
-                        this.playSound('error');
-                        this.dispatchReady = true;  // 🔥 Permitir nuevos intentos
+                    if (this.dispatchInProgress) {
+                        console.log('🚫 Despacho en progreso, no se puede repetir.');
                         return;
                     }
+
+                    this.dispatchInProgress = true;
+                    console.log('🚀 Iniciando el despacho...');
 
                     const response = await axios.post('/api/complete-dispatch/', {
                         nDocument: this.nDocument,
@@ -508,17 +510,19 @@
                     if (response.data.icon === 'success') {
                         this.playSound('successSound');
                         Swal.fire('Éxito', 'El documento fue marcado como completamente despachado.', 'success');
-                        this.dispatchReady = false;  // 🔥 Bloquear más despachos para este documento
+                        this.dispatchReady = false;
                     } else {
                         this.playSound('error');
                         Swal.fire('Error', response.data.message || 'Error al completar el despacho.', 'error');
-                        this.dispatchReady = true;  // 🔥 Permitir nuevos intentos
+                        this.dispatchReady = true;
                     }
                 } catch (error) {
                     console.error('Error al completar el despacho:', error);
                     this.playSound('error');
                     Swal.fire('Error', 'No se pudo completar el despacho.', 'error');
-                    this.dispatchReady = true;  // 🔥 Permitir nuevos intentos
+                    this.dispatchReady = true;
+                } finally {
+                    this.dispatchInProgress = false; // 🔥 Libera el bloqueo al finalizar
                 }
             },
             playSound(type) {
