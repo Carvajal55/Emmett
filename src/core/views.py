@@ -4594,66 +4594,58 @@ def guardar_resultados_incremental(resultado):
         except Exception as e:
             print(f"❌ Error al guardar resultado incremental: {str(e)}")
 
-def procesar_producto(producto, total_productos, index, retry=False):
-    """Procesa un SKU comparando stock local y Bsale, ajustando si es necesario."""
+def procesar_producto(producto, total_productos, index):
+    """Procesa un producto, compara stock local con Bsale y ajusta si es necesario."""
     sku = producto.sku
     iderp = producto.iderp
     cost = producto.lastcost
-    stock_bsale, stock_data = get_stock_bsale(iderp, retry)
-    
+    stock_bsale, stock_data = get_stock_bsale(iderp)
+
     if stock_bsale is None:
-        print(f"❌ Error crítico al obtener stock de Bsale para SKU {sku}")
-        return {
+        resultado = {
             "sku": sku,
             "nombre": producto.nameproduct,
-            "error": "Error crítico en la consulta a Bsale"
+            "error": "Error crítico en la consulta a Bsale",
+            "stock_bsale_data": json.dumps(stock_data, indent=2)
         }
+        print(f"❌ Error crítico en Bsale para SKU {sku}")
+        return resultado
 
-    stock_local = Uniqueproducts.objects.filter(Q(product=producto) & Q(state=0)).count()
+    stock_local = Uniqueproducts.objects.filter(product=producto, state=0).count()
     diferencia = stock_local - stock_bsale
 
     ajuste_resultado = "No ajuste necesario"
     ajuste_respuesta = {}
 
-    print(f"🔄 Procesando SKU {sku} ({index + 1}/{total_productos}) | Local: {stock_local} | Bsale: {stock_bsale} | Diferencia: {diferencia}")
-
-    # Comparación y Ajuste
+    # 🔥 Ajuste de stock
     if diferencia > 0:
         print(f"📥 Recepción en Bsale para SKU: {sku} | Diferencia: {diferencia}")
         ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "reception", iderp, cost, stock_data)
 
     elif diferencia < 0:
-        if abs(diferencia) <= stock_bsale:
-            print(f"📦 Consumo en Bsale para SKU: {sku} | Diferencia: {diferencia}")
-            ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost, stock_data)
-        else:
-            ajuste_resultado = f"❌ Error: No se puede restar {abs(diferencia)} porque el stock en Bsale es {stock_bsale}"
-            print(ajuste_resultado)
+        print(f"📦 Consumo en Bsale para SKU: {sku} | Diferencia: {diferencia}")
+        ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, diferencia, "consumption", iderp, cost, stock_data)
 
     elif stock_local == 0 and stock_bsale > 0:
-        print(f"🚫 Stock local 0 pero en Bsale hay {stock_bsale} - Poniendo en 0 en Bsale para SKU: {sku}")
+        print(f"🔄 Ajustando a 0 en Bsale para SKU: {sku}")
         ajuste_resultado, ajuste_respuesta = ajustar_stock_en_bsale(sku, -stock_bsale, "consumption", iderp, cost, stock_data)
 
-    if "No ajuste necesario" in ajuste_resultado:
-        print(f"🟡 Resultado para SKU {sku}: No ajuste necesario")
-    elif "Recepción realizada" in ajuste_resultado:
-        print(f"✅ Resultado para SKU {sku}: Stock sumado en Bsale")
-    elif "Consumo realizado" in ajuste_resultado:
-        print(f"🔴 Resultado para SKU {sku}: Stock restado en Bsale")
-    elif "Error" in ajuste_resultado:
-        print(f"❌ Resultado para SKU {sku}: {ajuste_resultado}")
-    else:
-        print(f"🟡 Resultado para SKU {sku}: {ajuste_resultado}")
+    # 🔥 Log detallado
+    print(f"🔄 Procesado SKU {sku} ({index + 1}/{total_productos}) | Local: {stock_local} | Bsale: {stock_bsale} | Diferencia: {diferencia}")
+    print(f"✅ Resultado para SKU {sku}: {ajuste_resultado}")
 
-    return {
+    resultado = {
         "sku": sku,
         "nombre": producto.nameproduct,
         "stock_local": stock_local,
         "stock_bsale": stock_bsale,
         "diferencia": diferencia,
         "ajuste": ajuste_resultado,
+        "stock_bsale_data": json.dumps(stock_data, indent=2),
         "ajuste_respuesta": ajuste_respuesta
     }
+
+    return resultado
 
 
 def guardar_resultados_json():
@@ -4707,53 +4699,28 @@ def guardar_resultados_final():
     excel_thread.start()
 
 def enviar_correo_resultados(resultados):
-    """
-    Envía un correo con los resultados del ajuste de stock.
-    """
+    """Envía un correo con los resultados del ajuste de stock."""
     if not resultados:
         print("❌ No hay resultados para enviar por correo.")
         return
 
-    # Construir el cuerpo del correo en formato de tabla
-    mensaje = """
-    <h3>Resultados del Ajuste de Stock en Bsale</h3>
-    <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse;">
-        <tr>
-            <th>SKU</th>
-            <th>Nombre</th>
-            <th>Stock Local</th>
-            <th>Stock Bsale</th>
-            <th>Diferencia</th>
-            <th>Ajuste</th>
-        </tr>
-    """
+    # Formatear el cuerpo del correo
+    mensaje = "Resultados del ajuste de stock en Bsale:\n\n"
+    for res in resultados:
+        mensaje += f"SKU: {res['sku']}\n"
+        mensaje += f"Nombre: {res['nombre']}\n"
+        mensaje += f"Stock Local: {res['stock_local']} | Stock Bsale: {res['stock_bsale']}\n"
+        mensaje += f"Diferencia: {res['diferencia']}\n"
+        mensaje += f"Ajuste: {res['ajuste']}\n"
+        mensaje += "-" * 50 + "\n"
 
-    for r in resultados:
-        mensaje += f"""
-            <tr>
-                <td>{r['sku']}</td>
-                <td>{r['nombre']}</td>
-                <td>{r['stock_local']}</td>
-                <td>{r['stock_bsale']}</td>
-                <td>{r['diferencia']}</td>
-                <td>{r['ajuste']}</td>
-            </tr>
-        """
-
-    mensaje += "</table>"
-    fecha_actual = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    subject = f"Resultados Ajuste Stock Bsale - {fecha_actual}"
-    from_email = settings.DEFAULT_FROM_EMAIL
-    to_email = ['erp@emmett.cl']  # Cambia o agrega destinatarios según sea necesario
-
+    subject = "Resultados del Ajuste de Stock en Bsale"
     send_mail(
         subject,
-        '',  # Dejar el cuerpo vacío ya que estamos enviando en HTML
-        from_email,
-        to_email,
+        mensaje,
+        settings.DEFAULT_FROM_EMAIL,
+        ['pfarias@emmett.cl'],  # Cambia el destinatario si es necesario
         fail_silently=False,
-        html_message=mensaje  # Enviar como HTML
     )
 
     print("✅ Correo enviado con los resultados.")
@@ -4784,60 +4751,30 @@ def guardar_resultados_en_excel(resultados):
 
 @csrf_exempt
 def ajustar_stock_bsale(request):
-    """Endpoint para comparar y ajustar stock en Bsale y enviar resultados por correo."""
+    """Comparar y ajustar stock en Bsale, y enviar resultados por correo."""
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    # Limitar a 40 productos para pruebas
-    productos = list(Products.objects.all())  
+    # 🔥 Reiniciar la lista de resultados
+    resultados.clear()
 
+    # 🔥 Obtener todos los productos (puedes cambiar el límite para pruebas)
+    productos = list(Products.objects.all()[:400])  # Ajusta el límite aquí
+
+    # 🔄 Procesar cada producto secuencialmente
     print("🔄 Iniciando procesamiento de productos...")
 
-    # Encolar productos
     for index, producto in enumerate(productos):
-        print(f"🔄 Encolando SKU {producto.sku} ({index + 1}/{len(productos)})")
-        queue.put((index, producto, len(productos)))
+        print(f"🔄 Procesando SKU {producto.sku} ({index + 1}/{len(productos)})")
+        resultado = procesar_producto(producto, len(productos), index)
+        resultados.append(resultado)
 
-    num_workers = 3
-    threads = []
+    print("✅ Todos los productos han sido procesados.")
 
-    print("🔄 Iniciando workers...")
-
-    # Iniciar workers
-    for i in range(num_workers):
-        t = Thread(target=procesar_producto_worker)
-        t.start()
-        threads.append(t)
-        print(f"✅ Worker {i+1} iniciado")
-
-    # Encolando señales de finalización
-    print("🔄 Encolando señales de finalización...")
-    for _ in range(num_workers):
-        queue.put(None)
-
-    # Esperando a que la cola se vacíe
-    print("🔄 Esperando a que la cola se vacíe...")
-    queue.join()
-    print("✅ Cola vaciada.")
-
-    # Esperando a que todos los threads finalicen
-    print("🔄 Esperando a que todos los threads finalicen...")
-    for t in threads:
-        t.join()
-    print("✅ Todos los threads han finalizado.")
-
-    # 🔥 NUEVO: Confirmar que todos los productos fueron procesados
-    total_procesados = len(resultados)
-    total_productos = len(productos)
-    print(f"✅ Procesados: {total_procesados} de {total_productos}")
-
-    # 🔥 NUEVO: Verificar si todos los productos fueron procesados
-    if total_procesados == total_productos:
-        print("✅ Todos los productos fueron procesados. Enviando resultados por correo...")
-        enviar_correo_resultados(resultados)
-        print("✅ Resultados enviados por correo.")
-    else:
-        print("❌ No se procesaron todos los productos. Verificar posibles errores.")
+    # 🔄 Enviar el correo con los resultados
+    print("🔄 Enviando resultados por correo...")
+    enviar_correo_resultados(resultados)
+    print("✅ Resultados enviados por correo.")
 
     # Retornar una respuesta exitosa al frontend
     return JsonResponse({"message": "El proceso se completó y los resultados fueron enviados por correo."})
