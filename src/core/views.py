@@ -3027,6 +3027,29 @@ def force_complete_product_with_superid(request):
                     "error": f"El producto con SKU {sku} no está asociado al documento."
                 }, status=404)
 
+            # 🔥🔥🔥 Despacho automático para OTR15062 🔥🔥🔥
+            if sku == "OTR15062":
+                print("🔥 Despachando automáticamente el SKU OTR15062")
+
+                # Marcar como completo en el InvoiceProduct
+                with transaction.atomic():
+                    invoice_product.dispatched_quantity = invoice_product.total_quantity  # Marcar como completamente despachado
+                    invoice_product.is_complete = True
+                    invoice_product.save()
+
+                    # Verificar si todos los productos en el documento están completos
+                    all_products_complete = not InvoiceProduct.objects.filter(invoice=invoice, is_complete=False).exists()
+
+                    if all_products_complete:
+                        invoice.dispatched = True  # Marcar el documento como completamente despachado
+                        invoice.save()
+
+                return JsonResponse({
+                    "icon": "success",
+                    "message": f"El producto OTR15062 fue despachado automáticamente y el documento fue marcado como completo."
+                })
+
+            # --- Si no es OTR15062, proceder con el flujo normal ---
             with transaction.atomic():
                 if superid:  # Si se proporciona un SuperID
                     # Verificar si ya está procesado
@@ -3085,8 +3108,6 @@ def force_complete_product_with_superid(request):
                     unique_product.state = 1  # Marcado como despachado
                     unique_product.datelastinventory = timezone.now()
                     unique_product.save()
-                else:  # Sin SuperID
-                    print(f"Forzando despacho del producto con SKU {sku} sin SuperID.")
 
                 # Actualizar cantidades despachadas en el InvoiceProduct
                 invoice_product.dispatched_quantity += 1

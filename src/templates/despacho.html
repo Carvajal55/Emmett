@@ -138,35 +138,29 @@
                 const product = this.products[index];
                 const superid = product.forceSuperid ? product.forceSuperid.trim() : null;
 
-                console.log("Enviando datos al backend:", {
-                    nDocument: this.nDocument,
-                    typeDocument: this.typeDocument,
-                    sku: product.code,
-                    superid: superid
-                });
+                console.log("🔥 Forzando despacho del SKU:", product.code);
 
                 try {
+                    // Enviar el SKU y la cantidad total al backend para forzar el despacho
                     const response = await axios.post('/api/force-complete-product-with-superid/', {
                         nDocument: this.nDocument,
                         typeDocument: this.typeDocument,
                         sku: product.code,
-                        superid: superid,
+                        quantity: product.quantity, // 🔥 Enviamos la cantidad total
+                        superid: superid, // No se envía SuperID
                     });
 
-                    console.log("Respuesta del backend:", response.data);
+                    console.log("✅ Respuesta del backend:", response.data);
 
                     if (response.data.icon === 'success') {
                         Swal.fire('Éxito', `Producto ${product.code} despachado correctamente.`, 'success');
-                        product.quantityScanned += 1; // Incrementa de a 1
-                        if (product.quantityScanned >= product.quantity) {
-                            product.is_complete = true;
-                        }
-                        if (superid) product.superids.push(superid);
+                        product.quantityScanned = product.quantity; // 🔥 Se marca como despachado por completo
+                        product.is_complete = true;
                     } else {
                         Swal.fire('Error', response.data.error || 'Error al forzar el despacho.', 'error');
                     }
                 } catch (error) {
-                    console.error('Error al forzar el despacho:', error);
+                    console.error('❌ Error al forzar el despacho:', error);
                     Swal.fire('Error', 'No se pudo procesar el despacho.', 'error');
                 }
             },
@@ -274,13 +268,13 @@
                     this.invoiceComplete = response.data.invoice_dispatched;
 
                     // Mapear productos y obtener detalles adicionales
-                    this.products = await Promise.all(response.data.products.map(async product => {
+                    this.products = await Promise.all(response.data.products.map(async (product, index) => {
                         const cleanSku = product.code.trim();  // 🔥 Eliminar espacios en el SKU
                         console.log(`🛠 Buscando detalles para SKU: ${cleanSku}`);
 
-                        // ✅ Marcar automáticamente como completo si el SKU es OTR15062
+                        // ✅ Si el SKU es OTR15062, se fuerza automáticamente el despacho
                         if (cleanSku === 'OTR15062') {
-                            console.log('🔥 OTR15062 detectado, marcando como completo automáticamente.');
+                            console.log('🔥 OTR15062 detectado, forzando despacho automáticamente.');
 
                             // Marcar el producto como completo en el frontend
                             const autoCompleteProduct = {
@@ -295,8 +289,8 @@
                                 is_complete: true // 🔥 Marcado como completo
                             };
 
-                            // 🔥 Reutilizar la lógica de forceCompleteWithSuperid
-                            this.forceCompleteWithSuperid(autoCompleteProduct);
+                            // 🔥 Llamar a la función de forzar producto automáticamente
+                            this.forceCompleteWithSuperid(index);
 
                             // Retornar el producto marcado como completo
                             return autoCompleteProduct;
@@ -335,6 +329,13 @@
                     }));
 
                     console.log('✅ Productos procesados:', this.products);
+
+                    // 🔥 Verificar si todos los productos están completos
+                    if (this.products.every(product => product.is_complete)) {
+                        this.invoiceComplete = true;
+                        Swal.fire('Éxito', '¡Todos los productos han sido despachados!', 'success');
+                    }
+
                     this.dispatchReady = true;
                 }).catch(error => {
                     Swal.fire('Error', 'No se pudieron obtener los detalles del documento.', 'error');
