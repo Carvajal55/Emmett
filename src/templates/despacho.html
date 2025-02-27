@@ -281,7 +281,9 @@
                         // ✅ Marcar automáticamente como completo si el SKU es OTR15062
                         if (cleanSku === 'OTR15062') {
                             console.log('🔥 OTR15062 detectado, marcando como completo automáticamente.');
-                            return {
+
+                            // Marcar el producto como completo en el frontend
+                            const autoCompleteProduct = {
                                 code: cleanSku,
                                 name: 'Producto OTR15062',
                                 description: 'Despacho automático',
@@ -292,6 +294,12 @@
                                 superids: [], // No hay SuperID
                                 is_complete: true // 🔥 Marcado como completo
                             };
+
+                            // 🔥 Reutilizar la lógica de forceCompleteWithSuperid
+                            this.forceCompleteWithSuperid(autoCompleteProduct);
+
+                            // Retornar el producto marcado como completo
+                            return autoCompleteProduct;
                         }
 
                         // Si no es OTR15062, proceder con la lógica normal
