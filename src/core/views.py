@@ -5150,14 +5150,21 @@ def actualizar_stock_local(request):
 def get_bsale_document(request, document_number, document_type):
     if request.method == "GET":
         try:
+            # Verificar y convertir el document_type en número
+            document_type = int(document_type)
+
+            # Validar el tipo de documento antes de construir la URL
+            if document_type not in [33, 39, 52]:
+                print("❌ Tipo de documento inválido:", document_type)
+                return JsonResponse({"error": "Tipo de documento inválido."}, status=400)
+
             # Construcción de la URL correcta para la API de Bsale
-            
-            bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}&expand={document_type}"
+            bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}&documenttypeid={document_type}"
             headers = {
                 "access_token": BSALE_API_TOKEN,
                 "Content-Type": "application/json"
             }
-            
+
             # 🔥 Imprimir la URL y los headers
             print("=== URL de Bsale ===")
             print(bsale_api_url)
