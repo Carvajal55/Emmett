@@ -23,9 +23,14 @@
     <!-- Selección de tipo de documento -->
     <div class="mb-3">
         <label for="cbTypeDocument">Tipo Documento</label>
-        <select id="cbTypeDocument" v-model="typeDocument" class="form-select">
-            <option value="39">BOLETA</option>
+        <select 
+            id="cbTypeDocument" 
+            v-model="typeDocument" 
+            class="form-select" 
+            @change="onTypeDocumentChange"
+        >
             <option value="33">FACTURA</option>
+            <option value="39">BOLETA</option>
             <option value="52">GUIA</option>
         </select>
     </div>
@@ -116,6 +121,9 @@
             }
         },
         watch: {
+            typeDocument(newVal, oldVal) {
+                console.log(`📌 Cambió typeDocument de ${oldVal} a ${newVal}`);
+            },
             allProductsComplete(value) {
                 // ✅ Solo despacha si está listo y no se ha disparado antes
                 if (value && this.dispatchReady) {
@@ -164,16 +172,19 @@
                     Swal.fire('Error', 'No se pudo procesar el despacho.', 'error');
                 }
             },
+            onTypeDocumentChange() {
+                console.log("📌 Type Document cambiado a:", this.typeDocument);
+                this.typeDocument = parseInt(this.typeDocument); // Forzar número
+            },
             fetchDocumentDetails(nDocument) {
                 console.log("📌 Número de Documento:", nDocument);
-                console.log("📌 Tipo de Documento:", this.typeDocument);  // 🔥 Imprimir el tipo de documento antes de enviar
+                console.log("📌 Tipo de Documento:", this.typeDocument);  // 🔥 Confirmar el tipo antes de enviar
 
                 axios
                     .get(`/api/get-document/${nDocument}/${this.typeDocument}/`)
                     .then(response => {
                         console.log("✅ Respuesta completa del backend:", response.data);
                         if (response.data.urlPublicView) {
-                            // 🔥 Abrir la URL en una nueva pestaña
                             window.open(response.data.urlPublicView, '_blank');
                         } else {
                             this.playSound('error');

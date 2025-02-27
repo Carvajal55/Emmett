@@ -5150,15 +5150,16 @@ def actualizar_stock_local(request):
 def get_bsale_document(request, document_number, document_type):
     if request.method == "GET":
         try:
-            # Verificar y convertir el document_type en número
-            document_type = int(document_type)
+            # 🔥 Confirmar el tipo de documento recibido
+            print("📌 Tipo de Documento recibido:", document_type)
 
-            # Validar el tipo de documento antes de construir la URL
+            # Convertir a número y validar
+            document_type = int(document_type)
             if document_type not in [33, 39, 52]:
                 print("❌ Tipo de documento inválido:", document_type)
                 return JsonResponse({"error": "Tipo de documento inválido."}, status=400)
 
-            # Construcción de la URL correcta para la API de Bsale
+            # Construir URL
             bsale_api_url = f"https://api.bsale.io/v1/documents.json?number={document_number}&documenttypeid={document_type}"
             headers = {
                 "access_token": BSALE_API_TOKEN,
@@ -5170,24 +5171,24 @@ def get_bsale_document(request, document_number, document_type):
             print(bsale_api_url)
             print("=== Headers ===")
             print(headers)
-            
-            # Realizamos la petición a la API
+
+            # Realizar la petición
             response = requests.get(bsale_api_url, headers=headers)
             
-            # 🔥 Imprimir el estado y el contenido de la respuesta
+            # 🔥 Imprimir estado y contenido de la respuesta
             print("=== Estado de la respuesta ===")
             print(response.status_code)
             print("=== Contenido de la respuesta ===")
             print(response.text)
             
-            # Verificamos si la respuesta es exitosa
+            # Verificar si la respuesta es exitosa
             if response.status_code == 200:
                 data = response.json()
 
                 # Verificar si se encontraron documentos
                 if "items" in data and len(data["items"]) > 0:
                     document = data["items"][0]
-                    # Retornamos la URL para abrir el documento en una nueva pestaña
+                    # Retornar la URL para abrir el documento en una nueva pestaña
                     return JsonResponse({
                         "urlPublicView": document.get("urlPublicView"),
                         "urlPdf": document.get("urlPdf"),
