@@ -649,7 +649,6 @@
                 const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
                 precio.valorSugerido = valorSugerido;
             },
-           
             abrirModal(detalle, mostrar) {
                 this.skuSeleccionado = detalle.sku;
                 this.nombreSeleccionado = detalle.model;
@@ -674,8 +673,8 @@
                 this.listasPrecios.forEach(precio => {
                     if (precio.mostrar) {
                         this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
-                        this.calcularValorSugerido(precio); 
-                        precio.margen = 0; // Inicializa el margen en 0%// Calcula el valor sugerido con margen de 25%
+                        this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
+                        this.recalcularMargen(precio); // Recalcula el margen
                     }
                 });
 
