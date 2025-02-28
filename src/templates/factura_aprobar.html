@@ -83,7 +83,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group col-6 mb-3" v-if="mostrarPrecioGlobal">
+                    <div class="form-group col-6 mb-3">
                         <div class="form-check">
                             <input 
                                 type="checkbox" 
@@ -103,7 +103,6 @@
                             @input="asignarPrecioGlobal"
                             placeholder="Ingrese un precio global"
                             :disabled="!habilitarInputGlobal"
-                            v-if="mostrarActualizarTodos"
                         />
                     </div>
                     <div class="col-12  mt-4">
@@ -112,24 +111,18 @@
                             class="btn btn-success"
                             @click="actualizarTodosLosPrecios"
                             style="padding: 10px 20px; font-size: 1rem;"
-                            v-if="mostrarActualizarTodos"
                         >
                             Actualizar Todos
                         </button>
                     </div>
                     <div class="row">
-                        <div v-for="(precio, index) in listasPrecios" 
-                             :key="index" 
-                             class="col-md-6 mb-3" 
-                             style="padding: 10px;"
-                             v-if="precio.mostrar"> <!-- Solo se muestran los precios con mostrar: true -->
-                             
+                        <div v-for="(precio, index) in listasPrecios" :key="index" class="col-md-6 mb-3" style="padding: 10px;">
                             <div class="form-group">
                                 <!-- Mostrar el label con el Valor Sugerido -->
                                 <label :for="'precio-' + precio.id" style="font-weight: bold; margin-bottom: 5px; display: block;">
                                     [[ precio.label ]]
                                 </label>
-                    
+                
                                 <!-- Mostrar el Valor Sugerido -->
                                 <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
                                     Valor Sugerido: [[ precio.valorSugerido || 'Pendiente' ]] CLP
@@ -137,7 +130,8 @@
                                 <p style="margin-top: 5px; font-size: 0.9rem; color: gray;">
                                     Valor Actual: [[ precio.valorActual || 'Pendiente' ]] CLP
                                 </p>
-                    
+                               
+                
                                 <!-- Input para ingresar el valor -->
                                 <input
                                     type="number"
@@ -148,12 +142,12 @@
                                     placeholder="Ingrese precio"
                                     style="margin-bottom: 10px;"
                                 />
-                    
+                
                                 <!-- Mostrar el margen calculado -->
                                 <p style="margin-top: 10px; font-size: 1rem;">
                                     <strong>Margen:</strong> [[ precio.margen || 0 ]]%
                                 </p>
-                    
+                
                                 <div class="row">
                                     <div class="col-4">
                                         <label for="fee" style="font-size: 0.8rem; font-weight: bold;">
@@ -198,8 +192,10 @@
                                             placeholder="Ej: 4990"
                                         />
                                     </div>
+                                    
+                                   
                                 </div>
-                    
+                
                                 <!-- Botón para guardar individual -->
                                 <button
                                     class="btn btn-primary mt-2 w-100"
@@ -228,7 +224,6 @@
                         class="btn btn-success"
                         @click="actualizarTodosLosPrecios"
                         style="padding: 10px 20px; font-size: 1rem;"
-                        v-if="mostrarActualizarTodos"
                     >
                         Actualizar Todos
                     </button>
@@ -284,9 +279,8 @@
                     <td style="text-align: center;">[[ detalle.margen ]]%</td>
                     <td style="text-align: center;">[[ detalle.totalStock ]]</td>
                     <td>
-                        <button class="btn btn-info btn-sm" @click="abrirModal(detalle,true)">P.MarketPlace</button>
+                        <button class="btn btn-info btn-sm" @click="abrirModal(detalle)">P.MarketPlace</button>
                         <button class="btn btn-primary btn-sm mt-1" @click="actualizarPrecioBase(detalle)">P.Base</button>
-                        <button class="btn btn-secondary btn-sm" @click="abrirModal(detalle, false)">Precios.G&M</button>
                     </td>
                 </tr>
             </tbody>
@@ -315,13 +309,11 @@
             errorMsg: '',    // Mensaje de error
             idFactura: null,
             listasPrecios: [
-                { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                { label: 'Paris', id: 12,  fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                { label: 'Falabella', id: 11, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                { label: 'Groben', id: 20, fee: 1.031, feePercentage: 1.25, iva: 1.19, n: 1, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false },
-                { label: 'Mayorista', id: 21, fee: 1, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false }
+                { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, margen: null, valor: null, valorSugerido: null },
+                { label: 'Paris', id: 12,  fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null },
+                
             ],
             detalleSeleccionado: null,
             skuSeleccionado: null, // SKU del producto seleccionado
@@ -329,32 +321,6 @@
             nombreSeleccionado: null,
             stockProductos: {},
             precioGlobal: null,
-        },
-        computed: {
-            mostrarActualizarTodos() {
-                // Filtrar las listas que están visibles
-                const listasVisibles = this.listasPrecios.filter(precio => precio.mostrar);
-                
-                // Verificar si todas las listas visibles son Groben y/o Mayorista
-                const soloGrobenOMayorista = listasVisibles.every(precio => 
-                    precio.label === 'Groben' || precio.label === 'Mayorista'
-                );
-
-                // Mostrar el botón solo si hay listas visibles y no son solo Groben y Mayorista
-                return listasVisibles.length > 0 && !soloGrobenOMayorista;
-            },
-            mostrarPrecioGlobal() {
-                // Filtrar las listas que están visibles
-                const listasVisibles = this.listasPrecios.filter(precio => precio.mostrar);
-                
-                // Verificar si todas las listas visibles son Groben y/o Mayorista
-                const soloGrobenOMayorista = listasVisibles.every(precio => 
-                    precio.label === 'Groben' || precio.label === 'Mayorista'
-                );
-
-                // Mostrar el input global solo si hay listas visibles y no son solo Groben y Mayorista
-                return listasVisibles.length > 0 && !soloGrobenOMayorista;
-            }
         },
         mounted() {
             console.log("Componente montado"); // Verificar que el mounted se ejecuta
@@ -408,24 +374,9 @@
                     return;
                 }
 
-                // 🔥 Filtrar Groben y Mayorista para que NO se actualicen masivamente
-                const preciosAActualizar = this.listasPrecios.filter(precio => 
-                    precio.label !== 'Groben' && precio.label !== 'Mayorista' && precio.mostrar
-                );
-
-                // Verificar si hay precios para actualizar después del filtro
-                if (preciosAActualizar.length === 0) {
-                    Swal.fire({
-                        title: 'Información',
-                        text: 'No hay precios para actualizar.',
-                        icon: 'info',
-                        confirmButtonText: 'OK'
-                    });
-                    return;
-                }
-
                 // Mapear todas las actualizaciones de precios
-                const actualizaciones = preciosAActualizar.map(precio => {
+                const actualizaciones = this.listasPrecios.map(precio => {
+                    // Validar que se ingresó un valor
                     if (!precio.valor || precio.valor <= 0) {
                         return Promise.resolve({
                             label: precio.label,
@@ -440,6 +391,7 @@
                         'Content-Type': 'application/json'
                     };
 
+                    // Obtener el detalle del precio (id_detalle)
                     return axios.get(url, { headers })
                         .then(response => {
                             const items = response.data.items || [];
@@ -448,9 +400,10 @@
                             }
                             const idDetalle = items[0].id;
 
+                            // Actualizar el precio en Bsale
                             const urlUpdate = `https://api.bsale.io/v1/price_lists/${precio.id}/details/${idDetalle}.json`;
                             const dataUpdate = {
-                                variantValue: Math.ceil(precio.valor / 1.19),
+                                variantValue: Math.ceil(precio.valor / 1.19), // Convertir el valor con IVA a neto
                                 id: idDetalle
                             };
 
@@ -474,6 +427,7 @@
                         const errores = results.filter(result => result.status === 'error');
                         const exitos = results.filter(result => result.status === 'success');
 
+                        // Mostrar un resumen de los resultados
                         Swal.fire({
                             title: 'Resultados de la Actualización',
                             html: `
@@ -504,9 +458,11 @@
                 axios.post('/api/obtener_valor_actual/', data)
                     .then(response => {
                         const valorRecibido = response.data.valor_actual;
+
+                        // Verificar si se recibió un valor válido y sumar el IVA
                         if (valorRecibido) {
-                            const valorConIva = Math.floor(valorRecibido * 1.19);
-                            this.$set(precio, 'valorActual', valorConIva);
+                            const valorConIva = Math.floor(valorRecibido * 1.19); // Sumar IVA y redondear
+                            this.$set(precio, 'valorActual', valorConIva); // Reactivo
                         } else {
                             this.$set(precio, 'valorActual', 'Pendiente');
                         }
@@ -518,13 +474,12 @@
             },
             initializeListasPrecios(detalle) {
                 return [
-                    { label: 'MercadoLibre', id: 10, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 4990, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                    { label: 'Paris', id: 12,  fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                    { label: 'Ripley', id: 13, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                    { label: 'Walmart', id: 14, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                    { label: 'Falabella', id: 11, fee: 1.25, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: true },
-                    { label: 'Groben', id: 20, fee: 1.031, feePercentage: 1.25, iva: 1.19, n: 1, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false },
-                    { label: 'Mayorista', id: 21, fee: 1, feePercentage: 1.25, iva: 1.19, n: 1.35, nPercentage: 1.35, despacho: 0, margen: null, valor: null, valorSugerido: null, mostrar: false }
+                    { label: 'MercadoLibre', id: 10, fee: 1.25, iva: 1.19, n: 1.35, despacho: 4990, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
+                    { label: 'Paris', id: 12, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
+                    { label: 'Ripley', id: 13, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
+                    { label: 'Walmart', id: 14, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null },
+                    { label: 'Falabella', id: 11, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0, costo: detalle.cost || 0, margen: null, valor: null, valorSugerido: null }
+
                 ];
             },
             recalcularTodos() {
@@ -543,10 +498,6 @@
                     case 'Ripley':
                         return 'background-color: #4b0082; color: white; width: 100%;';
                     case 'Walmart':
-                        return 'background-color: #0071ce; color: white; width: 100%;';
-                    case 'Groben':
-                        return 'background-color: #0071ce; color: white; width: 100%;';
-                    case 'Mayorista':
                         return 'background-color: #0071ce; color: white; width: 100%;';
                     default:
                         return 'background-color: #6c757d; color: white; width: 100%;';
@@ -649,7 +600,7 @@
                 const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
                 precio.valorSugerido = valorSugerido;
             },
-            abrirModal(detalle, mostrar) {
+            abrirModal(detalle) {
                 this.skuSeleccionado = detalle.sku;
                 this.nombreSeleccionado = detalle.model;
                 this.precioSeleccionado = detalle.precioBase;
@@ -657,25 +608,14 @@
 
                 console.log("Detalle seleccionado:", detalle);
 
-                // Reiniciar el estado del Precio Global
-                this.habilitarInputGlobal = false;
-                this.precioGlobal = null;
-
                 // Inicializar las listas de precios con valores por defecto
                 this.listasPrecios = this.initializeListasPrecios(detalle);
 
-                // Mostrar solo los valores de 'mostrar' que coincidan con el parámetro recibido
+                // Obtener los valores actuales y calcular sugeridos para cada lista de precios
                 this.listasPrecios.forEach(precio => {
-                    precio.mostrar = (precio.mostrar === mostrar);
-                });
-
-                // Obtener los valores actuales y calcular sugeridos solo para los que se muestran
-                this.listasPrecios.forEach(precio => {
-                    if (precio.mostrar) {
-                        this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
-                        this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
-                        this.recalcularMargen(precio); // Recalcula el margen
-                    }
+                    this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
+                    this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
+                    precio.margen = 0; // Inicializa el margen en 0%
                 });
 
                 // Mostrar el modal después de cargar los datos
@@ -686,7 +626,7 @@
                 const fee = parseFloat(precio.fee) || 1.25;
                 const iva = parseFloat(precio.iva) || 1.19;
                 const despacho = parseFloat(precio.despacho) || 0;
-                const n = parseFloat(precio.n) || 1;
+                const n = parseFloat(precio.n) || 1; // Tomar el valor de N
 
                 // Calcular Margen Deseado usando la fórmula dada
                 const margenDeseado = (100 - (100 / n)) / 100;
