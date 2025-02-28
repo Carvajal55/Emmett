@@ -631,21 +631,21 @@
                 const iva = parseFloat(precio.iva) || 1.19;
                 const despacho = parseFloat(precio.despacho) || 0;
                 const valorIngresado = parseFloat(precio.valor) || precio.valorSugerido || 0;
-                const n = parseFloat(precio.n) || 1; 
+                const n = parseFloat(precio.n) || 1; // Margen deseado
 
-                // Verificar si hay un valor válido
-                if (valorIngresado > 0 && costo > 0) {
-                    const valorNeto = (valorIngresado - despacho) / (iva * fee); // Corrige el cálculo del valor neto
-                    const margenIngresado = ((valorNeto - costo) / valorNeto) * 100;
+                // Calcular Margen usando el valor ingresado y el valor neto
+                if (valorIngresado > 0) {
+                    const valorNeto = ((valorIngresado - despacho) / (iva)) / fee;
+                    const margenIngresado = (1 - (costo / valorNeto)) * 100;
                     precio.margen = margenIngresado.toFixed(2);
                 } else {
                     precio.margen = 0;
                 }
 
-                // Calcular el margen deseado
+                // Calcular Margen Deseado para Valor Sugerido
                 const margenDeseado = (100 - (100 / n)) / 100;
 
-                // Calcular el valor sugerido con margen deseado
+                // Calcular Valor Sugerido considerando el margen deseado y el despacho
                 const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
                 precio.valorSugerido = valorSugerido;
             },
@@ -657,20 +657,29 @@
 
                 console.log("Detalle seleccionado:", detalle);
 
+                // Reiniciar el estado del Precio Global
                 this.habilitarInputGlobal = false;
                 this.precioGlobal = null;
 
+                // Inicializar las listas de precios con valores por defecto
                 this.listasPrecios = this.initializeListasPrecios(detalle);
 
+                // Mostrar solo los valores de 'mostrar' que coincidan con el parámetro recibido
                 this.listasPrecios.forEach(precio => {
-                    precio.mostrar = (precio.mostrar === mostrar);
+                    // Aquí está el cambio: ahora compara con el parámetro `mostrar` de manera directa
+                    precio.mostrar = mostrar;
+                });
+
+                // Obtener los valores actuales y calcular sugeridos solo para los que se muestran
+                this.listasPrecios.forEach(precio => {
                     if (precio.mostrar) {
-                        this.obtenerValorActual(precio);   
-                        this.calcularValorSugerido(precio); 
-                        this.recalcularMargen(precio); 
+                        this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
+                        this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
+                        this.recalcularMargen(precio); // Recalcula el margen
                     }
                 });
 
+                // Mostrar el modal después de cargar los datos
                 $('#modalPrecios').modal('show');
             },
             calcularValorSugerido(precio) {
@@ -686,8 +695,6 @@
                 // Calcular Valor Sugerido considerando el despacho y el margen calculado
                 const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
                 precio.valorSugerido = valorSugerido;
-
-                console.log(`Valor Sugerido para ${precio.label}:`, valorSugerido);
             },
 
             actualizarListasPrecios() {
@@ -767,22 +774,21 @@
                 }
                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
             },
-            recalcularMargen(precio) {
+           recalcularMargen(precio) {
                 const costo = parseFloat(precio.costo) || 0;
                 const fee = parseFloat(precio.fee) || 1.25;
                 const iva = parseFloat(precio.iva) || 1.19;
                 const despacho = parseFloat(precio.despacho) || 0;
                 const valorIngresado = parseFloat(precio.valor) || precio.valorSugerido || 0;
 
+                // Si el valor ingresado es mayor a 0, recalcular el margen
                 if (valorIngresado > 0) {
-                    const valorNeto = ((valorIngresado - despacho) / iva) / fee;
+                    const valorNeto = ((valorIngresado - despacho) / (iva))/fee;
                     const margenIngresado = (1 - (costo / valorNeto)) * 100;
                     precio.margen = margenIngresado.toFixed(2);
                 } else {
-                    precio.margen = 0;
+                    precio.margen = 0; // Inicializa en 0 si no hay valor ingresado
                 }
-
-                console.log(`Margen para ${precio.label}:`, precio.margen);
             },
             updateFee(precio) {
                 // Convertir porcentaje a formato decimal y recalcular margen
@@ -806,18 +812,22 @@
             },
             // Función para calcular el margen basado en el precio base
             calcularMargen(detalle) {
+                // Verifica que los valores sean números válidos
                 const costoNeto = parseFloat(detalle.cost_with_discount) || 0; 
-                const precioBaseNeto = (parseFloat(detalle.precioBase) || 0) / (1.19 * 1.25); // Incluye Fee e IVA
+                const precioBaseNeto = (parseFloat(detalle.precioBase) || 0) / 1.19; // Precio base sin IVA
 
-                if (precioBaseNeto > 0 && costoNeto > 0) {
-                    const margen = ((precioBaseNeto - costoNeto) / precioBaseNeto) * 100;
-                    detalle.margen = margen.toFixed(2);
+                if (precioBaseNeto > 0) {
+                    const margen = ((precioBaseNeto - costoNeto) / precioBaseNeto) * 100; // Fórmula del margen
+                    detalle.margen = margen.toFixed(2); // Redondea a 2 decimales
 
+                    // Imprime los valores utilizados en la ecuación
                     console.log(`Cálculo del margen para SKU ${detalle.sku}:`);
                     console.log(`Costo Neto: ${costoNeto}, Precio Base Neto: ${precioBaseNeto}`);
                     console.log(`Margen calculado: ${margen}%`);
                 } else {
-                    detalle.margen = 0;
+                    detalle.margen = 0; // Si el precio base neto es 0, el margen también lo es
+
+                    // Imprime un mensaje si no es posible calcular el margen
                     console.log(`No se puede calcular el margen para SKU ${detalle.sku}: Precio Base Neto es 0.`);
                 }
             },
@@ -965,20 +975,15 @@
 
         },
         mounted() {
-            console.log("Componente montado");
+            console.log("Componente montado");  // Verificar que el mounted se ejecuta
 
-            this.idFactura = this.getFacturaIdFromURL();
+            this.idFactura = this.getFacturaIdFromURL();  // Guardar el ID de la URL en la variable de Vue
             if (this.idFactura) {
-                this.obtenerFactura();
+                this.obtenerFactura();  // Llamar a la API con el ID de la factura
             } else {
                 console.error("No se pudo obtener el ID de la factura desde la URL");
             }
-
-            this.listasPrecios.forEach(precio => {
-                this.calcularValorSugerido(precio);
-                this.recalcularMargen(precio);
-            });
-        },
+        }
     });
 </script>
 {% endblock js %}
