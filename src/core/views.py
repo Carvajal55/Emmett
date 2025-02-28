@@ -913,86 +913,99 @@ def calcular_stock_bodegas(request):
 def enviar_correo_factura_aprobada(productos_actualizados, factura_id, n_documento, proveedor):
     """
     Envía dos correos notificando la aprobación de una factura:
-    1. Correo con costos detallados.
-    2. Correo sin costos.
-    
-    Detalles incluidos en ambos correos:
-    - Número de documento
-    - Proveedor
-    - Cantidad total de productos actualizados
-    - Para cada producto: SKU, Nombre y (opcionalmente) Precio
-    
-    Se espera que cada diccionario en 'productos_actualizados' contenga las claves:
-    'sku', 'name' y 'lastcost'.
+    - Con costos: A 'nuevosproductos@emmett.cl'
+    - Sin costos: A 'recepcion@emmett.cl'
     """
 
-    cantidad = len(productos_actualizados)
+    # Obtener fecha y hora actual ajustada a tu zona horaria
     fecha_actual = (timezone.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')
 
-    # Generar tabla con costos
-    tabla_con_costos = "\n".join([
-        f"| {i+1:<3} | {p['sku']:<15} | {p.get('name', 'Sin nombre'):<30} | ${p['lastcost']:<10,.0f} |"
-        for i, p in enumerate(productos_actualizados)
-    ])
+    # Títulos
+    subject_con_costos = f"Factura Aprobada: {factura_id} - {len(productos_actualizados)} productos actualizados (Con Costos)"
+    subject_sin_costos = f"Factura Aprobada: {factura_id} - {len(productos_actualizados)} productos actualizados (Sin Costos)"
 
-    # Generar tabla sin costos
-    tabla_sin_costos = "\n".join([
-        f"| {i+1:<3} | {p['sku']:<15} | {p.get('name', 'Sin nombre'):<30} |"
-        for i, p in enumerate(productos_actualizados)
-    ])
+    # Construir tabla con HTML para el correo
+    tabla_productos_con_costos = """
+        <table style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif;">
+            <thead>
+                <tr style="background-color: #f4f4f9; text-align: left;">
+                    <th style="padding: 8px; border: 1px solid #ddd;">SKU</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">Nombre</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">Precio</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    
+    tabla_productos_sin_costos = """
+        <table style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif;">
+            <thead>
+                <tr style="background-color: #f4f4f9; text-align: left;">
+                    <th style="padding: 8px; border: 1px solid #ddd;">SKU</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">Nombre</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
 
-    # Encabezado de la tabla
-    encabezado_con_costos = (
-        "| Nº  | SKU             | Nombre del Producto              | Precio        |\n"
-        "|-----|-----------------|---------------------------------|---------------|"
-    )
-    encabezado_sin_costos = (
-        "| Nº  | SKU             | Nombre del Producto              |\n"
-        "|-----|-----------------|---------------------------------|"
-    )
+    for producto in productos_actualizados:
+        tabla_productos_con_costos += f"""
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;">{producto['sku']}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">{producto.get('name', 'Sin nombre')}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${producto['lastcost']}</td>
+            </tr>
+        """
+        
+        tabla_productos_sin_costos += f"""
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;">{producto['sku']}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">{producto.get('name', 'Sin nombre')}</td>
+            </tr>
+        """
 
-    # Armar mensaje con costos
-    subject_con_costos = f"Factura Aprobada: {factura_id} - {cantidad} productos actualizados (Con Costos)"
-    message_con_costos = (
-        f"Fecha: {fecha_actual}\n\n"
-        f"Factura Aprobada\n"
-        f"Número de Documento: {n_documento}\n"
-        f"Proveedor: {proveedor}\n\n"
-        f"Cantidad de productos actualizados: {cantidad}\n\n"
-        "Detalle de productos:\n"
-        f"{encabezado_con_costos}\n"
-        f"{tabla_con_costos}"
-    )
+    tabla_productos_con_costos += """
+            </tbody>
+        </table>
+    """
+    
+    tabla_productos_sin_costos += """
+            </tbody>
+        </table>
+    """
 
-    # Armar mensaje sin costos
-    subject_sin_costos = f"Factura Aprobada: {factura_id} - {cantidad} productos actualizados (Sin Costos)"
-    message_sin_costos = (
-        f"Fecha: {fecha_actual}\n\n"
-        f"Factura Aprobada\n"
-        f"Número de Documento: {n_documento}\n"
-        f"Proveedor: {proveedor}\n\n"
-        f"Cantidad de productos actualizados: {cantidad}\n\n"
-        "Detalle de productos:\n"
-        f"{encabezado_sin_costos}\n"
-        f"{tabla_sin_costos}"
-    )
+    # Crear el cuerpo del correo en HTML
+    mensaje_html = lambda tabla: f"""
+        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+            <h2 style="color: #333;">Factura Aprobada</h2>
+            <p>Fecha: {fecha_actual}</p>
+            <p><strong>Factura ID:</strong> {factura_id}</p>
+            <p><strong>Número de Documento:</strong> {n_documento}</p>
+            <p><strong>Proveedor:</strong> {proveedor}</p>
+            <p>Cantidad de productos actualizados: {len(productos_actualizados)}</p>
+            <h3>Detalle de productos:</h3>
+            {tabla}
+        </div>
+    """
 
-    # Enviar correo con costos
+    # Correo con Costos
     send_mail(
         subject_con_costos,
-        message_con_costos,
+        '',  # El cuerpo de texto plano se deja vacío
         settings.DEFAULT_FROM_EMAIL,
-        ['nuevosproductos@emmett.cl'],
+        ['nuevosproductos@emmett.cl'],  # Destinatario del correo con costos
         fail_silently=False,
+        html_message=mensaje_html(tabla_productos_con_costos)
     )
 
-    # Enviar correo sin costos
+    # Correo sin Costos
     send_mail(
         subject_sin_costos,
-        message_sin_costos,
+        '',  # El cuerpo de texto plano se deja vacío
         settings.DEFAULT_FROM_EMAIL,
-        ['erp@emmett.cl'],
+        ['recepcion@emmett.cl'],  # Destinatario del correo sin costos
         fail_silently=False,
+        html_message=mensaje_html(tabla_productos_sin_costos)
     )
 
 @csrf_exempt
