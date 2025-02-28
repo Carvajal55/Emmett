@@ -910,37 +910,88 @@ def calcular_stock_bodegas(request):
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
 
-def enviar_correo_factura_aprobada(productos_actualizados, factura_id):
+def enviar_correo_factura_aprobada(productos_actualizados, factura_id, n_documento, proveedor):
     """
-    Envía un correo notificando la aprobación de una factura.
+    Envía dos correos notificando la aprobación de una factura:
+    1. Correo con costos detallados.
+    2. Correo sin costos.
     
-    Detalles incluidos en el correo:
-    - Cantidad total de productos actualizados.
-    - Para cada producto: SKU, nombre y precio.
+    Detalles incluidos en ambos correos:
+    - Número de documento
+    - Proveedor
+    - Cantidad total de productos actualizados
+    - Para cada producto: SKU, Nombre y (opcionalmente) Precio
     
     Se espera que cada diccionario en 'productos_actualizados' contenga las claves:
     'sku', 'name' y 'lastcost'.
     """
+
     cantidad = len(productos_actualizados)
-    lista_productos = "\n".join([
-        f"SKU: {p['sku']}, Nombre: {p.get('name', 'Sin nombre')}, Precio: {p['lastcost']}"
-        for p in productos_actualizados
-    ])
     fecha_actual = (timezone.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')
-    subject = f"Factura Aprobada: {factura_id} - {cantidad} productos actualizados"
-    message = (
-        f"Fecha: {fecha_actual}\n\n"
-        f"La factura con ID {factura_id} ha sido aprobada.\n\n"
-        f"Cantidad de productos actualizados: {cantidad}\n\n"
-        "Detalle de productos:\n"
-        f"{lista_productos}"
+
+    # Generar tabla con costos
+    tabla_con_costos = "\n".join([
+        f"| {i+1:<3} | {p['sku']:<15} | {p.get('name', 'Sin nombre'):<30} | ${p['lastcost']:<10,.0f} |"
+        for i, p in enumerate(productos_actualizados)
+    ])
+
+    # Generar tabla sin costos
+    tabla_sin_costos = "\n".join([
+        f"| {i+1:<3} | {p['sku']:<15} | {p.get('name', 'Sin nombre'):<30} |"
+        for i, p in enumerate(productos_actualizados)
+    ])
+
+    # Encabezado de la tabla
+    encabezado_con_costos = (
+        "| Nº  | SKU             | Nombre del Producto              | Precio        |\n"
+        "|-----|-----------------|---------------------------------|---------------|"
+    )
+    encabezado_sin_costos = (
+        "| Nº  | SKU             | Nombre del Producto              |\n"
+        "|-----|-----------------|---------------------------------|"
     )
 
+    # Armar mensaje con costos
+    subject_con_costos = f"Factura Aprobada: {factura_id} - {cantidad} productos actualizados (Con Costos)"
+    message_con_costos = (
+        f"Fecha: {fecha_actual}\n\n"
+        f"Factura Aprobada\n"
+        f"Número de Documento: {n_documento}\n"
+        f"Proveedor: {proveedor}\n\n"
+        f"Cantidad de productos actualizados: {cantidad}\n\n"
+        "Detalle de productos:\n"
+        f"{encabezado_con_costos}\n"
+        f"{tabla_con_costos}"
+    )
+
+    # Armar mensaje sin costos
+    subject_sin_costos = f"Factura Aprobada: {factura_id} - {cantidad} productos actualizados (Sin Costos)"
+    message_sin_costos = (
+        f"Fecha: {fecha_actual}\n\n"
+        f"Factura Aprobada\n"
+        f"Número de Documento: {n_documento}\n"
+        f"Proveedor: {proveedor}\n\n"
+        f"Cantidad de productos actualizados: {cantidad}\n\n"
+        "Detalle de productos:\n"
+        f"{encabezado_sin_costos}\n"
+        f"{tabla_sin_costos}"
+    )
+
+    # Enviar correo con costos
     send_mail(
-        subject,
-        message,
+        subject_con_costos,
+        message_con_costos,
         settings.DEFAULT_FROM_EMAIL,
-        ['nuevosproductos@emmett.cl'],  # Cambia o agrega destinatarios según sea necesario
+        ['nuevosproductos@emmett.cl'],
+        fail_silently=False,
+    )
+
+    # Enviar correo sin costos
+    send_mail(
+        subject_sin_costos,
+        message_sin_costos,
+        settings.DEFAULT_FROM_EMAIL,
+        ['erp@emmett.cl'],
         fail_silently=False,
     )
 
