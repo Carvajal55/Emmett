@@ -43,7 +43,7 @@
                 <p><strong>Observación:</strong> [[ factura.headers.observation || 'Sin observaciones' ]]</p>
                 
                 <!-- Botones para aprobar o rechazar -->
-                <div>
+                <div v-if="statusInvoiceD !== 1">
                     <button class="btn btn-success" @click="aprobarFactura()">Aprobar</button>
                     <button class="btn btn-danger" @click="confirmarRechazarFactura()">Rechazar</button>
                 </div>
@@ -309,6 +309,7 @@
         el: '#app',
         delimiters: ['[[', ']]'],  // Evitar conflictos con las etiquetas de Django
         data: {
+            statusInvoiceD: 0,  // ✅ Inicializa el estado del statusInvoiceD
             habilitarInputGlobal: false,
             factura: null,  // Datos de la factura
             detalles: [],   // Detalles de la factura
@@ -849,6 +850,9 @@
                         // ✅ Asignar nDocument y supplierName para usar en aprobarFactura
                         this.nDocumento = response.data.headers.nDocument;
                         this.proveedor = response.data.headers.supplierName;
+
+                        // ✅ Asignar statusInvoiceD para mostrar u ocultar botones
+                        this.statusInvoiceD = response.data.headers.statusInvoiceD;
 
                         // Llamar a obtenerDatosProducto para cada detalle
                         this.detalles.forEach(detalle => {

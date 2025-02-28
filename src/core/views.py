@@ -979,7 +979,6 @@ def enviar_correo_factura_aprobada(productos_actualizados, factura_id, n_documen
         <div style="font-family: Arial, sans-serif; line-height: 1.6;">
             <h2 style="color: #333;">Factura Aprobada</h2>
             <p>Fecha: {fecha_actual}</p>
-            <p><strong>Factura ID:</strong> {factura_id}</p>
             <p><strong>Número de Documento:</strong> {n_documento}</p>
             <p><strong>Proveedor:</strong> {proveedor}</p>
             <p>Cantidad de productos actualizados: {len(productos_actualizados)}</p>
@@ -1003,7 +1002,7 @@ def enviar_correo_factura_aprobada(productos_actualizados, factura_id, n_documen
         subject_sin_costos,
         '',  # El cuerpo de texto plano se deja vacío
         settings.DEFAULT_FROM_EMAIL,
-        ['recepcion@emmett.cl'],  # Destinatario del correo sin costos
+        ['erp@emmett.cl'],  # Destinatario del correo sin costos
         fail_silently=False,
         html_message=mensaje_html(tabla_productos_sin_costos)
     )
