@@ -529,6 +529,8 @@
             },
             recalcularTodos() {
                 this.listasPrecios.forEach(precio => {
+                    this.obtenerValorActual(precio);
+                    this.calcularValorSugerido(precio);
                     this.recalcularMargen(precio);
                 });
             },
@@ -649,6 +651,10 @@
                 const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
                 precio.valorSugerido = valorSugerido;
             },
+            toggleVisibilidad(precio) {
+                precio.mostrar = !precio.mostrar;
+            },
+
             abrirModal(detalle, mostrar) {
                 this.skuSeleccionado = detalle.sku;
                 this.nombreSeleccionado = detalle.model;
@@ -664,19 +670,24 @@
                 // Inicializar las listas de precios con valores por defecto
                 this.listasPrecios = this.initializeListasPrecios(detalle);
 
-                // Mostrar solo los valores de 'mostrar' que coincidan con el parámetro recibido
-                this.listasPrecios.forEach(precio => {
-                    // Aquí está el cambio: ahora compara con el parámetro `mostrar` de manera directa
-                    precio.mostrar = mostrar;
-                });
+                // **Separar Groben y Mayorista para que funcionen independientemente**
+                if (mostrar === false) {
+                    // Mostrar solo Groben y Mayorista
+                    this.listasPrecios.forEach(precio => {
+                        precio.mostrar = (precio.label === 'Groben' || precio.label === 'Mayorista');
+                    });
+                } else {
+                    // Mostrar todas excepto Groben y Mayorista
+                    this.listasPrecios.forEach(precio => {
+                        precio.mostrar = (precio.label !== 'Groben' && precio.label !== 'Mayorista');
+                    });
+                }
 
-                // Obtener los valores actuales y calcular sugeridos solo para los que se muestran
+                // **Siempre recalcular márgenes y valores sugeridos**
                 this.listasPrecios.forEach(precio => {
-                    if (precio.mostrar) {
-                        this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
-                        this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
-                        this.recalcularMargen(precio); // Recalcula el margen
-                    }
+                    this.obtenerValorActual(precio);   
+                    this.calcularValorSugerido(precio);
+                    this.recalcularMargen(precio);
                 });
 
                 // Mostrar el modal después de cargar los datos
