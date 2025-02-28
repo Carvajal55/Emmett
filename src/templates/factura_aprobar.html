@@ -657,28 +657,20 @@
 
                 console.log("Detalle seleccionado:", detalle);
 
-                // Reiniciar el estado del Precio Global
                 this.habilitarInputGlobal = false;
                 this.precioGlobal = null;
 
-                // Inicializar las listas de precios con valores por defecto
                 this.listasPrecios = this.initializeListasPrecios(detalle);
 
-                // Mostrar solo los valores de 'mostrar' que coincidan con el parámetro recibido
                 this.listasPrecios.forEach(precio => {
                     precio.mostrar = (precio.mostrar === mostrar);
-                });
-
-                // Obtener los valores actuales y calcular sugeridos solo para los que se muestran
-                this.listasPrecios.forEach(precio => {
                     if (precio.mostrar) {
-                        this.obtenerValorActual(precio);   // Obtiene el valor actual del marketplace
-                        this.calcularValorSugerido(precio); // Calcula el valor sugerido con margen de 25%
-                        this.recalcularMargen(precio); // Recalcula el margen
+                        this.obtenerValorActual(precio);   
+                        this.calcularValorSugerido(precio); 
+                        this.recalcularMargen(precio); 
                     }
                 });
 
-                // Mostrar el modal después de cargar los datos
                 $('#modalPrecios').modal('show');
             },
             calcularValorSugerido(precio) {
@@ -688,14 +680,14 @@
                 const despacho = parseFloat(precio.despacho) || 0;
                 const n = parseFloat(precio.n) || 1;
 
-                // Validar que el costo sea mayor a 0
-                if (costo > 0) {
-                    const margenDeseado = (100 - (100 / n)) / 100;
-                    const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
-                    precio.valorSugerido = valorSugerido;
-                } else {
-                    precio.valorSugerido = 0;
-                }
+                // Calcular Margen Deseado usando la fórmula dada
+                const margenDeseado = (100 - (100 / n)) / 100;
+
+                // Calcular Valor Sugerido considerando el despacho y el margen calculado
+                const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
+                precio.valorSugerido = valorSugerido;
+
+                console.log(`Valor Sugerido para ${precio.label}:`, valorSugerido);
             },
 
             actualizarListasPrecios() {
@@ -782,13 +774,15 @@
                 const despacho = parseFloat(precio.despacho) || 0;
                 const valorIngresado = parseFloat(precio.valor) || precio.valorSugerido || 0;
 
-                if (valorIngresado > 0 && costo > 0) {
-                    const valorNeto = ((valorIngresado - despacho) / (iva * fee));
-                    const margenIngresado = ((valorNeto - costo) / valorNeto) * 100;
+                if (valorIngresado > 0) {
+                    const valorNeto = ((valorIngresado - despacho) / iva) / fee;
+                    const margenIngresado = (1 - (costo / valorNeto)) * 100;
                     precio.margen = margenIngresado.toFixed(2);
                 } else {
                     precio.margen = 0;
                 }
+
+                console.log(`Margen para ${precio.label}:`, precio.margen);
             },
             updateFee(precio) {
                 // Convertir porcentaje a formato decimal y recalcular margen
@@ -971,15 +965,20 @@
 
         },
         mounted() {
-            console.log("Componente montado");  // Verificar que el mounted se ejecuta
+            console.log("Componente montado");
 
-            this.idFactura = this.getFacturaIdFromURL();  // Guardar el ID de la URL en la variable de Vue
+            this.idFactura = this.getFacturaIdFromURL();
             if (this.idFactura) {
-                this.obtenerFactura();  // Llamar a la API con el ID de la factura
+                this.obtenerFactura();
             } else {
                 console.error("No se pudo obtener el ID de la factura desde la URL");
             }
-        }
+
+            this.listasPrecios.forEach(precio => {
+                this.calcularValorSugerido(precio);
+                this.recalcularMargen(precio);
+            });
+        },
     });
 </script>
 {% endblock js %}
