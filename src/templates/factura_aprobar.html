@@ -846,6 +846,10 @@
                         }));
                         console.log("Datos de la factura:", response.data);
 
+                        // ✅ Asignar nDocument y supplierName para usar en aprobarFactura
+                        this.nDocumento = response.data.headers.nDocument;
+                        this.proveedor = response.data.headers.supplierName;
+
                         // Llamar a obtenerDatosProducto para cada detalle
                         this.detalles.forEach(detalle => {
                             this.obtenerDatosProducto(detalle);
@@ -902,7 +906,9 @@
 
                 const data = {
                     factura_id: this.idFactura, // ID de la factura
-                    detalles: detalles          // Detalles con SKU, costo y nombre
+                    detalles: detalles,          // Detalles con SKU, costo y nombre
+                    n_documento: this.nDocumento,  // ✅ Enviar Número de documento
+                    proveedor: this.proveedor      // ✅ Enviar Proveedor
                 };
 
                 axios.post('/api/aprobar-factura/', data)

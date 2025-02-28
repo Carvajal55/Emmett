@@ -1004,11 +1004,22 @@ def aprobar_factura(request):
             factura_id = data.get('factura_id')  # ID de la factura enviada desde el frontend
             detalles = data.get('detalles', [])
 
+            # 🔴 Nuevos datos recibidos:
+            n_documento = data.get('n_documento')  # Número de documento
+            proveedor = data.get('proveedor')      # Proveedor
+
+            # Validaciones adicionales:
             if not factura_id:
                 return JsonResponse({'error': 'No se proporcionó el ID de la factura.'}, status=400)
 
             if not detalles:
                 return JsonResponse({'error': 'No se proporcionaron detalles para actualizar.'}, status=400)
+
+            if not n_documento:
+                return JsonResponse({'error': 'No se proporcionó el número de documento.'}, status=400)
+
+            if not proveedor:
+                return JsonResponse({'error': 'No se proporcionó el proveedor.'}, status=400)
 
             # Listas para almacenar los resultados
             productos_actualizados = []
@@ -1043,8 +1054,8 @@ def aprobar_factura(request):
                 factura.status = 1  # Estado "Aprobada"
                 factura.save()
 
-                # ✅ Llamada a la función para enviar el correo
-                enviar_correo_factura_aprobada(productos_actualizados, factura_id)
+                # ✅ Llamada a la función para enviar el correo con nuevos parámetros
+                enviar_correo_factura_aprobada(productos_actualizados, factura_id, n_documento, proveedor)
 
             except Purchase.DoesNotExist:
                 return JsonResponse({'error': 'Factura no encontrada.'}, status=404)
@@ -1063,7 +1074,6 @@ def aprobar_factura(request):
             return JsonResponse({'error': str(e)}, status=500)
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
-
 
 @csrf_exempt
 def obtener_factura(request):
