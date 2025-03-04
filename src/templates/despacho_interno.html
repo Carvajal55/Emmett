@@ -151,12 +151,11 @@
                             description: response.data.description
                         };
 
-                        // Despachar el producto
+                        // Llamar a la función de despacho, y esperar su resultado
                         await this.dispatchConsumption(product);
-                        this.internalProducts.push(product); // Agregar a la lista de productos despachados
-                        
-                        this.showAlert(`SuperID ${superid} procesado correctamente.`, 'alert-success');
-                        this.playSound('successSound'); // Reproducir sonido de éxito
+
+                        // Agregar el producto a la lista de productos despachados
+                        this.internalProducts.push(product);
                     } else {
                         // Manejar casos de SuperID no encontrado u otros errores
                         this.showAlert(`Error: ${response.data.title}`, 'alert-danger');
@@ -280,7 +279,7 @@
                         this.playSound('successSound');
                     } else {
                         console.error('Error en la API de despacho:', response.data);
-                        this.showAlert(`Error: ${response.data.message}`, 'alert-danger');
+                        this.showAlert(`Error en el despacho: ${response.data.message}`, 'alert-danger');
                         this.playSound('errorSound');
                     }
                 } catch (error) {
