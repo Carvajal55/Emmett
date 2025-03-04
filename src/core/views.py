@@ -6111,20 +6111,15 @@ def bulk_upload_products(request):
         products_data = normalize_keys(products_data)
         print(f"Archivo leído y normalizado. Total de registros: {len(products_data)}")
 
-        # Extraer SKUs existentes
-        existing_skus = set(Products.objects.values_list('sku', flat=True))
-        print(f"SKUs existentes en la base de datos: {len(existing_skus)}")
+        # Extraer SKUs existentes y sus productos
+        existing_products = {p.sku: p for p in Products.objects.all()}
+        print(f"SKUs existentes en la base de datos: {len(existing_products)}")
 
-        # Procesar e insertar productos
+        # Procesar productos
         new_products = []
-        duplicate_skus = []
-        for record in tqdm(products_data, desc="Cargando productos", unit="producto"):
+        updated_products = 0
+        for record in tqdm(products_data, desc="Procesando productos", unit="producto"):
             sku = record.get("sku")
-
-            # Verificar si el SKU ya existe
-            if sku in existing_skus:
-                duplicate_skus.append(sku)
-                continue  # Saltar al siguiente registro
 
             # Convertir fecha correctamente
             createdate = record.get("createdate")
@@ -6138,27 +6133,42 @@ def bulk_upload_products(request):
 
             # Convertir uniquecodebar a booleano o None
             uniquecodebar = record.get("uniquecodebar")
-            if isinstance(uniquecodebar, bool):
-                pass  # Mantener el valor
+            if not isinstance(uniquecodebar, bool):
+                uniquecodebar = None  
+
+            # 🔄 **Si el SKU existe, actualizar el producto**
+            if sku in existing_products:
+                existing_product = existing_products[sku]
+                existing_product.nameproduct = record.get("nameproduct", existing_product.nameproduct)
+                existing_product.brands = record.get("brand", existing_product.brands)
+                existing_product.codebar = record.get("codebar", existing_product.codebar)
+                existing_product.lastcost = record.get("lastcost") or existing_product.lastcost
+                existing_product.lastprice = record.get("lastprice") or existing_product.lastprice
+                existing_product.currentstock = record.get("currentstock", existing_product.currentstock)
+                existing_product.createdate = createdate or existing_product.createdate
+                existing_product.uniquecodebar = uniquecodebar if uniquecodebar is not None else existing_product.uniquecodebar
+                existing_product.description = record.get("description", existing_product.description)  # 🔥 Actualiza la descripción
+
+                existing_product.save()
+                updated_products += 1  # Contador de productos actualizados
             else:
-                uniquecodebar = None  # Si es un número o texto, convertirlo en None
-
-            # Crear objeto de producto
-            new_products.append(
-                Products(
-                    sku=sku,
-                    nameproduct=record.get("nameproduct"),
-                    brands=record.get("brand"),
-                    codebar=record.get("codebar"),
-                    lastcost=record.get("lastcost") or 0,
-                    lastprice=record.get("lastprice") or 0,
-                    currentstock=record.get("currentstock", 0),
-                    createdate=createdate,
-                    uniquecodebar=uniquecodebar,
+                # 🆕 **Si el SKU no existe, crearlo**
+                new_products.append(
+                    Products(
+                        sku=sku,
+                        nameproduct=record.get("nameproduct"),
+                        brands=record.get("brand"),
+                        codebar=record.get("codebar"),
+                        lastcost=record.get("lastcost") or 0,
+                        lastprice=record.get("lastprice") or 0,
+                        currentstock=record.get("currentstock", 0),
+                        createdate=createdate,
+                        uniquecodebar=uniquecodebar,
+                        description=record.get("description", ""),
+                    )
                 )
-            )
 
-        # Insertar en la base de datos
+        # Insertar nuevos productos
         if new_products:
             Products.objects.bulk_create(new_products)
             print(f"Se han insertado {len(new_products)} nuevos productos.")
@@ -6166,8 +6176,7 @@ def bulk_upload_products(request):
         # Respuesta con resumen
         return JsonResponse({
             "status": "success",
-            "message": f"Se insertaron {len(new_products)} productos nuevos.",
-            "duplicates": duplicate_skus
+            "message": f"Se insertaron {len(new_products)} productos nuevos y se actualizaron {updated_products} productos existentes.",
         })
 
     except Exception as e:
