@@ -73,9 +73,10 @@ class UniqueproductsAdmin(admin.ModelAdmin):
 
 @admin.register(Purchase)
 class PurchaseAdmin(admin.ModelAdmin):
-    list_display = ('iddocument','number', 'idpurchase')
-    search_fields = ('id','iddocument','number', 'idpurchase')
-
+    list_display = ('iddocument', 'number', 'idpurchase', 'suppliername')  # Agregar suppliername
+    search_fields = ('id', 'iddocument', 'number', 'idpurchase', 'suppliername')  # Permitir búsqueda por suppliername
+    ordering = ['-dateadd']  # Ordenar del más reciente al más antiguo
+    
 @admin.register(Bodega)
 class Bodega(admin.ModelAdmin):
     list_display = ('idoffice','name')
