@@ -2972,7 +2972,10 @@ def dispatch_consumption_interno(request):
                     matching_products = [up for up in unique_products if up.superid == superid]
 
                     if not matching_products:
-                        return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'}, status=404)
+                        return JsonResponse({
+                            'title': f'SuperID {superid} no encontrado',
+                            'icon': 'error'
+                        }, status=404)
 
                     for unique_product in matching_products:
                         print(f"✅ Procesando SuperID {superid} - Producto SKU: {unique_product.product.sku}")
@@ -2994,9 +2997,11 @@ def dispatch_consumption_interno(request):
 
                             print("📡 Respuesta de Bsale:", response.status_code, response.text)
 
+                            # 🔴 Si Bsale devuelve un error, detenemos el proceso y enviamos el error al frontend
                             if response.status_code not in [200, 201]:
                                 error_data = response.json()
                                 error_message = error_data.get('error', 'Error desconocido en Bsale')
+                                
                                 return JsonResponse({
                                     'title': 'Error en Bsale',
                                     'icon': 'error',
@@ -3004,7 +3009,7 @@ def dispatch_consumption_interno(request):
                                     'error_details': response.text
                                 }, status=response.status_code)
 
-                        # 🔥 ACTUALIZAR STOCK LOCAL 🔥
+                        # 🔥 ACTUALIZAR STOCK LOCAL SOLO SI NO HUBO ERROR 🔥
                         unique_product.location = sector_despachados_id
                         unique_product.observation = f"Salida: {type_document} | Empresa: {company}"
                         unique_product.typedocout = type_document
@@ -3020,7 +3025,11 @@ def dispatch_consumption_interno(request):
 
         except Exception as e:
             print("❌ Error durante el despacho interno:", str(e))
-            return JsonResponse({'title': 'Error en el despacho', 'icon': 'error', 'message': str(e)}, status=500)
+            return JsonResponse({
+                'title': 'Error en el despacho',
+                'icon': 'error',
+                'message': str(e)
+            }, status=500)
 
     return JsonResponse({'title': 'Método no permitido', 'icon': 'error'}, status=405)
 
