@@ -2972,8 +2972,7 @@ def dispatch_consumption_interno(request):
                     matching_products = [up for up in unique_products if up.superid == superid]
 
                     if not matching_products:
-                        print(f"🚨 Error: SuperID {superid} no encontrado en la base de datos.")
-                        return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'})
+                        return JsonResponse({'title': f'SuperID {superid} no encontrado', 'icon': 'error'}, status=404)
 
                     for unique_product in matching_products:
                         print(f"✅ Procesando SuperID {superid} - Producto SKU: {unique_product.product.sku}")
@@ -2996,8 +2995,13 @@ def dispatch_consumption_interno(request):
                             print("📡 Respuesta de Bsale:", response.status_code, response.text)
 
                             if response.status_code not in [200, 201]:
-                                print(f"🚨 Error al descontar en Bsale para SuperID {superid}: {response.text}")
-                                raise Exception(f"Error en Bsale: {response.status_code} - {response.text}")
+                                error_message = response.json().get('message', 'Error desconocido en Bsale')
+                                return JsonResponse({
+                                    'title': 'Error en Bsale',
+                                    'icon': 'error',
+                                    'message': f'Bsale respondió: {error_message}',
+                                    'error_details': response.text
+                                }, status=response.status_code)
 
                         # 🔥 ACTUALIZAR STOCK LOCAL 🔥
                         unique_product.location = sector_despachados_id
@@ -3010,34 +3014,6 @@ def dispatch_consumption_interno(request):
                         unique_product.locationname = "Despachado"
                         unique_product.save()
                         print(f"✅ SuperID {superid} actualizado correctamente en el sistema local.")
-
-                        # 🔥 ACTUALIZAR TODAS LAS LÍNEAS DE `InvoiceProduct` CON EL MISMO SKU 🔥
-                        invoice_products = InvoiceProduct.objects.filter(
-                            invoice__document_number=n_document,
-                            product_sku=unique_product.product.sku,
-                            is_complete=False  # Solo actualizar las líneas que aún no están completas
-                        ).order_by('id')  # Aseguramos el orden para evitar inconsistencias
-
-                        print(f"🔍 Productos pendientes a actualizar: {invoice_products.count()}")
-
-                        cantidad_restante = cantidad
-                        for invoice_product in invoice_products:
-                            if cantidad_restante <= 0:
-                                break  # Ya se despachó toda la cantidad requerida
-
-                            cantidad_disponible = invoice_product.total_quantity - invoice_product.dispatched_quantity
-                            cantidad_a_despachar = min(cantidad_restante, cantidad_disponible)
-
-                            invoice_product.dispatched_quantity += cantidad_a_despachar
-                            invoice_product.is_complete = invoice_product.dispatched_quantity >= invoice_product.total_quantity
-                            invoice_product.save()
-
-                            cantidad_restante -= cantidad_a_despachar
-                            print(f"✅ Actualizado InvoiceProduct {invoice_product.id}: dispatched_quantity={invoice_product.dispatched_quantity}, is_complete={invoice_product.is_complete}")
-
-                        if cantidad_restante > 0:
-                            print(f"🚨 Error: Se intentó despachar más cantidad de la permitida para el SKU {unique_product.product.sku}")
-                            return JsonResponse({'title': 'Cantidad excedida', 'icon': 'error', 'message': f'La cantidad máxima permitida para el SKU {unique_product.product.sku} ya fue despachada.'})
 
             return JsonResponse({'title': 'Productos despachados con éxito', 'icon': 'success'})
 

@@ -261,7 +261,6 @@
                 const payload = {
                     nDocument: this.nDocument || null, // Puede ser null
                     typeDocument: this.typeDocument || 0,
-                     // Predeterminado 0 si no está definido
                     company: this.company,
                     products: [
                         {
@@ -281,13 +280,22 @@
                         this.playSound('successSound');
                     } else {
                         console.error('Error en la API de despacho:', response.data);
-                        this.showAlert(`Error al despachar SuperID: ${product.superid}`, 'alert-danger');
+                        this.showAlert(`Error: ${response.data.message}`, 'alert-danger');
                         this.playSound('errorSound');
                     }
                 } catch (error) {
-                    console.error('Error al realizar el despacho:', error);
-                    this.showAlert(`Error en el despacho de SuperID: ${product.superid}`, 'alert-danger');
-                    this.playSound('errorSound');
+                    if (error.response) {
+                        console.error('Error al despachar:', error.response.data);
+                        const errorMessage = error.response.data.message || 'Error desconocido';
+                        const errorDetails = error.response.data.error_details || '';
+
+                        this.showAlert(`Error en el despacho: ${errorMessage}. Detalles: ${errorDetails}`, 'alert-danger');
+                        this.playSound('errorSound');
+                    } else {
+                        console.error('Error en la conexión:', error);
+                        this.showAlert('Error de conexión con el servidor.', 'alert-danger');
+                        this.playSound('errorSound');
+                    }
                 }
             },
 
