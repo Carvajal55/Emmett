@@ -2995,11 +2995,12 @@ def dispatch_consumption_interno(request):
                             print("📡 Respuesta de Bsale:", response.status_code, response.text)
 
                             if response.status_code not in [200, 201]:
-                                error_message = response.json().get('message', 'Error desconocido en Bsale')
+                                error_data = response.json()
+                                error_message = error_data.get('error', 'Error desconocido en Bsale')
                                 return JsonResponse({
                                     'title': 'Error en Bsale',
                                     'icon': 'error',
-                                    'message': f'Bsale respondió: {error_message}',
+                                    'message': error_message,
                                     'error_details': response.text
                                 }, status=response.status_code)
 
