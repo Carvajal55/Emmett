@@ -391,6 +391,7 @@ def buscar_productosAPI(request):
                 'id': product.id,
                 'sku': product.sku,
                 'name': product.nameproduct,
+                'description': product.description or '',  # Agregado el campo description
                 'price': product.lastprice or 0,
                 'stock_total': stock_total,
                 'is_unique_product': True,
@@ -400,10 +401,13 @@ def buscar_productosAPI(request):
             'current_page': 1,
         }, status=200)
 
-    # 🔍 Buscar por SKU o nombre del producto
+    # 🔍 Buscar por SKU, nombre del producto o descripción
     productos_qs = Products.objects.filter(
-        Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
-    ).only('id', 'sku', 'nameproduct', 'lastprice')
+        Q(sku__icontains=query) | 
+        Q(nameproduct__icontains=query) | 
+        Q(prefixed__icontains=query) | 
+        Q(description__icontains=query)  # 🔥 Se agrega búsqueda por descripción
+    ).only('id', 'sku', 'nameproduct', 'description', 'lastprice')
 
     paginator = Paginator(productos_qs, 10)
     page = int(request.GET.get('page', 1))
@@ -420,6 +424,7 @@ def buscar_productosAPI(request):
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
+            'description': producto.description or '',  # 🔥 Agregado el campo description
             'price': producto.lastprice or 0,
             'stock_total': stock_total,
             'is_unique_product': False,
