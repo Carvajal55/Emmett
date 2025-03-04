@@ -6121,12 +6121,13 @@ def bulk_upload_products(request):
         for record in tqdm(products_data, desc="Procesando productos", unit="producto"):
             sku = record.get("sku")
 
-            # Convertir fecha correctamente
+            # Convertir fecha correctamente, asegurándose de que sea un string
             createdate = record.get("createdate")
             if createdate:
                 try:
+                    createdate = str(createdate)  # 🔥 Convertir a string si viene como número
                     createdate = datetime.strptime(createdate, "%Y/%m/%d %H:%M:%S")
-                except ValueError:
+                except (ValueError, TypeError):  # Capturar errores si la conversión falla
                     createdate = None
             else:
                 createdate = None
