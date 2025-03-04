@@ -1521,12 +1521,16 @@ def crear_producto(request):
         profundidad = data.get("profundidad")
         peso = data.get("peso")
         alias = data.get("alias")
-        categoria_bs_id = data.get("categoriaBsale")
+        categoria_bs_id = data.get("categoriaBsale")  # 🔥 ID de la categoría en Bsale (equivalente a idERP)
 
         # Validar que la marca exista en la base de datos
         marcas_existentes = [brand.name for brand in Brand.objects.all()]
         if marca not in marcas_existentes:
             return JsonResponse({"error": f"La marca '{marca}' no existe. Selecciona una marca válida."}, status=400)
+
+        # 🔥 Obtener el nombre de la categoría desde Categoryserp
+        categoria_obj = Categoryserp.objects.filter(iderp=categoria_bs_id).first()
+        categoria_bs_nombre = categoria_obj.namecategory if categoria_obj else "Sin categoría"
 
         # Generar el SKU con el prefijo correspondiente y el correlativo global
         prefix = get_sku_prefix(categoria)
@@ -1536,10 +1540,13 @@ def crear_producto(request):
         # Generar el código de barras único
         bar_code = f"9999{get_random_string(8, '0123456789')}"
 
+        # 🔥 Formatear la descripción con el nombre real de la categoría
+        descripcion_producto = f"{categoria_bs_nombre} {marca} {nombre_producto} {sku}"
+
         # 🔥 Crear JSON para la API de Bsale
         bsale_product_data = {
             "name": nombre_producto,
-            "description": f"{nombre_producto} - {marca}",
+            "description": descripcion_producto,  # ✅ Nueva descripción con nombre de la categoría de `Categoryserp`
             "code": sku,
             "barCode": bar_code,
             "price": precio,
@@ -1594,6 +1601,7 @@ def crear_producto(request):
                     largo=largo,
                     profundidad=profundidad,
                     peso=peso,
+                    description=descripcion_producto  # ✅ Guardar la nueva descripción en la BD
                 )
 
                 return JsonResponse({
@@ -1611,6 +1619,7 @@ def crear_producto(request):
                 "error": "Error al crear el producto en Bsale",
                 "details": response_product.json()
             }, status=400)
+
 
 @csrf_exempt
 def generar_json(request):
