@@ -3753,7 +3753,7 @@ def fetch_invoice_products(request):
         product_list.append({
             'code': product.product_sku,
             'name': product_info.nameproduct if product_info else 'Nombre no encontrado',
-            'description': product_info.prefixed if product_info else 'Descripción no encontrada',
+            'description': product_info.prefixed if product_info and product_info.prefixed else 'No disponible',
             'total_quantity': product.total_quantity,
             'dispatched_quantity': product.dispatched_quantity,
             'is_complete': product.is_complete,
