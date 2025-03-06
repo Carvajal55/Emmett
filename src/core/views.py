@@ -3639,10 +3639,10 @@ def fetch_invoice_products(request):
     if not type_document or not number:
         return JsonResponse({'error': 'Faltan parámetros de tipo de documento o número'}, status=400)
 
-    # Buscar el documento en el modelo
+    # Buscar el documento en la base de datos
     invoice = Invoice.objects.filter(document_type=type_document, document_number=number).first()
 
-    # Si no existe, consultar en Bsale y crearlo
+    # Si no existe en la BD, buscar en Bsale y crearlo
     if not invoice:
         url_costs = f"{BSALE_API_URL}/documents.json?codesii={type_document}&number={number}&expand=details"
         headers = {
@@ -3657,23 +3657,27 @@ def fetch_invoice_products(request):
 
             info = response.json()
             items = info.get('items', [])
+
+            # ✅ Validar si no hay documento en Bsale
             if not items:
                 return JsonResponse({'error': 'El documento no existe en Bsale.'}, status=404)
 
             document_info = items[0]
             document_id = document_info.get('id')
+
             if not document_id:
                 return JsonResponse({'error': 'El documento no existe en Bsale.'}, status=404)
 
-            # Crear el registro del documento
+            # ✅ Crear el registro del documento en la BD local
             invoice = Invoice.objects.create(
                 document_type=type_document,
                 document_number=number,
                 dispatched=False
             )
 
-            # Procesar los productos del documento
+            # Obtener detalles del documento
             details_url = document_info.get('details', {}).get('href')
+
             if not details_url:
                 return JsonResponse({'error': 'El documento no tiene detalles de productos asociados.'}, status=400)
 
@@ -3683,6 +3687,7 @@ def fetch_invoice_products(request):
 
             details_info = details_response.json()
             cost_details = details_info.get('items', [])
+
             if not cost_details:
                 return JsonResponse({'error': 'El documento no tiene productos asociados.'}, status=400)
 
@@ -3691,33 +3696,30 @@ def fetch_invoice_products(request):
                 sku = variant.get('code', '')  # Asegurar que el SKU sea un string
                 total_quantity = int(detail.get('quantity', 0))
 
-                # Verificar si el producto es un pack
-                if "pack" in sku.lower():  # Validar que el SKU contiene "pack"
-                    # Consultar detalles de la variante
+                # ✅ Manejo especial para productos tipo "pack"
+                if "pack" in sku.lower():
                     variant_response = requests.get(variant.get('href'), headers=headers)
                     if variant_response.status_code != 200:
-                        continue  # Saltar si no se puede obtener la variante
+                        continue  # Saltar si hay error
 
                     variant_info = variant_response.json()
                     product_url = variant_info.get('product', {}).get('href')
 
-                    # Consultar detalles del producto
                     product_response = requests.get(product_url, headers=headers)
                     if product_response.status_code != 200:
-                        continue  # Saltar si no se puede obtener el producto
+                        continue  # Saltar si hay error
 
                     product_info = product_response.json()
                     pack_details = product_info.get('pack_details', [])
 
-                    # Crear registros para cada componente del pack
+                    # ✅ Crear registros para cada componente del pack
                     for pack_item in pack_details:
                         component_quantity = int(pack_item.get('quantity', 1))
                         component_variant_id = pack_item.get('variant', {}).get('id')
 
-                        # Buscar el componente en el modelo Products
                         product = Products.objects.filter(iderp=component_variant_id).first()
                         if not product:
-                            continue  # Saltar si no se encuentra el producto en la base local
+                            continue  # Saltar si el producto no existe
 
                         InvoiceProduct.objects.create(
                             invoice=invoice,
@@ -3728,7 +3730,7 @@ def fetch_invoice_products(request):
                         )
 
                 else:
-                    # Crear el producto asociado al documento
+                    # ✅ Guardar el producto normal en la base de datos
                     InvoiceProduct.objects.create(
                         invoice=invoice,
                         product_sku=sku,
@@ -3740,23 +3742,13 @@ def fetch_invoice_products(request):
         except Exception as e:
             return JsonResponse({'error': 'Error en la comunicación con la API.', 'details': str(e)}, status=500)
 
-    # Obtener los productos asociados
+    # 🔥 Obtener productos asociados al invoice
     invoice_products = InvoiceProduct.objects.filter(invoice=invoice)
 
-    # Formatear los datos para la respuesta
+    # ✅ Formatear los datos para la respuesta
     product_list = []
     for product in invoice_products:
-        # 🔥 Log para depuración
-        print(f"Buscando producto con SKU: {product.product_sku}")
-
-        # Buscar el producto en el modelo `Products`
         product_info = Products.objects.filter(sku__iexact=product.product_sku.strip()).first()
-
-
-        if not product_info:
-            print(f"❌ Producto no encontrado en la BD para SKU: {product.product_sku}")
-        else:
-            print(f"✅ Producto encontrado: {product_info.nameproduct}")
 
         product_list.append({
             'code': product.product_sku,
@@ -3767,11 +3759,18 @@ def fetch_invoice_products(request):
             'is_complete': product.is_complete,
         })
 
-    # 🔥 Incluir si el invoice está `dispatched`
-    return JsonResponse({
-        'invoice_dispatched': invoice.dispatched,  # True o False
-        'products': product_list
-    }, status=200)
+    # ✅ 🔥 Verificar si hay solo un producto y enviarlo sin lista
+    response_data = {
+        'invoice_dispatched': invoice.dispatched
+    }
+
+    if len(product_list) == 1:
+        response_data['product'] = product_list[0]  # 🔥 Enviar un solo producto
+    else:
+        response_data['products'] = product_list  # 🔥 Enviar lista si hay más de un producto
+
+    return JsonResponse(response_data, status=200)
+
 
 
 @csrf_exempt
