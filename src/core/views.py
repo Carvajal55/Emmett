@@ -397,6 +397,7 @@ def buscar_productosAPI(request):
                 'stock_total': stock_total,
                 'is_unique_product': True,
                 'location_info': sector_info,
+                'descripcion':product.description
             }],
             'total_pages': 1,
             'current_page': 1,
