@@ -356,6 +356,8 @@ def calculate_stock(product, sector_mapping):
     ]
     return stock_total, unique_products_data
 
+
+
 def buscar_productosAPI(request):
     query = request.GET.get('q', '').strip()
     if not query:
@@ -380,7 +382,7 @@ def buscar_productosAPI(request):
             'description': sector.description if sector else 'Sin información',
         }
 
-        # 🔥 Filtrar solo los Uniqueproducts con state=0
+        # 🔥 Filtrar solo los Uniqueproducts con `state=0`
         stock_total = Uniqueproducts.objects.filter(
             Q(product=product) & Q(state=0) & Q(location__in=sector_mapping.keys())
         ).count()
@@ -390,6 +392,7 @@ def buscar_productosAPI(request):
                 'id': product.id,
                 'sku': product.sku,
                 'name': product.nameproduct,
+                'description': product.description or '',  # Agregado el campo description
                 'price': product.lastprice or 0,
                 'stock_total': stock_total,
                 'is_unique_product': True,
@@ -399,10 +402,13 @@ def buscar_productosAPI(request):
             'current_page': 1,
         }, status=200)
 
-    # 🔍 Buscar por SKU o nombre del producto
+    # 🔍 Buscar por SKU, nombre del producto o descripción
     productos_qs = Products.objects.filter(
-        Q(sku__icontains=query) | Q(nameproduct__icontains=query) | Q(prefixed__icontains=query)
-    ).only('id', 'sku', 'nameproduct', 'lastprice')
+        Q(sku__icontains=query) | 
+        Q(nameproduct__icontains=query) | 
+        Q(prefixed__icontains=query) | 
+        Q(description__icontains=query)  # 🔥 Se agrega búsqueda por descripción
+    ).only('id', 'sku', 'nameproduct', 'description', 'lastprice')
 
     paginator = Paginator(productos_qs, 10)
     page = int(request.GET.get('page', 1))
@@ -410,7 +416,7 @@ def buscar_productosAPI(request):
 
     productos_data = []
     for producto in productos_page:
-        # 🔥 Filtrar solo los Uniqueproducts con state=0
+        # 🔥 Filtrar solo los Uniqueproducts con `state=0`
         stock_total = Uniqueproducts.objects.filter(
             Q(product=producto) & Q(state=0) & Q(location__in=sector_mapping.keys())
         ).count()
@@ -419,6 +425,7 @@ def buscar_productosAPI(request):
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
+            'description': producto.description or '',  # 🔥 Agregado el campo description
             'price': producto.lastprice or 0,
             'stock_total': stock_total,
             'is_unique_product': False,
@@ -429,85 +436,6 @@ def buscar_productosAPI(request):
         'total_pages': paginator.num_pages,
         'current_page': productos_page.number,
     })
-
-# def buscar_productosAPI(request):
-#     query = request.GET.get('q', '').strip()
-#     if not query:
-#         return JsonResponse({'products': [], 'total_pages': 1, 'current_page': 1}, status=200)
-
-#     # Bodegas válidas y sus nombres
-#     bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1, 11, 12]
-#     bodega_mapping = {bodega.idoffice: bodega.name for bodega in Bodega.objects.filter(idoffice__in=bodegas_validas_ids)}
-
-#     sector_mapping = get_sector_mapping(bodegas_validas_ids)
-
-#     # 🔍 Buscar por SuperID en Uniqueproducts
-#     unique_product = Uniqueproducts.objects.filter(superid=query, state=0).select_related('product').first()
-#     if unique_product and unique_product.product:
-#         product = unique_product.product
-
-#         # Consultar Sectoroffice relacionado con el campo 'location'
-#         sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
-#         sector_info = {
-#             'sector': sector.namesector if sector else 'Sin información',
-#             'bodega': bodega_mapping.get(sector.idoffice, 'Sin información') if sector else 'Sin información',
-#             'description': sector.description if sector else 'Sin información',
-#         }
-
-#         # 🔥 Filtrar solo los Uniqueproducts con `state=0`
-#         stock_total = Uniqueproducts.objects.filter(
-#             Q(product=product) & Q(state=0) & Q(location__in=sector_mapping.keys())
-#         ).count()
-
-#         return JsonResponse({
-#             'products': [{
-#                 'id': product.id,
-#                 'sku': product.sku,
-#                 'name': product.nameproduct,
-#                 'description': product.description or '',  # Agregado el campo description
-#                 'price': product.lastprice or 0,
-#                 'stock_total': stock_total,
-#                 'is_unique_product': True,
-#                 'location_info': sector_info,
-#             }],
-#             'total_pages': 1,
-#             'current_page': 1,
-#         }, status=200)
-
-#     # 🔍 Buscar por SKU, nombre del producto o descripción
-#     productos_qs = Products.objects.filter(
-#         Q(sku__icontains=query) | 
-#         Q(nameproduct__icontains=query) | 
-#         Q(prefixed__icontains=query) | 
-#         Q(description__icontains=query)  # 🔥 Se agrega búsqueda por descripción
-#     ).only('id', 'sku', 'nameproduct', 'description', 'lastprice')
-
-#     paginator = Paginator(productos_qs, 10)
-#     page = int(request.GET.get('page', 1))
-#     productos_page = paginator.get_page(page)
-
-#     productos_data = []
-#     for producto in productos_page:
-#         # 🔥 Filtrar solo los Uniqueproducts con `state=0`
-#         stock_total = Uniqueproducts.objects.filter(
-#             Q(product=producto) & Q(state=0) & Q(location__in=sector_mapping.keys())
-#         ).count()
-
-#         productos_data.append({
-#             'id': producto.id,
-#             'sku': producto.sku,
-#             'name': producto.nameproduct,
-#             'description': producto.description or '',  # 🔥 Agregado el campo description
-#             'price': producto.lastprice or 0,
-#             'stock_total': stock_total,
-#             'is_unique_product': False,
-#         })
-
-#     return JsonResponse({
-#         'products': productos_data,
-#         'total_pages': paginator.num_pages,
-#         'current_page': productos_page.number,
-#     })
 
 
 def producto_detalles(request, product_id):
@@ -1070,7 +998,7 @@ def enviar_correo_factura_aprobada(productos_actualizados, factura_id, n_documen
         subject_con_costos,
         '',  # El cuerpo de texto plano se deja vacío
         settings.DEFAULT_FROM_EMAIL,
-        ['nuevosproductos@emmett.cl'],  # Destinatario del correo con costos
+        ['rcavieres@emmett.cl'],  # Destinatario del correo con costos
         fail_silently=False,
         html_message=mensaje_html(tabla_productos_con_costos)
     )
@@ -1435,10 +1363,10 @@ def get_suppliers(request):
     if query:
         suppliers = Supplier.objects.filter(
             Q(namesupplier__icontains=query) | Q(rutsupplier__icontains=query)
-        ).values('id', 'namesupplier', 'rutsupplier')
+        ).order_by('namesupplier').values('id', 'namesupplier', 'rutsupplier')
     else:
-        # Si no hay búsqueda, devolver todos los proveedores
-        suppliers = Supplier.objects.all().values('id', 'namesupplier', 'rutsupplier')
+        # Si no hay búsqueda, devolver todos los proveedores ordenados alfabéticamente
+        suppliers = Supplier.objects.all().order_by('namesupplier').values('id', 'namesupplier', 'rutsupplier')
 
     # Convertimos a lista y retornamos en formato JSON
     return JsonResponse(list(suppliers), safe=False)
@@ -4907,7 +4835,7 @@ def enviar_correo_resultados(resultados):
         subject,
         '',
         settings.DEFAULT_FROM_EMAIL,
-        ['erp@emmett.cl'],  # Cambia el destinatario si es necesario
+        ['rcavieres@emmett.cl'],  # Cambia el destinatario si es necesario
         fail_silently=False,
         html_message=mensaje_html  # Se envía como HTML
     )
