@@ -1008,7 +1008,7 @@ def enviar_correo_factura_aprobada(productos_actualizados, factura_id, n_documen
         subject_sin_costos,
         '',  # El cuerpo de texto plano se deja vacío
         settings.DEFAULT_FROM_EMAIL,
-        ['erp@emmett.cl'],  # Destinatario del correo sin costos
+        ['rcavieres@emmett.cl'],  # Destinatario del correo sin costos
         fail_silently=False,
         html_message=mensaje_html(tabla_productos_sin_costos)
     )
