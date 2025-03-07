@@ -504,6 +504,7 @@ def producto_detalles(request, product_id):
             'sku': producto.sku,
             'name': producto.nameproduct,
             'price': producto.lastprice or 0,
+            'description':producto.description,
             'stock_total': stock_total,
             'bodegas': bodegas_stock,
             'unique_products': unique_products_data,
