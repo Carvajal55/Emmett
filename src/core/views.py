@@ -1581,11 +1581,20 @@ def generar_json(request):
             global_discount = float(headers.get('dcto', 0) or 0)  # Descuento global
 
             # Crear el nombre del archivo basado en los datos del encabezado
-            json_file_name = f"s_{supplier}t_{type_document}f_{number_document}.json"
-
-            # Guardar el JSON
+            # Crear nombre base + timestamp
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            base_json_file_name = f"s_{supplier}t_{type_document}f_{number_document}_{timestamp}"
+            json_file_name = base_json_file_name + ".json"
             relative_json_path = os.path.join('models', 'invoices', 'json', json_file_name)
             absolute_json_path = os.path.join(settings.BASE_DIR, relative_json_path)
+
+            # Validar si existe, agregar sufijo incremental
+            counter = 1
+            while os.path.exists(absolute_json_path):
+                json_file_name = f"{base_json_file_name}_{counter}.json"
+                relative_json_path = os.path.join('models', 'invoices', 'json', json_file_name)
+                absolute_json_path = os.path.join(settings.BASE_DIR, relative_json_path)
+                counter += 1
             os.makedirs(os.path.dirname(absolute_json_path), exist_ok=True)
 
             # Calcular totales y procesar detalles
