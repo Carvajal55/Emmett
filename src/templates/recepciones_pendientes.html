@@ -33,16 +33,15 @@
         
             <!-- Filtro por estado de facturas -->
             <div class="col-md-4">
-                <select
-                    v-model="estadoSeleccionado"
-                    class="form-select"
-                    @change="fetchFacturas(1)"
-                >
-                    <option value="pendientes">Por Aprobar</option>
-                    <option value="aprobadas">Aprobadas</option>
+                <select id="estado" v-model="estadoSeleccionado" class="form-select" @change="fetchFacturas(1)">
+                    <option value="todas">Todas</option> <!-- 🔥 Mostrar todo -->
+                    <option value="pendientes">Por Aprobar</option> <!-- status 0 -->
+                    <option value="aprobadas">Aprobadas</option>   <!-- status 1 -->
+                    <option value="rechazadas">Rechazadas</option> <!-- status 2 o el que uses -->
                 </select>
             </div>
          </div>
+         
 
 
         <!-- Tabla para las facturas -->
@@ -170,16 +169,17 @@
 
                 // Mapear estado seleccionado a valores de status
                 const statusMapping = {
-                    pendientes: 0, // Status 0: facturas pendientes
-                    aprobadas: 1   // Status 1: facturas aprobadas
-                    
+                    todas: '',         // 🔥 No manda status, muestra todo
+                    pendientes: 0,     // Pendientes
+                    aprobadas: 1,      // Aprobadas
+                    rechazadas: 2      // Rechazadas (ajusta según tu base de datos si usas otro número)
                 };
 
                 let params = {
-                    status: statusMapping[this.estadoSeleccionado], // Estado seleccionado
+                    status: statusMapping[this.estadoSeleccionado], // 🔥 Este valor puede ir vacío para mostrar todo
                     page: this.currentPage,
-                    proveedor: this.searchProveedor,  // Nuevo filtro de proveedor
-                    folio: this.searchFolio  // Nuevo filtro de folio
+                    proveedor: this.searchProveedor,
+                    folio: this.searchFolio
                 };
 
                 axios.get('/api/listar-facturas-pendientes/', { params })
