@@ -23,9 +23,7 @@
     <!-- Aquí mostraremos los datos de la factura -->
     <div v-if="factura" class="container">
         <div class="row">
-            <button class="btn btn-success mt-3" @click="exportarExcel">
-                Descargar Excel(EN DESARROLLO)
-            </button>
+            
             <!-- Columna 1 -->
             <div class="col-md-4">
                 <p><strong>Forma de Pago:</strong> [[ factura.headers.typePay ]]</p>
@@ -34,6 +32,9 @@
                 <p><strong>Ingresado Por:</strong> [[ factura.headers.userProcess ]]</p>
                 <p><strong>Estado Resumen:</strong> OK</p>
                 <p><strong>PDF:</strong> <a :href="`/media/${factura.headers.urlImg}`" target="_blank">Ver PDF</a></p>
+                <button class="btn btn-success mt-3" @click="exportarExcel">
+                    Descargar Excel(EN DESARROLLO)
+                </button>
             
 
             </div>
