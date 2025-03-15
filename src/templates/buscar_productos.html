@@ -7,12 +7,21 @@
         <div class="card-body">
             <!-- Gestión de Productos -->
             <div v-show="activeTab === 'gestion'">
+                <!-- Campo de Búsqueda y Filtro de Marcas -->
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5>Gestión de Productos</h5>
-                    <!-- Campo de Búsqueda con Autocompletar -->
-                    <input type="text" class="form-control" placeholder="Buscar por SKU o Nombre" 
-                        v-model="searchQuery" @input="fetchProducts(1)" 
-                        list="productSuggestions" ref="searchInput">
+                    <div class="d-flex" style="gap: 10px; width: 60%;">
+                        <input type="text" class="form-control" placeholder="Buscar por SKU o Nombre" 
+                            v-model="searchQuery" @input="fetchProducts(1)" 
+                            list="productSuggestions" ref="searchInput">
+
+                        <select class="form-control" v-model="selectedBrand" @change="fetchProducts(1)">
+                            <option value="">Todas las marcas</option>
+                            <option v-for="brand in brands" :key="brand" :value="brand">
+                                [[ brand ]]
+                            </option>
+                        </select>
+                    </div>
                 </div>
                 <hr>
 
@@ -152,6 +161,8 @@
             products: [],             // Lista de productos
             bodegas: [],              // Lista de sucursales (bodegas)
             searchQuery: '',          // Término de búsqueda
+            brands: [],               // NUEVO: Lista de marcas
+            selectedBrand: '',  
             currentPage: 1,           // Página actual
             totalPages: 1,            // Total de páginas
             maxVisiblePages: 10,      // Máximo de páginas visibles en la paginación
@@ -244,7 +255,11 @@
 
                 try {
                     const response = await axios.get(`/api/buscar-productos/`, {
-                        params: { page, q: this.searchQuery },
+                        params: { 
+                            page, 
+                            q: this.searchQuery,         // Búsqueda por SKU o nombre
+                            brand: this.selectedBrand,   // Nuevo: filtro por marca
+                        },
                         cancelToken: this.cancelTokenSource.token,
                     });
 
@@ -256,6 +271,7 @@
                     if (currentSelectedId && !this.products.some(product => product.id === currentSelectedId)) {
                         this.selectedProduct = null;
                     }
+
                     this.isLoading = false;
                 } catch (error) {
                     if (axios.isCancel(error)) {
@@ -266,7 +282,14 @@
                     this.isLoading = false;
                 }
             },
-
+            async fetchBrands() {
+                try {
+                    const response = await axios.get('/api/listar-marcas/');
+                    this.brands = response.data.brands; // Suponiendo que la API devuelve {"brands": ["Marca1", "Marca2"]}
+                } catch (error) {
+                    console.error('Error al cargar marcas:', error);
+                }
+            },
     
             // Ver detalles de un producto
             async verDetallesProducto(productId) {
@@ -307,6 +330,7 @@
         },
         mounted() {
             this.fetchBodegas(); // Cargar las bodegas al iniciar la aplicación
+            this.fetchBrands();
     
             // Enfocar automáticamente en el input de búsqueda
             const searchInput = this.$refs.searchInput;

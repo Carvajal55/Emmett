@@ -63,6 +63,7 @@ urlpatterns = [
     path('api/aprobar-factura/', core_views.aprobar_factura, name='aprobar_factura'),
     path('api/obtener_factura/', core_views.obtener_factura, name='obtener_factura'),
     path('factura/aprobar/<int:id>/', core_views.factura_aprobar_view, name='factura_aprobar'),
+    path('api/listar-marcas/', core_views.listar_marcas, name='listar_marcas'),
     #Imprimir etiquetas
     path('api/imprimir-etiqueta/', core_views.imprimir_etiqueta, name='imprimir_etiqueta'),
     path('api/imprimir-etiquetaqr/', core_views.imprimir_etiqueta_qr, name='imprimir_etiqueta_qr'),

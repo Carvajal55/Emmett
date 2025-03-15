@@ -356,7 +356,9 @@ def calculate_stock(product, sector_mapping):
     ]
     return stock_total, unique_products_data
 
-
+def listar_marcas(request):
+    brands = Products.objects.values_list('brands', flat=True).distinct()
+    return JsonResponse({'brands': list(brands)})
 
 def buscar_productosAPI(request):
     query = request.GET.get('q', '').strip()
