@@ -998,12 +998,11 @@
 
     let promesas = [];
 
-    // Recorremos cada detalle (SKU)
+    // Recorrer cada detalle (SKU)
     this.detalles.forEach(detalle => {
-        // Por cada detalle, recorrer las listas visibles
+        // Por cada marketplace visible
         this.listasPrecios.forEach(precioLista => {
             if (precioLista.mostrar) {
-                // Crear promesa para obtener valor actual
                 let promesa = axios.post('/api/obtener_valor_actual/', {
                     price_list_id: precioLista.id,
                     sku: detalle.sku
@@ -1012,18 +1011,18 @@
                     const valorActual = response.data.valor_actual ? Math.ceil(response.data.valor_actual * 1.19) : 'Pendiente';
                     const costo = parseFloat(detalle.cost) || 0;
 
-                    // Calcular margen basado en costo y valor actual
+                    // Calcular margen real
                     let margenActual = 'Pendiente';
                     if (valorActual !== 'Pendiente' && costo > 0) {
                         const valorNeto = valorActual / 1.19;
                         margenActual = ((valorNeto - costo) / valorNeto * 100).toFixed(2);
                     }
 
-                    // Guardar valor y margen actual para ese SKU y lista
+                    // Guardar los datos calculados
                     this.$set(detalle, `precioActual_${precioLista.label}`, valorActual);
                     this.$set(detalle, `margenActual_${precioLista.label}`, margenActual);
 
-                    // También guardar el sugerido y su margen
+                    // Guardar sugeridos
                     const precioSugerido = precioLista.valor || 'Pendiente';
                     const margenSugerido = precioLista.margen || 'Pendiente';
                     this.$set(detalle, `precioSugerido_${precioLista.label}`, precioSugerido);
@@ -1031,6 +1030,7 @@
                 })
                 .catch(error => {
                     console.error(`Error al obtener valor actual para ${precioLista.label} SKU: ${detalle.sku}`, error);
+                    // Guardar como error si falla
                     this.$set(detalle, `precioActual_${precioLista.label}`, 'Error');
                     this.$set(detalle, `margenActual_${precioLista.label}`, 'Error');
                     this.$set(detalle, `precioSugerido_${precioLista.label}`, 'Error');
@@ -1042,20 +1042,21 @@
         });
     });
 
-    // Cuando terminen todas las consultas, generar el Excel
+    // Al finalizar todas las promesas, generar Excel
     Promise.all(promesas).then(() => {
         let data = this.detalles.map(detalle => {
             let preciosMarketplaces = {};
-            // Agregar dinámicamente los precios y márgenes de cada marketplace
+            // Generar columnas dinámicas para cada marketplace visible
             this.listasPrecios.forEach(precioLista => {
                 if (precioLista.mostrar) {
                     preciosMarketplaces[`Precio Actual ${precioLista.label}`] = detalle[`precioActual_${precioLista.label}`] || 'N/A';
-                    preciosMarketplaces[`Margen Actual ${precioLista.label}`] = detalle[`margenActual_${precioLista.label}`] || 'N/A';
+                    preciosMarketplaces[`Margen Actual ${precioLista.label} (%)`] = detalle[`margenActual_${precioLista.label}`] || 'N/A';
                     preciosMarketplaces[`Precio Sugerido ${precioLista.label}`] = detalle[`precioSugerido_${precioLista.label}`] || 'N/A';
-                    preciosMarketplaces[`Margen Sugerido ${precioLista.label}`] = detalle[`margenSugerido_${precioLista.label}`] || 'N/A';
+                    preciosMarketplaces[`Margen Sugerido ${precioLista.label} (%)`] = detalle[`margenSugerido_${precioLista.label}`] || 'N/A';
                 }
             });
 
+            // Combinar con columnas base
             return {
                 SKU: detalle.sku,
                 Producto: detalle.model,
@@ -1069,17 +1070,17 @@
                 "Precio Base": detalle.precioBase || 0,
                 "Margen %": detalle.margen || 0,
                 "Stock Total": detalle.totalStock || 0,
-                ...preciosMarketplaces // 🔥 Aquí se integran todos los precios y márgenes de marketplaces
+                ...preciosMarketplaces // Marketplace dinámico
             };
         });
 
         // Convertir a hoja Excel
         let ws = XLSX.utils.json_to_sheet(data);
         let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Detalles Factura");
+        XLSX.utils.book_append_sheet(wb, ws, "ResumenFactura");
 
         // Descargar archivo
-        XLSX.writeFile(wb, `Factura_${this.idFactura}_completa.xlsx`);
+        XLSX.writeFile(wb, `Factura_${this.idFactura}_con_precios.xlsx`);
     });
 }
 
