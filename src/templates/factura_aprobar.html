@@ -32,9 +32,7 @@
                 <p><strong>Ingresado Por:</strong> [[ factura.headers.userProcess ]]</p>
                 <p><strong>Estado Resumen:</strong> OK</p>
                 <p><strong>PDF:</strong> <a :href="`/media/${factura.headers.urlImg}`" target="_blank">Ver PDF</a></p>
-                <button class="btn btn-success mt-3" @click="exportarExcel">
-                    Descargar Excel(EN DESARROLLO)
-                </button>
+                
             
 
             </div>
@@ -64,6 +62,9 @@
         </div>
     </div>
     <div class="col-12  mt-4">
+        <button class="btn btn-warning mt-3" @click="exportarExcel">
+            Descargar Excel
+        </button>
         <button class="btn btn-primary" @click="actualizarPreciosBaseMasivo">
             Actualizar Todos los Precios Base
         </button>
