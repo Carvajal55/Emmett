@@ -357,7 +357,15 @@ def calculate_stock(product, sector_mapping):
     return stock_total, unique_products_data
 
 def listar_marcas(request):
-    brands = Products.objects.values_list('brands', flat=True).distinct()
+    # Obtener marcas únicas, ignorando vacíos y ordenadas alfabéticamente
+    brands = (
+        Products.objects
+        .exclude(brands__isnull=True)  # Excluir nulos
+        .exclude(brands__exact='')    # Excluir vacíos
+        .values_list('brands', flat=True)
+        .distinct()
+        .order_by('brands')           # Orden alfabético
+    )
     return JsonResponse({'brands': list(brands)})
 
 def buscar_productosAPI(request):
