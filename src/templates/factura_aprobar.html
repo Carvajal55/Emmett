@@ -61,14 +61,19 @@
             </div>
         </div>
     </div>
-    <div class="col-12  mt-4">
-        <button class="btn btn-warning mt-3" @click="exportarExcel">
-            Descargar Excel
-        </button>
-        <button class="btn btn-primary" @click="actualizarPreciosBaseMasivo">
-            Actualizar Todos los Precios Base
-        </button>
+    <div class="row mt-4">
+        <div class="col-12 mb-2">
+            <button class="btn btn-warning w-100" @click="exportarExcel">
+                Descargar Excel
+            </button>
+        </div>
+        <div class="col-12">
+            <button class="btn btn-primary w-100" @click="actualizarPreciosBaseMasivo">
+                Actualizar Todos los Precios Base
+            </button>
+        </div>
     </div>
+    
    <!-- Modal -->
    <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog" aria-labelledby="modalPreciosLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl custom-modal-width" role="document">
