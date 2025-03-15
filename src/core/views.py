@@ -362,64 +362,74 @@ def listar_marcas(request):
 
 def buscar_productosAPI(request):
     query = request.GET.get('q', '').strip()
-    if not query:
-        return JsonResponse({'products': [], 'total_pages': 1, 'current_page': 1}, status=200)
+    brand = request.GET.get('brand', '').strip()  # 🔥 Nuevo: recibir parámetro brand
+    page = int(request.GET.get('page', 1))
 
     # Bodegas válidas y sus nombres
     bodegas_validas_ids = [10, 9, 7, 6, 4, 2, 1, 11, 12]
     bodega_mapping = {bodega.idoffice: bodega.name for bodega in Bodega.objects.filter(idoffice__in=bodegas_validas_ids)}
-
     sector_mapping = get_sector_mapping(bodegas_validas_ids)
 
-    # 🔍 Buscar por SuperID en Uniqueproducts
-    unique_product = Uniqueproducts.objects.filter(superid=query, state=0).select_related('product').first()
-    if unique_product and unique_product.product:
-        product = unique_product.product
+    # Si no hay query y no hay marca, devolver vacío
+    if not query and not brand:
+        return JsonResponse({'products': [], 'total_pages': 1, 'current_page': 1}, status=200)
 
-        # Consultar Sectoroffice relacionado con el campo 'location'
-        sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
-        sector_info = {
-            'sector': sector.namesector if sector else 'Sin información',
-            'bodega': bodega_mapping.get(sector.idoffice, 'Sin información') if sector else 'Sin información',
-            'description': sector.description if sector else 'Sin información',
-        }
+    # 🔍 Buscar por SuperID (solo si hay query)
+    if query:
+        unique_product = Uniqueproducts.objects.filter(superid=query, state=0).select_related('product').first()
+        if unique_product and unique_product.product:
+            product = unique_product.product
 
-        # 🔥 Filtrar solo los Uniqueproducts con `state=0`
-        stock_total = Uniqueproducts.objects.filter(
-            Q(product=product) & Q(state=0) & Q(location__in=sector_mapping.keys())
-        ).count()
+            # Consultar Sectoroffice relacionado
+            sector = Sectoroffice.objects.filter(idsectoroffice=unique_product.location).first()
+            sector_info = {
+                'sector': sector.namesector if sector else 'Sin información',
+                'bodega': bodega_mapping.get(sector.idoffice, 'Sin información') if sector else 'Sin información',
+                'description': sector.description if sector else 'Sin información',
+            }
 
-        return JsonResponse({
-            'products': [{
-                'id': product.id,
-                'sku': product.sku,
-                'name': product.nameproduct,
-                'description': product.description or '',  # Agregado el campo description
-                'price': product.lastprice or 0,
-                'stock_total': stock_total,
-                'is_unique_product': True,
-                'location_info': sector_info,
-                'descripcion':product.description
-            }],
-            'total_pages': 1,
-            'current_page': 1,
-        }, status=200)
+            # Stock total de ese producto
+            stock_total = Uniqueproducts.objects.filter(
+                Q(product=product) & Q(state=0) & Q(location__in=sector_mapping.keys())
+            ).count()
 
-    # 🔍 Buscar por SKU, nombre del producto o descripción
-    productos_qs = Products.objects.filter(
-        Q(sku__icontains=query) | 
-        Q(nameproduct__icontains=query) | 
-        Q(prefixed__icontains=query) | 
-        Q(description__icontains=query)  # 🔥 Se agrega búsqueda por descripción
-    ).only('id', 'sku', 'nameproduct', 'description', 'lastprice')
+            return JsonResponse({
+                'products': [{
+                    'id': product.id,
+                    'sku': product.sku,
+                    'name': product.nameproduct,
+                    'description': product.description or '',
+                    'price': product.lastprice or 0,
+                    'stock_total': stock_total,
+                    'is_unique_product': True,
+                    'location_info': sector_info,
+                    'descripcion': product.description
+                }],
+                'total_pages': 1,
+                'current_page': 1,
+            }, status=200)
 
+    # 🔍 Buscar por SKU, nombre, prefixed, descripción (y filtrar por marca si viene)
+    filtros = Q()
+    if query:
+        filtros &= (
+            Q(sku__icontains=query) |
+            Q(nameproduct__icontains=query) |
+            Q(prefixed__icontains=query) |
+            Q(description__icontains=query)
+        )
+    if brand:
+        filtros &= Q(brands=brand)  # 🔥 Filtrar por marca exacta (puedes usar icontains si quieres que sea parcial)
+
+    # Consulta final de productos
+    productos_qs = Products.objects.filter(filtros).only('id', 'sku', 'nameproduct', 'description', 'lastprice')
+
+    # Paginación
     paginator = Paginator(productos_qs, 10)
-    page = int(request.GET.get('page', 1))
     productos_page = paginator.get_page(page)
 
     productos_data = []
     for producto in productos_page:
-        # 🔥 Filtrar solo los Uniqueproducts con `state=0`
         stock_total = Uniqueproducts.objects.filter(
             Q(product=producto) & Q(state=0) & Q(location__in=sector_mapping.keys())
         ).count()
@@ -428,7 +438,7 @@ def buscar_productosAPI(request):
             'id': producto.id,
             'sku': producto.sku,
             'name': producto.nameproduct,
-            'description': producto.description or '',  # 🔥 Agregado el campo description
+            'description': producto.description or '',
             'price': producto.lastprice or 0,
             'stock_total': stock_total,
             'is_unique_product': False,
