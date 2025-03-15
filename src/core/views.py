@@ -1599,6 +1599,7 @@ def generar_json(request):
             observation = headers.get('observation', '')
             date_purchase = headers.get('datePurchase', None)
             global_discount = float(headers.get('dcto', 0) or 0)  # Descuento global
+            status = headers.get('status', 0)  # 🔥 Aquí se captura el status dinámico
 
             # Crear el nombre del archivo basado en los datos del encabezado
             # Crear nombre base + timestamp
@@ -1653,7 +1654,7 @@ def generar_json(request):
                 subtotal=subtotal_with_discount,
                 urljson=relative_json_path,
                 urlimg=relative_file_path,  # Guardar la ruta relativa del archivo
-                status=0,
+                status=status,
             )
 
             return JsonResponse({

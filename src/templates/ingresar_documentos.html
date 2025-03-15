@@ -447,15 +447,26 @@
             />
         </div>
 
-        <!-- Botones de acción omitidos por brevedad... -->
+        <!-- Botón para guardar normalmente -->
         <button 
-            type="button" 
-            style="background-color: #28a745; color: white; border: none;" 
-            class="btn btn-lg" 
-            @click="enviarDatos"
-            :disabled="!formularioValido">
-            Guardar
+        type="button" 
+        style="background-color: #28a745; color: white; border: none;" 
+        class="btn btn-lg" 
+        @click="enviarDatos(1)" 
+        :disabled="!formularioValido">
+        Guardar
         </button>
+
+        <!-- Botón para guardar como borrador -->
+        <button 
+        type="button" 
+        style="background-color: #ffc107; color: black; border: none;" 
+        class="btn btn-lg ms-2" 
+        @click="enviarDatos(3)"> <!-- ⚙️ Aquí enviamos status 3 -->
+        Guardar Borrador
+        </button>
+
+        
 
         </div>
         <!-- Contenido de las tablas -->
@@ -1167,7 +1178,7 @@
                     this.form.img_url = null; // Limpia el campo si no hay archivo seleccionado
                 }
             },
-            enviarDatos() {
+            enviarDatos(status = 1) {
                 const formData = new FormData();
 
                 // Adjuntar imagen si existe
@@ -1194,7 +1205,8 @@
                         urlPDF: "",
                         urlJson: "",
                         dateReception: this.currentDate,
-                        userProcess: "Nombre Usuario"
+                        userProcess: "Nombre Usuario",
+                        status: status, // 🔥 Aquí enviamos el status (1 normal, 3 borrador)
                     },
                     details: this.productosDocumento.map(producto => ({
                         qty: producto.cantidad,
