@@ -105,16 +105,16 @@
                                 <template v-else>
                                     <!-- Botón Editar para facturas aprobadas -->
                                     <button
-                                        type="button"
-                                        class="btn btn-warning m-1 px-5"
-                                        @click="aprobarFactura(factura.id)"
+                                    type="button"
+                                    class="btn btn-warning m-1 px-5"
+                                    @click="editarFactura(factura.id)"
                                     >
-                                        <div class="icon-box-inner">
-                                            <div class="icon-base">
-                                                <i class="fadeIn animated bx bx-edit"></i>
-                                            </div>
-                                            Editar
+                                    <div class="icon-box-inner">
+                                        <div class="icon-base">
+                                            <i class="fadeIn animated bx bx-edit"></i>
                                         </div>
+                                        Editar
+                                    </div>
                                     </button>
                                 </template>
                             </td>
@@ -161,6 +161,10 @@
             estadoSeleccionado: 'pendientes'
         },
         methods: {
+            editarFactura(idFactura) {
+                // Redirigir a la página de edición con el ID de la factura
+                window.location.href = `/factura/editar/${idFactura}/`;
+            },
             aprobarFactura(idFactura) {
                 // Redirigir a la nueva página con el ID de la factura
                 window.location.href = `/factura/aprobar/${idFactura}/`;
