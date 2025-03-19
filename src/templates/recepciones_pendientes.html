@@ -162,12 +162,11 @@
         },
         methods: {
             editarFactura(factura) {
-                // Guardar el proveedor y el número de factura en LocalStorage antes de redirigir
-                localStorage.setItem("factura_proveedor", factura.supplier);
-                localStorage.setItem("factura_numero", factura.number);
+                // Guardar los datos de la factura en sessionStorage
+                sessionStorage.setItem("facturaEdicion", JSON.stringify(factura));
 
-                // Redirigir a la vista de edición
-                window.location.href = `/factura/editar/`;
+                // Redirigir a la vista de ingreso de documentos
+                window.location.href = "/ingresar_documentos/";
             },
             aprobarFactura(idFactura) {
                 // Redirigir a la nueva página con el ID de la factura

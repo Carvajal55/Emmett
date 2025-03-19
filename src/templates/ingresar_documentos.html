@@ -1265,21 +1265,21 @@
             this.searchProveedoresProd();
             this.cargarCategorias();
 
-            // Obtener datos guardados en LocalStorage
-            const facturaProveedor = localStorage.getItem("factura_proveedor");
-            const facturaNumero = localStorage.getItem("factura_numero");
+            // Obtener la factura almacenada en sessionStorage
+            const facturaGuardada = sessionStorage.getItem("facturaEdicion");
 
-            // Si existen los datos, cargarlos en el formulario y buscar la factura
-            if (facturaProveedor && facturaNumero) {
-                this.form.proveedor = facturaProveedor;
-                this.form.numeroDocumento = facturaNumero;
+            if (facturaGuardada) {
+                const factura = JSON.parse(facturaGuardada);
 
-                // Llamar automáticamente a buscarFactura para cargar los datos
-                this.buscarFactura();
+                // Precargar los datos en el formulario
+                this.form.proveedor = factura.supplier;
+                this.form.numeroDocumento = factura.number;
+                
+                // Ejecutar la búsqueda para traer los datos de la factura en el sistema
+                this.buscarFactura(); 
 
-                // Limpiar LocalStorage después de cargar los datos
-                localStorage.removeItem("factura_proveedor");
-                localStorage.removeItem("factura_numero");
+                // Borrar la factura del sessionStorage para evitar problemas al navegar
+                sessionStorage.removeItem("facturaEdicion");
             }
         }
     });
