@@ -1112,6 +1112,28 @@ def aprobar_factura(request):
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
+
+def verificar_borrador(request):
+    supplier = request.GET.get('supplier')
+    number = request.GET.get('number')
+    tipo_documento = request.GET.get('type')
+
+    try:
+        factura = Purchase.objects.filter(
+            supplier=supplier,
+            number=number,
+            typedoc=tipo_documento,
+            status=4  # Solo buscamos facturas en estado 'borrador'
+        ).first()
+
+        if factura:
+            return JsonResponse({'existe': True, 'facturaId': factura.id})
+        else:
+            return JsonResponse({'existe': False})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 @csrf_exempt
 def obtener_factura(request):
     if request.method == 'POST':

@@ -1186,9 +1186,9 @@
                     formData.append("img_url", this.form.img_url);
                 }
 
-                // Adjuntar el JSON como string
-                formData.append("jsonData", JSON.stringify({
-                    facturaId: this.facturaId,
+                // Crear JSON con la información de la factura
+                const facturaData = {
+                    facturaId: this.facturaId, // 🔥 Si ya tiene un ID, se sobreescribirá
                     headers: {
                         supplier: this.form.rutProveedor,
                         supplierName: this.form.razonSocial,
@@ -1206,7 +1206,7 @@
                         urlJson: "",
                         dateReception: this.currentDate,
                         userProcess: "Nombre Usuario",
-                        status: status, // 🔥 Aquí enviamos el status (1 normal, 3 borrador)
+                        status: status, // 🔥 Si es 4 (borrador) y ya existe, se sobreescribirá
                     },
                     details: this.productosDocumento.map(producto => ({
                         qty: producto.cantidad,
@@ -1218,32 +1218,56 @@
                         sku: producto.sku,
                         model: producto.model,
                     }))
-                }));
+                };
 
-                axios.post('/api/generar-json/', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
+                // Adjuntar JSON como string al FormData
+                formData.append("jsonData", JSON.stringify(facturaData));
+
+                // 🔥 Primero verificamos si ya existe un borrador para esta factura
+                axios.get('/api/verificar-borrador/', {
+                    params: {
+                        supplier: this.form.rutProveedor,
+                        number: this.form.numeroDocumento,
+                        type: this.form.tipoDocumento
+                    }
                 })
                 .then(response => {
-                    Swal.fire({
-                        title: 'Éxito',
-                        text: 'La factura se ha guardado correctamente.',
-                        icon: 'success',
-                        confirmButtonText: 'OK'
-                    }).then(() => {
-                        if (status == 0){
-                            window.location.href = "{% url 'recepciones_pendientes' %}";
-                        }
-                            
+                    if (response.data.existe) {
+                        // 🔥 Si ya hay un borrador, se actualizará
+                        facturaData.facturaId = response.data.facturaId;
+                        console.log("✅ Actualizando borrador con ID:", response.data.facturaId);
+                    } else {
+                        console.log("📌 No hay borrador previo, creando uno nuevo.");
+                    }
+
+                    // Ahora enviamos la factura (nueva o actualizada)
+                    axios.post('/api/generar-json/', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    })
+                    .then(response => {
+                        Swal.fire({
+                            title: 'Éxito',
+                            text: status === 4 ? 'El borrador se ha guardado correctamente.' : 'La factura se ha guardado correctamente.',
+                            icon: 'success',
+                            confirmButtonText: 'OK'
+                        }).then(() => {
+                            if (status == 0) {
+                                window.location.href = "{% url 'recepciones_pendientes' %}";
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        console.error("❌ Error al guardar la factura:", error);
+                        Swal.fire({
+                            title: 'Error',
+                            text: 'Hubo un problema al guardar la factura.',
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        });
                     });
                 })
                 .catch(error => {
-                    console.error("Error al enviar los datos:", error);
-                    Swal.fire({
-                        title: 'Error',
-                        text: 'Hubo un problema al guardar la factura.',
-                        icon: 'error',
-                        confirmButtonText: 'OK'
-                    });
+                    console.error("❌ Error al verificar borrador:", error);
                 });
             },
 
