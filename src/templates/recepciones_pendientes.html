@@ -162,12 +162,25 @@
         },
         methods: {
             editarFactura(factura) {
-                // Guardar los datos de la factura en sessionStorage
+                console.log("📌 Factura seleccionada para editar:", factura);
+
+                // Verificar si la factura tiene los datos necesarios antes de guardarlos
+                if (!factura || !factura.supplier || !factura.number || !factura.typeDocument) {
+                    console.error("❌ La factura no tiene todos los datos necesarios:", factura);
+                    Swal.fire("Error", "La factura no tiene todos los datos necesarios.", "error");
+                    return;
+                }
+
+                // Guardar la factura en sessionStorage
                 sessionStorage.setItem("facturaEdicion", JSON.stringify(factura));
 
+                // Verificar que se guardó correctamente
+                console.log("✅ Factura guardada en sessionStorage:", sessionStorage.getItem("facturaEdicion"));
+
                 // Redirigir a la vista de ingreso de documentos
-                window.location.href = "/ingresar_documentos/";
+                // window.location.href = "/ingresar_documentos/";
             },
+
             aprobarFactura(idFactura) {
                 // Redirigir a la nueva página con el ID de la factura
                 window.location.href = `/factura/aprobar/${idFactura}/`;
