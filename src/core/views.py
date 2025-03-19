@@ -1612,7 +1612,7 @@ def generar_json(request):
                 relative_file_path = ''  # Si no se envía imagen, dejar vacío
 
             # Procesar el resto de los datos JSON
-            data = json.loads(request.POST.get('jsonData'))  # Obtener el JSON enviado como parte de la solicitud
+            data = json.loads(request.POST.get('jsonData'))
             headers = data.get('headers', {})
             supplier = headers.get('supplier', '')
             supplier_name = headers.get('supplierName', '')
@@ -1620,25 +1620,30 @@ def generar_json(request):
             number_document = headers.get('nDocument', None)
             observation = headers.get('observation', '')
             date_purchase = headers.get('datePurchase', None)
-            global_discount = float(headers.get('dcto', 0) or 0)  # Descuento global
-            status = headers.get('status', 0)  # 🔥 Aquí se captura el status dinámico
+            global_discount = float(headers.get('dcto', 0) or 0)
+            status = headers.get('status', 0)
 
-            # Crear el nombre del archivo basado en los datos del encabezado
-            # Crear nombre base + timestamp
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            base_json_file_name = f"s_{supplier}t_{type_document}f_{number_document}_{timestamp}"
-            json_file_name = base_json_file_name + ".json"
-            relative_json_path = os.path.join('models', 'invoices', 'json', json_file_name)
-            absolute_json_path = os.path.join(settings.BASE_DIR, relative_json_path)
+            # 🔥 Buscar si ya existe un borrador con el mismo proveedor y número de documento
+            factura_existente = Purchase.objects.filter(
+                supplier=supplier,
+                number=number_document,
+                typedoc=type_document,
+                status=4  # Solo verificamos facturas en estado de borrador
+            ).first()
 
-            # Validar si existe, agregar sufijo incremental
-            counter = 1
-            while os.path.exists(absolute_json_path):
-                json_file_name = f"{base_json_file_name}_{counter}.json"
-                relative_json_path = os.path.join('models', 'invoices', 'json', json_file_name)
-                absolute_json_path = os.path.join(settings.BASE_DIR, relative_json_path)
-                counter += 1
-            os.makedirs(os.path.dirname(absolute_json_path), exist_ok=True)
+            if factura_existente:
+                # 🔄 Sobrescribir el JSON existente manteniendo la misma ruta
+                json_file_name = factura_existente.urljson
+                absolute_json_path = os.path.join(settings.BASE_DIR, json_file_name)
+                mensaje_accion = "Borrador actualizado correctamente."
+                purchase_id = factura_existente.id
+            else:
+                # 🆕 Crear un nuevo archivo JSON si no existe
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                json_file_name = f"models/invoices/json/s_{supplier}t_{type_document}f_{number_document}_{timestamp}.json"
+                absolute_json_path = os.path.join(settings.BASE_DIR, json_file_name)
+                mensaje_accion = "Borrador creado correctamente."
+                purchase_id = None  # Se asignará si creamos un nuevo registro
 
             # Calcular totales y procesar detalles
             subtotal_without_discount = 0
@@ -1661,33 +1666,45 @@ def generar_json(request):
             headers['subtotalBruto'] = subtotal_bruto
             data['headers'] = headers
 
+            # Guardar el JSON actualizado
+            os.makedirs(os.path.dirname(absolute_json_path), exist_ok=True)
             with open(absolute_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(data, json_file, ensure_ascii=False, indent=4)
 
-            # Guardar en la base de datos sin sobrescribir facturas previas
-            purchase = Purchase.objects.create(
-                typedoc=type_document,
-                number=number_document,
-                supplier=supplier,
-                suppliername=supplier_name,
-                observation=observation,
-                dateadd=timezone.now(),
-                dateproccess=date_purchase,
-                subtotal=subtotal_with_discount,
-                urljson=relative_json_path,
-                urlimg=relative_file_path,  # Guardar la ruta relativa del archivo
-                status=status,
-            )
+            if factura_existente:
+                # 🔄 Actualizar el borrador en la base de datos en lugar de crear uno nuevo
+                factura_existente.urljson = json_file_name
+                factura_existente.urlimg = relative_file_path
+                factura_existente.subtotal = subtotal_with_discount
+                factura_existente.dateproccess = date_purchase
+                factura_existente.observation = observation
+                factura_existente.save()
+            else:
+                # 🆕 Crear un nuevo registro si no había un borrador
+                purchase = Purchase.objects.create(
+                    typedoc=type_document,
+                    number=number_document,
+                    supplier=supplier,
+                    suppliername=supplier_name,
+                    observation=observation,
+                    dateadd=timezone.now(),
+                    dateproccess=date_purchase,
+                    subtotal=subtotal_with_discount,
+                    urljson=json_file_name,
+                    urlimg=relative_file_path,
+                    status=status,
+                )
+                purchase_id = purchase.id
 
             return JsonResponse({
-                'message': 'Factura guardada correctamente',
-                'urlJson': relative_json_path,
+                'message': mensaje_accion,
+                'urlJson': json_file_name,
                 'subtotalWithoutDiscount': subtotal_without_discount,
                 'subtotalWithDiscount': subtotal_with_discount,
                 'iva': iva_amount,
                 'subtotalBruto': subtotal_bruto,
-                'purchaseId': purchase.id,
-                'action': 'created'
+                'purchaseId': purchase_id,
+                'action': 'updated' if factura_existente else 'created'
             }, status=201)
 
         except Exception as e:
