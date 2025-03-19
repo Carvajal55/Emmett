@@ -1265,12 +1265,21 @@
             this.searchProveedoresProd();
             this.cargarCategorias();
 
-            // Obtener ID de factura desde la URL
-                const facturaId = window.location.pathname.split('/').pop();
+            // Obtener datos guardados en LocalStorage
+            const facturaProveedor = localStorage.getItem("factura_proveedor");
+            const facturaNumero = localStorage.getItem("factura_numero");
 
-            if (facturaId && !isNaN(facturaId)) {
-                this.form.numeroDocumento = facturaId;
-                this.buscarFactura(); // Llamar a la función para cargar la factura solo en edición
+            // Si existen los datos, cargarlos en el formulario y buscar la factura
+            if (facturaProveedor && facturaNumero) {
+                this.form.proveedor = facturaProveedor;
+                this.form.numeroDocumento = facturaNumero;
+
+                // Llamar automáticamente a buscarFactura para cargar los datos
+                this.buscarFactura();
+
+                // Limpiar LocalStorage después de cargar los datos
+                localStorage.removeItem("factura_proveedor");
+                localStorage.removeItem("factura_numero");
             }
         }
     });

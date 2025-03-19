@@ -161,9 +161,13 @@
             estadoSeleccionado: 'pendientes'
         },
         methods: {
-            editarFactura(idFactura) {
-                // Redirigir a la página de edición con el ID de la factura
-                window.location.href = `/factura/editar/${idFactura}/`;
+            editarFactura(factura) {
+                // Guardar el proveedor y el número de factura en LocalStorage antes de redirigir
+                localStorage.setItem("factura_proveedor", factura.supplier);
+                localStorage.setItem("factura_numero", factura.number);
+
+                // Redirigir a la vista de edición
+                window.location.href = `/factura/editar/`;
             },
             aprobarFactura(idFactura) {
                 // Redirigir a la nueva página con el ID de la factura
