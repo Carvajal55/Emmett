@@ -162,24 +162,29 @@
         },
         methods: {
             editarFactura(factura) {
-                console.log("📌 Factura seleccionada para editar:", factura);
+    console.log("📌 Factura seleccionada para editar:", factura);
 
-                // Verificar si la factura tiene los datos necesarios antes de guardarlos
-                if (!factura || !factura.supplier || !factura.number || !factura.typeDocument) {
-                    console.error("❌ La factura no tiene todos los datos necesarios:", factura);
-                    Swal.fire("Error", "La factura no tiene todos los datos necesarios.", "error");
-                    return;
-                }
+    // Verificar si la factura tiene los datos necesarios antes de guardarlos
+    if (!factura || !factura.supplier || !factura.number || !factura.typeDocument) {
+        console.error("❌ La factura no tiene todos los datos necesarios:", factura);
+        Swal.fire("Error", "La factura no tiene todos los datos necesarios.", "error");
+        return;
+    }
 
-                // Guardar la factura en sessionStorage
-                sessionStorage.setItem("facturaEdicion", JSON.stringify(factura));
+    // Guardar la factura en sessionStorage
+    try {
+        sessionStorage.setItem("facturaEdicion", JSON.stringify(factura));
 
-                // Verificar que se guardó correctamente
-                console.log("✅ Factura guardada en sessionStorage:", sessionStorage.getItem("facturaEdicion"));
+        // Verificar que se guardó correctamente
+        console.log("✅ Factura guardada en sessionStorage:", sessionStorage.getItem("facturaEdicion"));
 
-                // Redirigir a la vista de ingreso de documentos
-                // window.location.href = "/ingresar_documentos/";
-            },
+        // Redirigir a la vista de ingreso de documentos
+        window.location.href = "/ingresar_documentos/";
+    } catch (error) {
+        console.error("❌ Error al guardar en sessionStorage:", error);
+        Swal.fire("Error", "Hubo un problema al guardar la factura.", "error");
+    }
+},
 
             aprobarFactura(idFactura) {
                 // Redirigir a la nueva página con el ID de la factura
