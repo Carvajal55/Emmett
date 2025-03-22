@@ -1512,9 +1512,11 @@ def crear_producto(request):
         # 🔥 Formatear la descripción con el nombre real de la categoría
         descripcion_producto = f"{categoria_bs_nombre} {marca} {nombre_producto} {sku}"
 
+        nombre_producto_bsale = f"{marca} {nombre_producto} {categoria_bs_nombre} "
+
         # 🔥 Crear JSON para la API de Bsale
         bsale_product_data = {
-            "name": nombre_producto,
+            "name": nombre_producto_bsale,
             "description": descripcion_producto,  # ✅ Nueva descripción con nombre de la categoría de `Categoryserp`
             "code": sku,
             "barCode": bar_code,
@@ -1558,7 +1560,7 @@ def crear_producto(request):
                 # 🔥 Guardar en la base de datos local
                 nuevo_producto = Products.objects.create(
                     sku=sku,
-                    nameproduct=nombre_producto,
+                    nameproduct=nombre_producto_bsale,
                     prefixed=alias,
                     brands=marca,
                     codebar=bar_code,
