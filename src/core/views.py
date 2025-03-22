@@ -3999,17 +3999,12 @@ def imprimir_etiqueta_qr(request):
         absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
         os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
-        # Obtener el correlativo actual
-        # Filtrar los productos que NO están en estado rechazado y que no pertenecen a facturas rechazadas
+        # 🔄 Obtener el último correlativo REAL del producto
         last_unique_product = Uniqueproducts.objects.filter(
-            product=producto,
-            state__in=[0, 1],  # Ajusta los estados según tu lógica (ej: 0: disponible, 1: usado)
-        ).exclude(
-            iddocumentincome__in=Purchase.objects.filter(status=2).values_list('id', flat=True)
+            product=producto
         ).order_by('-correlative').first()
-        print(f"✅ last_unique_product: {last_unique_product}")
+
         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
-        print(f"✅ current_correlative: {current_correlative}")
 
         base_numeric_sku = ''.join(filter(str.isdigit, sku))
         if not base_numeric_sku:
@@ -4032,7 +4027,7 @@ def imprimir_etiqueta_qr(request):
                 x_qr, y_qr = x_offset, 25 * mm
                 qr_width, qr_height = 22 * mm, 22 * mm
 
-                # Generar QR Code
+                # Generar QR
                 qr = qrcode.QRCode(
                     version=1,
                     error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -4050,28 +4045,22 @@ def imprimir_etiqueta_qr(request):
 
                 pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
-                # Detalles de la etiqueta
+                # Detalles
                 pdf.setFont("Helvetica-Bold", 10)
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{sku}")
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
 
-                # Nombre del producto
-                # Limitar el nombre del producto a un máximo de 20 caracteres, agregando "..." si es necesario
                 nombre_truncado = textwrap.shorten(producto.nameproduct, width=25, placeholder="...")
-                #pdf.drawString(x_qr, y_qr - 15, f"{producto.nameproduct}")
                 pdf.drawString(x_qr, y_qr - 15, f"{nombre_truncado}")
 
-
-                # Código de barras
                 barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
                 barcode_sku.drawOn(pdf, x_qr - 6 * mm, y_qr - 50)
 
-                # SuperID y número de documento
                 pdf.drawString(x_qr, y_qr - 60, f"{super_id}")
                 pdf.drawString(x_qr + 25 * mm, y_qr - 60, f"{number}")
 
-                # Crear el UniqueProduct
+                # Guardar Uniqueproduct
                 Uniqueproducts.objects.create(
                     product=producto,
                     superid=super_id,
@@ -4083,7 +4072,7 @@ def imprimir_etiqueta_qr(request):
                     printlabel=os.path.join(settings.MEDIA_URL, relative_file_path),
                     iddocumentincome=number,
                     dateadd=date.today(),
-                    location=100000  # ID de la ubicación de Almacén cambiar a 100000 para local
+                    location=100000
                 )
 
                 current_correlative += 1
@@ -4093,12 +4082,12 @@ def imprimir_etiqueta_qr(request):
 
         pdf.save()
 
-        # Actualizar stock en Bsale
-        bsale_response = actualizar_stock_bsale(producto.iderp, 1, qty, producto.lastcost,number)
+        # 📦 Actualizar stock en Bsale
+        bsale_response = actualizar_stock_bsale(producto.iderp, 1, qty, producto.lastcost, number)
         if not bsale_response:
             return JsonResponse({'error': 'Etiqueta creada, pero no se pudo actualizar stock en Bsale.'}, status=500)
 
-        # Marcar detalles como impresos en el archivo JSON
+        # ✅ Marcar como impreso en JSON
         try:
             with open(url_json, 'r+') as json_file:
                 data = json.load(json_file)
@@ -4111,7 +4100,7 @@ def imprimir_etiqueta_qr(request):
         except (FileNotFoundError, json.JSONDecodeError) as e:
             return JsonResponse({'error': f'Error al procesar el archivo JSON: {str(e)}'}, status=400)
 
-        # Actualizar estado de la factura
+        # 📝 Marcar factura como "impresa completa" si todos los productos tienen printed = true
         try:
             factura = Purchase.objects.get(urljson=url_json)
             if all(detail.get('printed') for detail in data.get('details', [])):
@@ -4129,6 +4118,7 @@ def imprimir_etiqueta_qr(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
 
 
 @csrf_exempt
