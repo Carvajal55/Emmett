@@ -3999,12 +3999,27 @@ def imprimir_etiqueta_qr(request):
         absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
         os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
-        # 🔄 Obtener el último correlativo REAL del producto
-        last_unique_product = Uniqueproducts.objects.filter(
-            product=producto
-        ).order_by('-correlative').first()
+        # 🔄 Obtener el último correlativo REAL desde el superid (no desde el campo correlative)
+        base_numeric_sku = ''.join(filter(str.isdigit, sku))
+        if not base_numeric_sku:
+            return JsonResponse({'error': 'El SKU no contiene números válidos.'}, status=400)
 
-        current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
+        base_superid = f"{base_numeric_sku}e"
+
+        # Buscar los superid que comiencen con esa base y extraer el correlativo más alto
+        superids_existentes = Uniqueproducts.objects.filter(superid__startswith=base_superid).values_list('superid', flat=True)
+
+        max_correlative = 0
+        for sid in superids_existentes:
+            try:
+                cor = int(sid.split('e')[1])
+                if cor > max_correlative:
+                    max_correlative = cor
+            except (IndexError, ValueError):
+                continue
+
+        current_correlative = max_correlative + 1
+
 
         base_numeric_sku = ''.join(filter(str.isdigit, sku))
         if not base_numeric_sku:
