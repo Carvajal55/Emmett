@@ -6579,3 +6579,83 @@ def bulk_upload_brands(request):
 
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)})
+
+
+#Editar Productos
+    
+@csrf_exempt
+@require_http_methods(["PUT"])
+def editar_producto(request, sku):
+    try:
+        # Buscar el producto localmente
+        producto = Products.objects.filter(sku=sku).first()
+        if not producto:
+            return JsonResponse({'success': False, 'message': 'Producto no encontrado'}, status=404)
+
+        body = json.loads(request.body)
+
+        # Guardar todos los campos localmente
+        producto.nameproduct = body.get('name', producto.nameproduct)
+        producto.prefixed = body.get('prefixed', producto.prefixed)
+        producto.brands = body.get('brands', producto.brands)
+        producto.iderp = body.get('iderp', producto.iderp)
+        producto.alto = body.get('alto', producto.alto)
+        producto.largo = body.get('largo', producto.largo)
+        producto.profundidad = body.get('profundidad', producto.profundidad)
+        producto.peso = body.get('peso', producto.peso)
+        producto.save()
+
+        # Obtener variante en Bsale
+        bsale_variant_res = requests.get(
+            f'{BSALE_API_URL}/variants.json?code={sku}',
+            headers=HEADERS
+        )
+        variant_data = bsale_variant_res.json().get('items')
+
+        if not variant_data:
+            return JsonResponse({'success': False, 'message': 'Variante no encontrada en Bsale'}, status=404)
+
+        variant = variant_data[0]
+        variant_id = variant["id"]
+        product_id = variant["product"]["id"]
+
+        # --- 1. ACTUALIZAR NOMBRE EN BSALE ---
+        payload_nombre = {
+            "id": variant_id,
+            "productId": int(product_id),
+            "description": producto.nameproduct,
+            "barCode": sku,
+            "code": sku
+        }
+
+        update_nombre = requests.put(
+            f'{BSALE_API_URL}/variants/{variant_id}.json',
+            headers=HEADERS,
+            data=json.dumps(payload_nombre)
+        )
+
+        if update_nombre.status_code not in [200, 201]:
+            return JsonResponse({'success': False, 'message': 'Nombre local guardado, pero error al actualizar nombre en Bsale'}, status=500)
+
+        # --- 2. ACTUALIZAR PRECIO EN BSALE (si viene en el body) ---
+        nuevo_precio = body.get('precio')
+        if nuevo_precio:
+            precio_payload = {
+                "price": float(nuevo_precio)
+            }
+
+            update_precio = requests.put(
+                f"{BSALE_API_URL}/variants/{variant_id}/prices/1.json",  # ID 1 para lista de precios principal
+                headers=HEADERS,
+                data=json.dumps(precio_payload)
+            )
+
+            if update_precio.status_code not in [200, 201]:
+                return JsonResponse({'success': False, 'message': 'Nombre actualizado en Bsale, pero error al actualizar precio'}, status=500)
+
+        return JsonResponse({'success': True, 'message': 'Producto actualizado localmente y en Bsale'}, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Error al procesar la solicitud'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)
