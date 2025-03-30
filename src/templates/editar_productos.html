@@ -7,6 +7,7 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5>Gestión de Productos Ingresar SKU</h5>
+                <!-- Buscador -->
                 <input 
                     type="text" 
                     class="form-control" 
@@ -22,12 +23,14 @@
                 </datalist>
             </div>
             <hr>
+            
+            <!-- Formulario para editar el producto -->
             <div v-if="product">
                 <h5>Editar Producto</h5>
                 <form @submit.prevent="updateProduct">
                     <div class="form-group">
                         <label>SKU</label>
-                        <input type="text" v-model="product.sku" class="form-control" disabled>
+                        <input type="text" v-model="product.sku" class="form-control" readonly>
                     </div>
                     <div class="form-group">
                         <label>Nombre</label>
@@ -62,48 +65,16 @@
                         <input type="number" v-model="product.peso" class="form-control">
                     </div>
                     <div class="form-group">
-                        <label>Costo</label>
-                        <input type="number" v-model="product.cost" class="form-control">
+                        <label>Precio</label>
+                        <input type="number" v-model="product.precio" class="form-control">
+                    </div>
+                    <hr>
+                    <div v-if="product.bsalePrice">
+                        <p><strong>Precio Base Bsale:</strong> [[ formatCurrency(product.bsalePrice) ]]</p>
+                        <button class="btn btn-info" @click="abrirModalListas()">Editar Precios Marketplaces</button>
                     </div>
                     <button type="submit" class="btn btn-success mt-3">Guardar Cambios</button>
-                    <button type="button" class="btn btn-info mt-3 ml-2" @click="abrirModal(product)">Listas de Precio</button>
                 </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal para Listas de Precio -->
-    <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Actualizar Precio Base y Margen</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body" v-if="product">
-                    <p><strong>SKU:</strong> [[ product.sku ]]</p>
-                    <p><strong>Nombre:</strong> [[ product.name ]]</p>
-                    <p><strong>Precio Bsale Actual:</strong> [[ formatCurrency(product.precioBase) ]]</p>
-
-                    <div class="form-group">
-                        <label>Nuevo Precio Base</label>
-                        <input type="number" class="form-control" v-model="nuevoPrecio" @input="calcularMargen">
-                    </div>
-                    <div class="form-group">
-                        <label>Costo</label>
-                        <input type="number" class="form-control" v-model="product.cost" @input="calcularMargen">
-                    </div>
-                    <div class="form-group">
-                        <label>Margen Estimado</label>
-                        <p><strong>[[ margen ]]%</strong></p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="button" class="btn btn-primary" @click="actualizarPrecioBase">Actualizar</button>
-                </div>
             </div>
         </div>
     </div>
@@ -113,40 +84,65 @@
 {% block js %}
 <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 new Vue({
     el: '#app',
     delimiters: ['[[', ']]'],
     data: {
-        searchQuery: '',
-        suggestions: [],
-        product: null,
-        nuevoPrecio: null,
-        margen: 0
+        searchQuery: '', // Almacena el término de búsqueda
+        suggestions: [], // Lista de productos para el autocompletar
+        product: null,   // Producto seleccionado para editar
+        listasPrecios: [],
+        skuSeleccionado: null,
+        nombreSeleccionado: null,
+        precioSeleccionado: null,
+        detalleSeleccionado: null,
     },
     mounted() {
-        if (this.$refs.searchInput) this.$refs.searchInput.focus();
+        this.$refs.searchInput.focus(); // Cargar las bodegas al iniciar la aplicación
     },
     methods: {
         async fetchProducts(page = 1) {
-            this.searchQuery = this.searchQuery.trim();
-            if (!this.searchQuery) return;
+            this.searchQuery = this.searchQuery.trim(); // Limpia la entrada
+
+            if (!this.searchQuery) {
+                alert('Por favor, ingrese un SKU válido.');
+                this.suggestions = [];
+                this.product = null;
+                return;
+            }
+
             try {
                 const response = await axios.get(`/api/buscar-productos/?q=${this.searchQuery}&page=${page}`);
                 this.suggestions = response.data.products;
-                if (this.suggestions.length === 1) {
-                    this.product = this.suggestions[0];
-                    this.obtenerDatosProducto(this.product);
+
+                if (response.data.products.length === 1) {
+                    this.product = response.data.products[0]; // Selecciona el producto automáticamente
+                } else if (response.data.products.length === 0) {
+                    alert('No se encontraron productos con el SKU ingresado.');
+                    this.product = null;
+                } else {
+                    this.product = null; // Resetea si hay múltiples resultados
                 }
-            } catch (err) {
-                console.error(err);
+            } catch (error) {
+                console.error('Error al buscar productos:', error);
+                alert('Hubo un problema al buscar el producto. Inténtalo de nuevo.');
+                this.suggestions = [];
+                this.product = null;
             }
         },
         async updateProduct() {
-            if (!this.product || !this.product.sku) return;
+            if (!this.product || !this.product.sku) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Producto inválido. Asegúrate de seleccionar un producto válido.',
+                });
+                return;
+            }
+
             try {
-                await axios.put(`/api/editar-producto/${this.product.sku}/`, {
+                const response = await axios.put(`/api/editar-producto/${this.product.sku}/`, {
                     name: this.product.name,
                     prefixed: this.product.prefixed,
                     brands: this.product.brands,
@@ -157,65 +153,74 @@ new Vue({
                     peso: this.product.peso,
                 });
 
-                await axios.post(`/api/actualizar_nombre_bsale/`, {
-                    sku: this.product.sku,
-                    nombre: this.product.name
+                if (response.data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Éxito',
+                        text: 'Producto actualizado correctamente.',
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Advertencia',
+                        text: `Error al actualizar el producto: ${response.data.message}`,
+                    });
+                }
+            } catch (error) {
+                console.error('Error al actualizar el producto:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Hubo un problema al actualizar el producto. Inténtalo de nuevo.',
                 });
-
-                Swal.fire('Actualizado', 'Producto actualizado correctamente', 'success');
-            } catch (err) {
-                console.error(err);
-                Swal.fire('Error', 'No se pudo actualizar el producto', 'error');
             }
         },
-        async obtenerDatosProducto(producto) {
-            const formData = new FormData();
-            formData.append("sku", producto.sku);
-            formData.append("price_list_id", 3);
-            try {
-                const res = await axios.post("/api/obtener_datos_producto/", formData);
-                this.product.precioBase = res.data.bsalePrice || 0;
-                this.product.cost = res.data.lastCost || 0;
-            } catch (err) {
-                console.error(err);
-            }
-        },
-        abrirModal(producto) {
-            this.nuevoPrecio = producto.precioBase;
-            this.calcularMargen();
-            $('#modalPrecios').modal('show');
-        },
-        async actualizarPrecioBase() {
-            if (!this.nuevoPrecio || !this.product) return;
-            const data = {
-                iderp: this.product.iderp,
-                sku: this.product.sku,
-                type: 3,
-                bPrice: this.nuevoPrecio
-            };
-            try {
-                await axios.post('/api/actualizar_precio/', data);
-                Swal.fire('Actualizado', 'Precio base actualizado correctamente', 'success');
-                $('#modalPrecios').modal('hide');
-                this.product.precioBase = this.nuevoPrecio;
-            } catch (err) {
-                console.error(err);
-                Swal.fire('Error', 'No se pudo actualizar el precio', 'error');
-            }
-        },
-        calcularMargen() {
-            if (!this.product || !this.nuevoPrecio || !this.product.cost) {
-                this.margen = 0;
+        async updateProduct() {
+            if (!this.product || !this.product.sku) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Producto inválido. Asegúrate de seleccionar un producto válido.',
+                });
                 return;
             }
-            const neto = this.nuevoPrecio / 1.19;
-            const margenCalculado = ((neto - this.product.cost) / neto) * 100;
-            this.margen = margenCalculado.toFixed(2);
-        },
-        formatCurrency(value) {
-            if (!value || isNaN(value)) return "$0";
-            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
-        },
+
+            try {
+                const response = await axios.put(`/api/editar-producto/${this.product.sku}/`, {
+                    name: this.product.name,
+                    prefixed: this.product.prefixed,
+                    brands: this.product.brands,
+                    iderp: this.product.iderp,
+                    alto: this.product.alto,
+                    largo: this.product.largo,
+                    profundidad: this.product.profundidad,
+                    peso: this.product.peso,
+                    precio: this.product.precio  // 👈 nuevo campo
+                });
+
+                if (response.data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Éxito',
+                        text: 'Producto actualizado correctamente.',
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Advertencia',
+                        text: `Error al actualizar el producto: ${response.data.message}`,
+                    });
+                }
+            } catch (error) {
+                console.error('Error al actualizar el producto:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Hubo un problema al actualizar el producto. Inténtalo de nuevo.',
+                });
+            }
+        }
+
     }
 });
 </script>
