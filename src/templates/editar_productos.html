@@ -61,6 +61,10 @@
                         <label>Peso</label>
                         <input type="number" v-model="product.peso" class="form-control">
                     </div>
+                    <div class="form-group">
+                        <label>Costo</label>
+                        <input type="number" v-model="product.cost" class="form-control">
+                    </div>
                     <button type="submit" class="btn btn-success mt-3">Guardar Cambios</button>
                     <button type="button" class="btn btn-info mt-3 ml-2" @click="abrirModal(product)">Listas de Precio</button>
                 </form>
@@ -78,10 +82,10 @@
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div class="modal-body">
-                    <p><strong>SKU:</strong> [[ product?.sku ]]</p>
-                    <p><strong>Nombre:</strong> [[ product?.name ]]</p>
-                    <p><strong>Precio Bsale Actual:</strong> [[ formatCurrency(product?.precioBase) ]]</p>
+                <div class="modal-body" v-if="product">
+                    <p><strong>SKU:</strong> [[ product.sku ]]</p>
+                    <p><strong>Nombre:</strong> [[ product.name ]]</p>
+                    <p><strong>Precio Bsale Actual:</strong> [[ formatCurrency(product.precioBase) ]]</p>
 
                     <div class="form-group">
                         <label>Nuevo Precio Base</label>
@@ -122,7 +126,7 @@ new Vue({
         margen: 0
     },
     mounted() {
-        this.$refs.searchInput?.focus();
+        if (this.$refs.searchInput) this.$refs.searchInput.focus();
     },
     methods: {
         async fetchProducts(page = 1) {
