@@ -113,7 +113,7 @@ new Vue({
         nuevoPrecio: null,
     },
     mounted() {
-        this.$refs.searchInput.focus();
+        this.$refs.searchInput?.focus();
     },
     methods: {
         async fetchProducts(page = 1) {
@@ -133,7 +133,7 @@ new Vue({
         async updateProduct() {
             if (!this.product || !this.product.sku) return;
             try {
-                const response = await axios.put(`/api/editar-producto/${this.product.sku}/`, {
+                await axios.put(`/api/editar-producto/${this.product.sku}/`, {
                     name: this.product.name,
                     prefixed: this.product.prefixed,
                     brands: this.product.brands,
@@ -143,6 +143,12 @@ new Vue({
                     profundidad: this.product.profundidad,
                     peso: this.product.peso,
                 });
+
+                await axios.post(`/api/actualizar_nombre_bsale/`, {
+                    sku: this.product.sku,
+                    nombre: this.product.name
+                });
+
                 Swal.fire('Actualizado', 'Producto actualizado correctamente', 'success');
             } catch (err) {
                 console.error(err);
