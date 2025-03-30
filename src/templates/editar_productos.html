@@ -7,7 +7,6 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5>Gestión de Productos Ingresar SKU</h5>
-                <!-- Buscador -->
                 <input 
                     type="text" 
                     class="form-control" 
@@ -23,8 +22,6 @@
                 </datalist>
             </div>
             <hr>
-            
-            <!-- Formulario para editar el producto -->
             <div v-if="product">
                 <h5>Editar Producto</h5>
                 <form @submit.prevent="updateProduct">
@@ -71,10 +68,53 @@
                     <hr>
                     <div v-if="product.bsalePrice">
                         <p><strong>Precio Base Bsale:</strong> [[ formatCurrency(product.bsalePrice) ]]</p>
-                        <button class="btn btn-info" @click="abrirModalListas()">Editar Precios Marketplaces</button>
+                        <button class="btn btn-info" @click="abrirModalListas">Editar Precios Marketplaces</button>
                     </div>
                     <button type="submit" class="btn btn-success mt-3">Guardar Cambios</button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Precios -->
+    <div class="modal fade" id="modalPrecios" tabindex="-1" role="dialog" aria-labelledby="modalPreciosLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Precios para [[ product.sku ]] - [[ product.name ]]</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-4" v-for="(precio, index) in listasPrecios" :key="index">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6>[[ precio.label ]]</h6>
+                                    <div class="form-group">
+                                        <label>Precio</label>
+                                        <input type="number" class="form-control" v-model.number="precio.valor">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Fee</label>
+                                        <input type="number" class="form-control" v-model.number="precio.fee">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Margen</label>
+                                        <input type="number" class="form-control" v-model.number="precio.n">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Despacho</label>
+                                        <input type="number" class="form-control" v-model.number="precio.despacho">
+                                    </div>
+                                    <button class="btn btn-primary mt-2 w-100" @click="actualizarListaPrecio(precio.id, precio.valor)">Guardar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -84,143 +124,68 @@
 {% block js %}
 <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 new Vue({
     el: '#app',
     delimiters: ['[[', ']]'],
     data: {
-        searchQuery: '', // Almacena el término de búsqueda
-        suggestions: [], // Lista de productos para el autocompletar
-        product: null,   // Producto seleccionado para editar
-        listasPrecios: [],
-        skuSeleccionado: null,
-        nombreSeleccionado: null,
-        precioSeleccionado: null,
-        detalleSeleccionado: null,
-    },
-    mounted() {
-        this.$refs.searchInput.focus(); // Cargar las bodegas al iniciar la aplicación
+        searchQuery: '',
+        suggestions: [],
+        product: null,
+        listasPrecios: [
+            { label: 'MercadoLibre', id: 10, fee: 1.25, n: 1.35, despacho: 4990, valor: null },
+            { label: 'Paris', id: 12, fee: 1.25, n: 1.35, despacho: 0, valor: null },
+            { label: 'Falabella', id: 11, fee: 1.25, n: 1.35, despacho: 0, valor: null }
+        ]
     },
     methods: {
         async fetchProducts(page = 1) {
-            this.searchQuery = this.searchQuery.trim(); // Limpia la entrada
-
-            if (!this.searchQuery) {
-                alert('Por favor, ingrese un SKU válido.');
-                this.suggestions = [];
-                this.product = null;
-                return;
-            }
-
+            this.searchQuery = this.searchQuery.trim();
+            if (!this.searchQuery) return;
             try {
                 const response = await axios.get(`/api/buscar-productos/?q=${this.searchQuery}&page=${page}`);
                 this.suggestions = response.data.products;
-
                 if (response.data.products.length === 1) {
-                    this.product = response.data.products[0]; // Selecciona el producto automáticamente
-                } else if (response.data.products.length === 0) {
-                    alert('No se encontraron productos con el SKU ingresado.');
-                    this.product = null;
-                } else {
-                    this.product = null; // Resetea si hay múltiples resultados
+                    this.product = response.data.products[0];
                 }
             } catch (error) {
-                console.error('Error al buscar productos:', error);
-                alert('Hubo un problema al buscar el producto. Inténtalo de nuevo.');
-                this.suggestions = [];
-                this.product = null;
+                console.error(error);
             }
         },
         async updateProduct() {
-            if (!this.product || !this.product.sku) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Producto inválido. Asegúrate de seleccionar un producto válido.',
-                });
-                return;
-            }
-
+            if (!this.product || !this.product.sku) return;
             try {
-                const response = await axios.put(`/api/editar-producto/${this.product.sku}/`, {
-                    name: this.product.name,
-                    prefixed: this.product.prefixed,
-                    brands: this.product.brands,
-                    iderp: this.product.iderp,
-                    alto: this.product.alto,
-                    largo: this.product.largo,
-                    profundidad: this.product.profundidad,
-                    peso: this.product.peso,
-                });
-
+                const response = await axios.put(`/api/editar-producto/${this.product.sku}/`, this.product);
                 if (response.data.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Éxito',
-                        text: 'Producto actualizado correctamente.',
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Advertencia',
-                        text: `Error al actualizar el producto: ${response.data.message}`,
-                    });
+                    Swal.fire('Éxito', 'Producto actualizado correctamente', 'success');
                 }
             } catch (error) {
-                console.error('Error al actualizar el producto:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Hubo un problema al actualizar el producto. Inténtalo de nuevo.',
-                });
+                console.error(error);
+                Swal.fire('Error', 'No se pudo actualizar el producto', 'error');
             }
         },
-        async updateProduct() {
-            if (!this.product || !this.product.sku) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Producto inválido. Asegúrate de seleccionar un producto válido.',
-                });
-                return;
-            }
-
-            try {
-                const response = await axios.put(`/api/editar-producto/${this.product.sku}/`, {
-                    name: this.product.name,
-                    prefixed: this.product.prefixed,
-                    brands: this.product.brands,
-                    iderp: this.product.iderp,
-                    alto: this.product.alto,
-                    largo: this.product.largo,
-                    profundidad: this.product.profundidad,
-                    peso: this.product.peso,
-                    precio: this.product.precio  // 👈 nuevo campo
-                });
-
-                if (response.data.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Éxito',
-                        text: 'Producto actualizado correctamente.',
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Advertencia',
-                        text: `Error al actualizar el producto: ${response.data.message}`,
-                    });
-                }
-            } catch (error) {
-                console.error('Error al actualizar el producto:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Hubo un problema al actualizar el producto. Inténtalo de nuevo.',
-                });
-            }
+        abrirModalListas() {
+            $('#modalPrecios').modal('show');
+        },
+        actualizarListaPrecio(type, bPrice) {
+            if (!this.product.sku || !bPrice) return;
+            const data = {
+                sku: this.product.sku,
+                type: type,
+                bPrice: bPrice
+            };
+            axios.post('/api/actualizar_precio/', data)
+                .then(() => Swal.fire('Actualizado', 'Precio actualizado correctamente', 'success'))
+                .catch(() => Swal.fire('Error', 'No se pudo actualizar el precio', 'error'));
+        },
+        formatCurrency(value) {
+            if (!value || isNaN(value)) return '0';
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
         }
-
+    },
+    mounted() {
+        this.$refs.searchInput.focus();
     }
 });
 </script>
