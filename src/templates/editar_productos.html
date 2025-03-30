@@ -73,19 +73,27 @@
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Actualizar Precio Base Bsale</h5>
+                    <h5 class="modal-title">Actualizar Precio Base y Margen</h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p v-if="product"><strong>SKU:</strong> [[ product.sku ]]</p>
-                    <p v-if="product"><strong>Nombre:</strong> [[ product.name ]]</p>
-                    <p v-if="product"><strong>Precio Bsale Actual:</strong> [[ formatCurrency(product.precioBase) ]]</p>
+                    <p><strong>SKU:</strong> [[ product?.sku ]]</p>
+                    <p><strong>Nombre:</strong> [[ product?.name ]]</p>
+                    <p><strong>Precio Bsale Actual:</strong> [[ formatCurrency(product?.precioBase) ]]</p>
 
                     <div class="form-group">
                         <label>Nuevo Precio Base</label>
-                        <input type="number" class="form-control" v-model="nuevoPrecio">
+                        <input type="number" class="form-control" v-model="nuevoPrecio" @input="calcularMargen">
+                    </div>
+                    <div class="form-group">
+                        <label>Costo</label>
+                        <input type="number" class="form-control" v-model="product.cost" @input="calcularMargen">
+                    </div>
+                    <div class="form-group">
+                        <label>Margen Estimado</label>
+                        <p><strong>[[ margen ]]%</strong></p>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -111,6 +119,7 @@ new Vue({
         suggestions: [],
         product: null,
         nuevoPrecio: null,
+        margen: 0
     },
     mounted() {
         this.$refs.searchInput?.focus();
@@ -162,12 +171,14 @@ new Vue({
             try {
                 const res = await axios.post("/api/obtener_datos_producto/", formData);
                 this.product.precioBase = res.data.bsalePrice || 0;
+                this.product.cost = res.data.lastCost || 0;
             } catch (err) {
                 console.error(err);
             }
         },
         abrirModal(producto) {
             this.nuevoPrecio = producto.precioBase;
+            this.calcularMargen();
             $('#modalPrecios').modal('show');
         },
         async actualizarPrecioBase() {
@@ -187,6 +198,15 @@ new Vue({
                 console.error(err);
                 Swal.fire('Error', 'No se pudo actualizar el precio', 'error');
             }
+        },
+        calcularMargen() {
+            if (!this.product || !this.nuevoPrecio || !this.product.cost) {
+                this.margen = 0;
+                return;
+            }
+            const neto = this.nuevoPrecio / 1.19;
+            const margenCalculado = ((neto - this.product.cost) / neto) * 100;
+            this.margen = margenCalculado.toFixed(2);
         },
         formatCurrency(value) {
             if (!value || isNaN(value)) return "$0";
