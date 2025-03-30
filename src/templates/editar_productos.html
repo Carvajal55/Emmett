@@ -81,7 +81,7 @@
         <div class="modal-dialog modal-xl" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Editar Precios para [[ product.sku ]] - [[ product.name ]]</h5>
+                    <h5 class="modal-title" v-if="product">Editar Precios para [[ product.sku ]] - [[ product.name ]]</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -185,7 +185,11 @@ new Vue({
         }
     },
     mounted() {
-        this.$refs.searchInput.focus();
+        this.$nextTick(() => {
+            if (this.$refs.searchInput) {
+                this.$refs.searchInput.focus();
+            }
+        });
     }
 });
 </script>
