@@ -79,9 +79,9 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p><strong>SKU:</strong> [[ product.sku ]]</p>
-                    <p><strong>Nombre:</strong> [[ product.name ]]</p>
-                    <p><strong>Precio Bsale Actual:</strong> [[ formatCurrency(product.precioBase) ]]</p>
+                    <p v-if="product"><strong>SKU:</strong> [[ product.sku ]]</p>
+                    <p v-if="product"><strong>Nombre:</strong> [[ product.name ]]</p>
+                    <p v-if="product"><strong>Precio Bsale Actual:</strong> [[ formatCurrency(product.precioBase) ]]</p>
 
                     <div class="form-group">
                         <label>Nuevo Precio Base</label>
