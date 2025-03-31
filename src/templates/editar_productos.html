@@ -145,7 +145,6 @@ new Vue({
                 this.suggestions = response.data.products;
                 if (response.data.products.length === 1) {
                     this.product = response.data.products[0];
-                    this.obtenerListasPrecios();
                 }
             } catch (error) {
                 console.error(error);
@@ -164,6 +163,30 @@ new Vue({
             }
         },
         abrirModalListas() {
+            this.listasPrecios = [
+                { label: 'MercadoLibre', id: 10, fee: 1.25, iva: 1.19, n: 1.35, despacho: 4990 },
+                { label: 'Paris', id: 12, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0 },
+                { label: 'Ripley', id: 13, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0 },
+                { label: 'Walmart', id: 14, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0 },
+                { label: 'Falabella', id: 11, fee: 1.25, iva: 1.19, n: 1.35, despacho: 0 },
+                { label: 'Groben', id: 20, fee: 1.031, iva: 1.19, n: 1, despacho: 0 },
+                { label: 'Mayorista', id: 21, fee: 1, iva: 1.19, n: 1.35, despacho: 0 }
+            ];
+
+            this.listasPrecios.forEach(precio => {
+                axios.post('/api/obtener_valor_actual/', {
+                    sku: this.product.sku,
+                    price_list_id: precio.id
+                }).then(response => {
+                    const valorRecibido = response.data.valor_actual;
+                    precio.valorActual = valorRecibido ? Math.floor(valorRecibido * 1.19) : 0;
+                    this.recalcularMargen(precio);
+                }).catch(error => {
+                    console.error(`Error al obtener precio para ${precio.label}:`, error);
+                    precio.valorActual = 0;
+                });
+            });
+
             $('#modalPrecios').modal('show');
         },
         actualizarListaPrecio(type, bPrice) {
@@ -176,18 +199,6 @@ new Vue({
             axios.post('/api/actualizar_precio/', data)
                 .then(() => Swal.fire('Actualizado', 'Precio actualizado correctamente', 'success'))
                 .catch(() => Swal.fire('Error', 'No se pudo actualizar el precio', 'error'));
-        },
-        async obtenerListasPrecios() {
-            try {
-                const response = await axios.post('/api/listas-precio-producto/', {
-                    sku: this.product.sku
-                });
-                this.listasPrecios = response.data;
-                this.listasPrecios.forEach(precio => this.recalcularMargen(precio));
-                this.product.bsalePrice = this.listasPrecios.find(p => p.id === 3)?.valor || 0;
-            } catch (error) {
-                console.error('Error al obtener precios desde Bsale:', error);
-            }
         },
         recalcularMargen(precio) {
             const costo = parseFloat(this.product.precio || 0);
