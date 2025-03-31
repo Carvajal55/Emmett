@@ -217,6 +217,7 @@ new Vue({
         },
         actualizarListaPrecio(type, bPrice) {
             if (!this.product.sku || !bPrice) return;
+            console.log(this.product)
             const data = {
                 sku: this.product.sku,
                 type: type,
