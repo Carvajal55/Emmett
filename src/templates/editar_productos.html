@@ -41,23 +41,23 @@
                         <label>Marca</label>
                         <input type="text" v-model="product.brands" class="form-control">
                     </div>
-                    <div class="form-group">
+                    <div class="d-none form-group">
                         <label>ID ERP</label>
                         <input type="text" v-model="product.iderp" class="form-control">
                     </div>
-                    <div class="form-group">
+                    <div class="d-none form-group">
                         <label>Alto</label>
                         <input type="number" v-model="product.alto" class="form-control">
                     </div>
-                    <div class="form-group">
+                    <div class="d-none form-group">
                         <label>Largo</label>
                         <input type="number" v-model="product.largo" class="form-control">
                     </div>
-                    <div class="form-group">
+                    <div class="d-none form-group">
                         <label>Profundidad</label>
                         <input type="number" v-model="product.profundidad" class="form-control">
                     </div>
-                    <div class="form-group">
+                    <div class="d-none form-group">
                         <label>Peso</label>
                         <input type="number" v-model="product.peso" class="form-control">
                     </div>
@@ -66,7 +66,6 @@
                         <input type="number" v-model="product.precio" class="form-control">
                     </div>
                     <hr>
-                    <p><strong>Precio Base Bsale:</strong> [[ formatCurrency(product.bsalePrice) ]]</p>
                     <button class="btn btn-info" type="button" @click="abrirModalListas">Editar Precios Marketplaces</button>
                     <button type="submit" class="btn btn-success mt-3" @click="actualizarListaPrecio(3, product.precio)" >Guardar Cambios</button>
                 </form>
