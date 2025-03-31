@@ -66,10 +66,8 @@
                         <input type="number" v-model="product.precio" class="form-control">
                     </div>
                     <hr>
-                    <div >
-                        <p><strong>Precio Base Bsale:</strong> [[ formatCurrency(product.bsalePrice) ]]</p>
-                        <button class="btn btn-info" type="button" @click="abrirModalListas">Editar Precios Marketplaces</button>
-                    </div>
+                    <p><strong>Precio Base Bsale:</strong> [[ formatCurrency(product.bsalePrice) ]]</p>
+                    <button class="btn btn-info" type="button" @click="abrirModalListas">Editar Precios Marketplaces</button>
                     <button type="submit" class="btn btn-success mt-3">Guardar Cambios</button>
                 </form>
             </div>
@@ -135,11 +133,7 @@ new Vue({
         searchQuery: '',
         suggestions: [],
         product: null,
-        listasPrecios: [
-            { label: 'MercadoLibre', id: 10, fee: 1.25, n: 1.35, despacho: 4990, valor: null, margen: 0, valorSugerido: 0 },
-            { label: 'Paris', id: 12, fee: 1.25, n: 1.35, despacho: 0, valor: null, margen: 0, valorSugerido: 0 },
-            { label: 'Falabella', id: 11, fee: 1.25, n: 1.35, despacho: 0, valor: null, margen: 0, valorSugerido: 0 }
-        ]
+        listasPrecios: []
     },
     methods: {
         async fetchProducts(page = 1) {
@@ -150,7 +144,7 @@ new Vue({
                 this.suggestions = response.data.products;
                 if (response.data.products.length === 1) {
                     this.product = response.data.products[0];
-                    this.recalcularTodos();
+                    this.obtenerListasPrecios();
                 }
             } catch (error) {
                 console.error(error);
@@ -170,7 +164,6 @@ new Vue({
         },
         abrirModalListas() {
             $('#modalPrecios').modal('show');
-            this.recalcularTodos();
         },
         actualizarListaPrecio(type, bPrice) {
             if (!this.product.sku || !bPrice) return;
@@ -182,6 +175,18 @@ new Vue({
             axios.post('/api/actualizar_precio/', data)
                 .then(() => Swal.fire('Actualizado', 'Precio actualizado correctamente', 'success'))
                 .catch(() => Swal.fire('Error', 'No se pudo actualizar el precio', 'error'));
+        },
+        async obtenerListasPrecios() {
+            try {
+                const response = await axios.post('/api/listas-precio-producto/', {
+                    sku: this.product.sku
+                });
+                this.listasPrecios = response.data;
+                this.listasPrecios.forEach(p => this.recalcularMargen(p));
+                this.product.bsalePrice = this.listasPrecios.find(p => p.id === 3)?.valor || 0;
+            } catch (error) {
+                console.error('Error al obtener precios desde Bsale:', error);
+            }
         },
         recalcularMargen(precio) {
             const costo = parseFloat(this.product.precio || 0);
@@ -200,13 +205,9 @@ new Vue({
                 precio.margen = 0;
             }
 
-            // Calcular sugerido
             const margenDeseado = (100 - (100 / n)) / 100;
             const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
             precio.valorSugerido = valorSugerido;
-        },
-        recalcularTodos() {
-            this.listasPrecios.forEach(p => this.recalcularMargen(p));
         },
         formatCurrency(value) {
             if (!value || isNaN(value)) return '0';
