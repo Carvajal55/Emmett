@@ -88,6 +88,7 @@
                             <div class="card mb-3">
                                 <div class="card-body">
                                     <h6>[[ precio.label ]]</h6>
+                                    <p><strong>Precio actual:</strong> [[ formatCurrency(precio.valorActual) ]]</p>
                                     <div class="form-group">
                                         <label>Precio</label>
                                         <input type="number" class="form-control" v-model.number="precio.valor" @input="recalcularMargen(precio)">
@@ -182,7 +183,7 @@ new Vue({
                     sku: this.product.sku
                 });
                 this.listasPrecios = response.data;
-                this.listasPrecios.forEach(p => this.recalcularMargen(p));
+                this.listasPrecios.forEach(precio => this.recalcularMargen(precio));
                 this.product.bsalePrice = this.listasPrecios.find(p => p.id === 3)?.valor || 0;
             } catch (error) {
                 console.error('Error al obtener precios desde Bsale:', error);
