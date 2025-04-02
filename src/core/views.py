@@ -6671,7 +6671,7 @@ def get_bsale_pdf(request):
 
     try:
         headers = {
-            "Authorization": f"Bearer {token}",
+            "access_token": f"Bearer {token}",
             "Accept": "application/json"
         }
 
