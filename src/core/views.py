@@ -6668,7 +6668,7 @@ def get_bsale_pdf(request):
     code_sii = request.GET.get('codeSii')
     number = request.GET.get('number')
 
-    print(f"➡️ codeSii: {code_sii}, number: {number}")  # 👈 imprime los parámetros recibidos
+    print(f"➡️ codeSii: {code_sii}, number: {number}")
 
     try:
         headers = {
@@ -6685,17 +6685,11 @@ def get_bsale_pdf(request):
 
         data = res.json()
 
-        if data and isinstance(data, list) and len(data) > 0:
-            doc_id = data[0]["id"]
-            print(f"✅ Documento encontrado. ID: {doc_id}")
-
-            url_detalle = f"https://api.bsale.io/v1/third_party_documents/{doc_id}.json"
-            res2 = requests.get(url_detalle, headers=headers)
-            print(f"📥 Status code 2: {res2.status_code}")
-            print(f"📄 Response 2: {res2.text}")
-
-            doc = res2.json()
-            return JsonResponse({"urlPdf": doc.get("urlPdf")})
+        if data and data.get("count", 0) > 0:
+            documento = data["items"][0]
+            url_pdf = documento.get("urlPdf")
+            print(f"✅ URL PDF: {url_pdf}")
+            return JsonResponse({"urlPdf": url_pdf})
         else:
             print("❌ No se encontró el documento.")
             return JsonResponse({"error": "Documento no encontrado"}, status=404)
@@ -6705,4 +6699,5 @@ def get_bsale_pdf(request):
         print("🔥 ERROR DETECTADO:")
         traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=500)
+
 
