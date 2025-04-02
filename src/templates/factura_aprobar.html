@@ -31,7 +31,12 @@
                 <p><strong>Fecha Pago Documento:</strong> [[ factura.headers.dateExpired || 'N/A' ]]</p>
                 <p><strong>Ingresado Por:</strong> [[ factura.headers.userProcess ]]</p>
                 <p><strong>Estado Resumen:</strong> OK</p>
-                <p><strong>PDF:</strong> <a :href="`/media/${factura.headers.urlImg}`" target="_blank">Ver PDF</a></p>
+                <p><strong>PDF:</strong> 
+                    <a :href="pdfUrl" target="_blank" v-if="pdfUrl">Ver PDF</a>
+                    <button @click="cargarPdf(factura.headers.typeDocument, factura.headers.nDocument)" v-else>
+                      Cargar PDF
+                    </button>
+                  </p>
                 
             
 
@@ -342,8 +347,10 @@
             nombreSeleccionado: null,
             stockProductos: {},
             precioGlobal: null,
+            pdfUrl: null,
         },
         computed: {
+            
             mostrarActualizarTodos() {
                 // Filtrar las listas que están visibles
                 const listasVisibles = this.listasPrecios.filter(precio => precio.mostrar);
@@ -383,6 +390,21 @@
             
         },
         methods: {
+            async cargarPdf(codeSii, number) {
+                try {
+                    const response = await fetch(`/api/get-bsale-pdf?codeSii=${codeSii}&number=${number}`);
+                    const data = await response.json();
+
+                    if (data && data.urlPdf) {
+                    this.pdfUrl = data.urlPdf;
+                    } else {
+                    alert('No se encontró el PDF del documento.');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error al buscar el PDF.');
+                }
+            },
             calcularPorcentaje(valor) {
                 if (valor && valor > 0) {
                     return ((valor - 1) * 100).toFixed(2);

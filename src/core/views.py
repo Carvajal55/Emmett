@@ -6661,3 +6661,36 @@ def editar_producto(request, sku):
         return JsonResponse({'success': False, 'message': 'Error al procesar la solicitud'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)
+
+#Obtener pdf 
+@csrf_exempt
+def get_bsale_pdf(request):
+    code_sii = request.GET.get('codeSii')
+    number = request.GET.get('number')
+    token = BSALE_API_TOKEN
+
+    try:
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json"
+        }
+
+        # Paso 1: Buscar el documento por codeSii y number
+        url_busqueda = f"https://api.bsale.io/v1/third_party_documents.json?codeSii={code_sii}&number={number}"
+        res = requests.get(url_busqueda, headers=headers)
+        data = res.json()
+
+        if data and len(data) > 0:
+            doc_id = data[0]["id"]
+
+            # Paso 2: Obtener detalles del documento
+            url_detalle = f"https://api.bsale.io/v1/third_party_documents/{doc_id}.json"
+            res2 = requests.get(url_detalle, headers=headers)
+            doc = res2.json()
+
+            return JsonResponse({"urlPdf": doc.get("urlPdf")})
+        else:
+            return JsonResponse({"error": "Documento no encontrado"}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
