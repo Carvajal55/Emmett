@@ -32,9 +32,8 @@
                 <p><strong>Ingresado Por:</strong> [[ factura.headers.userProcess ]]</p>
                 <p><strong>Estado Resumen:</strong> OK</p>
                 <p><strong>PDF:</strong> 
-                    <a :href="pdfUrl" target="_blank" v-if="pdfUrl">Ver PDF</a>
-                    <button @click="cargarPdf(factura.headers.typeDocument, factura.headers.nDocument)" v-else>
-                      Cargar PDF
+                    <button @click="abrirPdf(factura.headers.typeDocument, factura.headers.nDocument)">
+                      Ver PDF
                     </button>
                   </p>
                 
@@ -390,19 +389,20 @@
             
         },
         methods: {
-            async cargarPdf(codeSii, number) {
+            async abrirPdf(codeSii, number) {
                 try {
-                    const response = await fetch(`/api/get-bsale-pdf?codeSii=${codeSii}&number=${number}`);
-                    const data = await response.json();
+                const response = await fetch(`/api/get-bsale-pdf/?codeSii=${codeSii}&number=${number}`);
+                const data = await response.json();
 
-                    if (data && data.urlPdf) {
-                    this.pdfUrl = data.urlPdf;
-                    } else {
-                    alert('No se encontró el PDF del documento.');
-                    }
+                if (data.urlPdf) {
+                    // Abrir el PDF en una nueva pestaña
+                    window.open(data.urlPdf, '_blank');
+                } else {
+                    alert('No se encontró el PDF para esta factura.');
+                }
                 } catch (error) {
-                    console.error('Error:', error);
-                    alert('Error al buscar el PDF.');
+                console.error('Error al cargar el PDF:', error);
+                alert('Error al intentar obtener el PDF.');
                 }
             },
             calcularPorcentaje(valor) {
