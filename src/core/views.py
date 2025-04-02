@@ -6667,30 +6667,42 @@ def editar_producto(request, sku):
 def get_bsale_pdf(request):
     code_sii = request.GET.get('codeSii')
     number = request.GET.get('number')
-    token = BSALE_API_TOKEN
+
+    print(f"➡️ codeSii: {code_sii}, number: {number}")  # 👈 imprime los parámetros recibidos
 
     try:
         headers = {
-            "access_token": f"Bearer {token}",
+            "access_token": BSALE_API_TOKEN,
             "Accept": "application/json"
         }
 
-        # Paso 1: Buscar el documento por codeSii y number
         url_busqueda = f"https://api.bsale.io/v1/third_party_documents.json?codeSii={code_sii}&number={number}"
+        print(f"📡 Consultando Bsale: {url_busqueda}")
+
         res = requests.get(url_busqueda, headers=headers)
+        print(f"📥 Status code 1: {res.status_code}")
+        print(f"📄 Response 1: {res.text}")
+
         data = res.json()
 
-        if data and len(data) > 0:
+        if data and isinstance(data, list) and len(data) > 0:
             doc_id = data[0]["id"]
+            print(f"✅ Documento encontrado. ID: {doc_id}")
 
-            # Paso 2: Obtener detalles del documento
             url_detalle = f"https://api.bsale.io/v1/third_party_documents/{doc_id}.json"
             res2 = requests.get(url_detalle, headers=headers)
-            doc = res2.json()
+            print(f"📥 Status code 2: {res2.status_code}")
+            print(f"📄 Response 2: {res2.text}")
 
+            doc = res2.json()
             return JsonResponse({"urlPdf": doc.get("urlPdf")})
         else:
+            print("❌ No se encontró el documento.")
             return JsonResponse({"error": "Documento no encontrado"}, status=404)
 
     except Exception as e:
+        import traceback
+        print("🔥 ERROR DETECTADO:")
+        traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=500)
+
