@@ -32,9 +32,9 @@
                 <p><strong>Ingresado Por:</strong> [[ factura.headers.userProcess ]]</p>
                 <p><strong>Estado Resumen:</strong> OK</p>
                 <p><strong>PDF:</strong> 
-                    <button @click="abrirPdf(factura.headers.typeDocument, factura.headers.nDocument)">
+                    <a href="#" @click.prevent="abrirPdf(factura.headers.typeDocument, factura.headers.nDocument)">
                       Ver PDF
-                    </button>
+                    </a>
                   </p>
                 
             
