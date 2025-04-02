@@ -94,7 +94,7 @@ urlpatterns = [
     path('api/actualizar_precio/', core_views.actualizar_precio, name='actualizar_precio'),
     path('api/actualizar_precios_masivo/', core_views.actualizar_precio_masivo, name='actualizar_precio_masivo'),
     path('api/obtener_valor_actual/', core_views.obtener_valor_actual, name='obtener_valor_actual'),
-    path('api/get-bsale-pdf', core_views.get_bsale_pdf, name='get_bsale_pdf'),
+    path('api/get-bsale-pdf/', core_views.get_bsale_pdf, name='get_bsale_pdf'),
 
 
 
