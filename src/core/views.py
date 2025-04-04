@@ -4752,7 +4752,14 @@ def procesar_producto(producto, total_productos, index):
         print(f"❌ Error crítico en Bsale para SKU {sku}")
         return resultado
 
-    stock_local = Uniqueproducts.objects.filter(product=producto, state=0).count()
+    # Bodegas válidas (excluyendo 0, 11 y 12)
+    BODEGAS_VALIDAS = [1, 2, 4, 6, 7, 9, 10]
+
+    stock_local = Uniqueproducts.objects.filter(
+        product=producto,
+        state=0,
+        location__idoffice__in=BODEGAS_VALIDAS
+    ).count()
     diferencia = stock_local - stock_bsale
 
     ajuste_resultado = "No ajuste necesario"
