@@ -4755,10 +4755,14 @@ def procesar_producto(producto, total_productos, index):
     # Bodegas válidas (excluyendo 0, 11 y 12)
     BODEGAS_VALIDAS = [1, 2, 4, 6, 7, 9, 10]
 
+    # Primero obtén los ID de sectores válidos
+    sectores_validos = Sectoroffice.objects.filter(idoffice__in=BODEGAS_VALIDAS).values_list('idSectorOffice', flat=True)
+
+    # Luego usa esos IDs para filtrar los productos
     stock_local = Uniqueproducts.objects.filter(
         product=producto,
         state=0,
-        location__idoffice__in=BODEGAS_VALIDAS
+        location__in=sectores_validos
     ).count()
     diferencia = stock_local - stock_bsale
 
