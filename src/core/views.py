@@ -4924,40 +4924,29 @@ def enviar_correo_resultados(resultados):
 
 def guardar_resultados_en_excel(resultados):
     """
-    Guarda los resultados en un archivo Excel en un hilo separado.
+    Guarda los resultados en un archivo Excel.
     """
     def _guardar_excel():
         try:
+            # Solo usamos la lista `resultados` que ya tiene los valores correctos
             if not resultados:
-                print("⚠️ No hay resultados para guardar en Excel.")
+                print("⚠️ No hay resultados para guardar.")
                 return
 
-            # Asegurarse de que todos los datos sean consistentes
-            resultados_filtrados = [
-                r for r in resultados
-                if r.get("stock_local") is not None and r.get("stock_bsale") is not None
-            ]
+            # Convertir la lista de resultados en un DataFrame
+            df = pd.DataFrame(resultados)
 
-            df = pd.DataFrame(resultados_filtrados)
-
-            # Mostrar para validar
-            print("📊 Primeros resultados que se guardarán en Excel:")
-            print(df[["sku", "stock_local", "stock_bsale", "diferencia"]].head(10))
-
+            # Definir ruta de guardado
             excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
 
-            # ✅ Eliminar archivo anterior si existe
-            if os.path.exists(excel_path):
-                os.remove(excel_path)
-
-            # Guardar
+            # Guardar DataFrame como Excel
             df.to_excel(excel_path, index=False)
-            print(f"📁 Excel guardado correctamente en {excel_path}")
+            print(f"📊 Excel guardado en: {excel_path}")
 
         except Exception as e:
-            print(f"❌ Error al guardar Excel: {str(e)}")
+            print(f"❌ Error al guardar el Excel: {str(e)}")
 
-    # Ejecutar en un hilo separado
+    # Guardar en un hilo separado (opcional)
     excel_thread = Thread(target=_guardar_excel)
     excel_thread.start()
 
