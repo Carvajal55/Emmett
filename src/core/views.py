@@ -4921,69 +4921,71 @@ def enviar_correo_resultados(resultados):
 
     print("✅ Correo enviado con los resultados en formato HTML.")
 
-
 def guardar_resultados_en_excel(resultados):
     """
-    Guarda los resultados en un archivo Excel.
+    Guarda los resultados en un archivo Excel con fecha y hora.
     """
     def _guardar_excel():
         try:
-            # Solo usamos la lista `resultados` que ya tiene los valores correctos
-            if not resultados:
-                print("⚠️ No hay resultados para guardar.")
-                return
+            # Obtener fecha y hora actual
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            filename = f"stock_comparacion_{timestamp}.xlsx"
+            excel_path = os.path.join(settings.MEDIA_ROOT, filename)
 
-            # Convertir la lista de resultados en un DataFrame
+            # Convertir resultados en DataFrame
             df = pd.DataFrame(resultados)
-
-            # Definir ruta de guardado
-            excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
-
-            # Guardar DataFrame como Excel
             df.to_excel(excel_path, index=False)
-            print(f"📊 Excel guardado en: {excel_path}")
 
+            print(f"📊 Informe Excel guardado en: {excel_path}")
         except Exception as e:
-            print(f"❌ Error al guardar el Excel: {str(e)}")
+            print(f"❌ Error al guardar el informe en Excel: {str(e)}")
 
-    # Guardar en un hilo separado (opcional)
+    # Ejecutar en un hilo
     excel_thread = Thread(target=_guardar_excel)
     excel_thread.start()
 
 
 @csrf_exempt
 def ajustar_stock_bsale(request):
-    """Comparar y ajustar stock en Bsale, y enviar resultados por correo."""
+    """Comparar y ajustar stock en Bsale, guardar Excel y enviar resultados por correo."""
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    # 🔥 Reiniciar la lista de resultados
+    # 🧹 Limpiar resultados previos
     resultados.clear()
 
-    # 🔥 Obtener todos los productos (puedes cambiar el límite para pruebas)
-    productos = list(Products.objects.all())  # Ajusta el límite aquí
+    # 🧹 Eliminar archivo temporal de resultados si existe
+    temp_file = os.path.join(settings.MEDIA_ROOT, "temp_stock_resultados.json")
+    if os.path.exists(temp_file):
+        os.remove(temp_file)
+        print("🧹 Archivo temporal anterior eliminado.")
 
-    # 🔄 Procesar cada producto secuencialmente
-    print("🔄 Iniciando procesamiento de productos...")
+    # 🔥 Obtener todos los productos
+    productos = list(Products.objects.all())  # Puedes filtrar aquí si es necesario
+    total = len(productos)
+    print(f"🔄 Iniciando procesamiento de {total} productos...")
 
     for index, producto in enumerate(productos):
-        print(f"🔄 Procesando SKU {producto.sku} ({index + 1}/{len(productos)})")
-        resultado = procesar_producto(producto, len(productos), index)
+        print(f"🔄 Procesando SKU {producto.sku} ({index + 1}/{total})")
+        resultado = procesar_producto(producto, total, index)
         resultados.append(resultado)
 
-    print("✅ Todos los productos han sido procesados.")
+    print(f"✅ Todos los productos han sido procesados. Total: {len(resultados)}")
 
-    # 🔄 Enviar el correo con los resultados
-    print("🔄 Enviando resultados por correo...")
-    enviar_correo_resultados(resultados)
-    print("✅ Resultados enviados por correo.")
+    # 🧾 Mostrar muestra de resultados para verificar
+    print("🔍 Muestra de resultados que se enviarán:")
+    for r in resultados[:3]:  # Puedes aumentar si quieres
+        print(json.dumps(r, indent=2, ensure_ascii=False))
 
+    # 📤 Guardar en Excel
     guardar_resultados_en_excel(resultados)
-    print("✅ Resultados enviados por correo.")
+    print("📊 Resultados guardados en Excel.")
 
+    # 📧 Enviar por correo
+    enviar_correo_resultados(resultados)
+    print("📩 Resultados enviados por correo.")
 
-    # Retornar una respuesta exitosa al frontend
-    return JsonResponse({"message": "El proceso se completó y los resultados fueron enviados por correo."})
+    return JsonResponse({"message": "Proceso completo: stock ajustado, Excel generado y correo enviado."})
 
 REQUEST_TIMEOUT = 5
 #---------------------------------
