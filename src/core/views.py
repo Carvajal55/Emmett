@@ -4910,9 +4910,9 @@ def enviar_correo_resultados(resultados):
         subject,
         '',
         settings.DEFAULT_FROM_EMAIL,
-        ['rcavieres@emmett.cl'],  # Cambia el destinatario si es necesario
+        ['rcavieres@emmett.cl', 'carvajal.emmett@gmail.com'],  # Todos los destinatarios juntos
         fail_silently=False,
-        html_message=mensaje_html  # Se envía como HTML
+        html_message=mensaje_html
     )
 
     print("✅ Correo enviado con los resultados en formato HTML.")
