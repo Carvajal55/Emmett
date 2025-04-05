@@ -4924,20 +4924,36 @@ def guardar_resultados_en_excel(resultados):
     """
     def _guardar_excel():
         try:
-            # Convertir resultados en DataFrame
-            df = pd.DataFrame(resultados)
-            
-            # Ruta para guardar el Excel
-            excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
-            
-            # Guardar DataFrame en Excel
-            df.to_excel(excel_path, index=False)
-            
-            print(f"📊 Informe Excel guardado en: {excel_path}")
-        except Exception as e:
-            print(f"❌ Error al guardar el informe en Excel: {str(e)}")
+            if not resultados:
+                print("⚠️ No hay resultados para guardar en Excel.")
+                return
 
-    # Ejecuta la función en un hilo separado
+            # Asegurarse de que todos los datos sean consistentes
+            resultados_filtrados = [
+                r for r in resultados
+                if r.get("stock_local") is not None and r.get("stock_bsale") is not None
+            ]
+
+            df = pd.DataFrame(resultados_filtrados)
+
+            # Mostrar para validar
+            print("📊 Primeros resultados que se guardarán en Excel:")
+            print(df[["sku", "stock_local", "stock_bsale", "diferencia"]].head(10))
+
+            excel_path = os.path.join(settings.MEDIA_ROOT, "stock_comparacion.xlsx")
+
+            # ✅ Eliminar archivo anterior si existe
+            if os.path.exists(excel_path):
+                os.remove(excel_path)
+
+            # Guardar
+            df.to_excel(excel_path, index=False)
+            print(f"📁 Excel guardado correctamente en {excel_path}")
+
+        except Exception as e:
+            print(f"❌ Error al guardar Excel: {str(e)}")
+
+    # Ejecutar en un hilo separado
     excel_thread = Thread(target=_guardar_excel)
     excel_thread.start()
 
@@ -4968,6 +4984,10 @@ def ajustar_stock_bsale(request):
     print("🔄 Enviando resultados por correo...")
     enviar_correo_resultados(resultados)
     print("✅ Resultados enviados por correo.")
+
+    guardar_resultados_en_excel(resultados)
+    print("✅ Resultados enviados por correo.")
+
 
     # Retornar una respuesta exitosa al frontend
     return JsonResponse({"message": "El proceso se completó y los resultados fueron enviados por correo."})
