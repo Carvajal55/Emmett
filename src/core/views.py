@@ -4756,7 +4756,7 @@ def procesar_producto(producto, total_productos, index):
     BODEGAS_VALIDAS = [1, 2, 4, 6, 7, 9, 10]
 
     # Primero obtén los ID de sectores válidos
-    sectores_validos = Sectoroffice.objects.filter(idoffice__in=BODEGAS_VALIDAS).values_list('idSectorOffice', flat=True)
+    sectores_validos = Sectoroffice.objects.filter(idoffice__in=BODEGAS_VALIDAS).values_list('idsectoroffice', flat=True)
 
     # Luego usa esos IDs para filtrar los productos
     stock_local = Uniqueproducts.objects.filter(
