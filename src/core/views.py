@@ -3980,7 +3980,7 @@ def imprimir_etiqueta_qr(request):
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
     try:
-        # Obtener los datos enviados desde el front-end
+        # Obtener los datos enviados desde el front-end bsale_categoria
         sku = request.POST.get('sku')
         number = request.POST.get('number')
         model = request.POST.get('model')
@@ -3994,7 +3994,7 @@ def imprimir_etiqueta_qr(request):
         producto = Products.objects.filter(sku=sku).first()
         if not producto:
             return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
-
+        
         # Preparar rutas para guardar el PDF
         pdf_filename = f'etiqueta_{sku}.pdf'
         relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
@@ -4062,21 +4062,27 @@ def imprimir_etiqueta_qr(request):
 
                 pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
-                # Detalles
+               # Detalles
                 pdf.setFont("Helvetica-Bold", 10)
-                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{sku}")
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 60, f"{sku}")
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 50, f"{producto.prefixed}") #bsale categoria
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{producto.brands}")#marca
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
 
-                nombre_truncado = textwrap.shorten(producto.nameproduct, width=25, placeholder="...")
+                # Truncado confiable
+                nombre = str(producto.nameproduct).strip()
+                max_len = 30  # ajusta este valor según espacio disponible
+                nombre_truncado = (nombre[:max_len - 3] + "...") if len(nombre) > max_len else nombre
                 pdf.drawString(x_qr, y_qr - 15, f"{nombre_truncado}")
 
+                # Código de barras
                 barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
                 barcode_sku.drawOn(pdf, x_qr - 6 * mm, y_qr - 50)
 
+                # IDs
                 pdf.drawString(x_qr, y_qr - 60, f"{super_id}")
                 pdf.drawString(x_qr + 25 * mm, y_qr - 60, f"{number}")
-
                 # Guardar Uniqueproduct
                 Uniqueproducts.objects.create(
                     product=producto,
@@ -4242,152 +4248,152 @@ def reimprimir_etiqueta_qr(request):
 
 
 
-@csrf_exempt
-def imprimir_etiqueta(request):
-    if request.method == 'POST':
-        # Obtener los datos enviados desde el front-end
-        sku = request.POST.get('sku')
-        model = request.POST.get('model')
-        qty = int(request.POST.get('qty', 1))
-        codebar = request.POST.get('codebar', '')
-        url_json = request.POST.get('urlJson')  # Ruta del archivo JSON
+# @csrf_exempt
+# def imprimir_etiqueta(request):
+#     if request.method == 'POST':
+#         # Obtener los datos enviados desde el front-end
+#         sku = request.POST.get('sku')
+#         model = request.POST.get('model')
+#         qty = int(request.POST.get('qty', 1))
+#         codebar = request.POST.get('codebar', '')
+#         url_json = request.POST.get('urlJson')  # Ruta del archivo JSON
 
-        # Validaciones iniciales
-        if not sku or qty <= 0 or not url_json:
-            return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
+#         # Validaciones iniciales
+#         if not sku or qty <= 0 or not url_json:
+#             return JsonResponse({'error': 'Datos inválidos para generar la etiqueta.'}, status=400)
         
-        # Obtener el producto correspondiente del modelo Products
-        try:
-            producto = Products.objects.get(sku=sku)
-        except Products.DoesNotExist:
-            return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
+#         # Obtener el producto correspondiente del modelo Products
+#         try:
+#             producto = Products.objects.get(sku=sku)
+#         except Products.DoesNotExist:
+#             return JsonResponse({'error': 'Producto no encontrado.'}, status=404)
 
-        # Crear el nombre y la ruta del archivo PDF
-        pdf_filename = f'etiqueta_{sku}.pdf'
-        relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
-        absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
-        os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
+#         # Crear el nombre y la ruta del archivo PDF
+#         pdf_filename = f'etiqueta_{sku}.pdf'
+#         relative_file_path = os.path.join('models', 'etiquetas', pdf_filename)
+#         absolute_file_path = os.path.join(settings.MEDIA_ROOT, relative_file_path)
+#         os.makedirs(os.path.dirname(absolute_file_path), exist_ok=True)
 
-        # Obtener el último correlativo y SuperID para el producto
-        last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
-        current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
-        base_numeric_sku = ''.join(filter(str.isdigit, sku))  # Extraer números del SKU
-        if not base_numeric_sku:
-            return JsonResponse({'error': 'El SKU no contiene números válidos.'}, status=400)
+#         # Obtener el último correlativo y SuperID para el producto
+#         last_unique_product = Uniqueproducts.objects.filter(product=producto).order_by('-correlative').first()
+#         current_correlative = (last_unique_product.correlative if last_unique_product else 0) + 1
+#         base_numeric_sku = ''.join(filter(str.isdigit, sku))  # Extraer números del SKU
+#         if not base_numeric_sku:
+#             return JsonResponse({'error': 'El SKU no contiene números válidos.'}, status=400)
 
-        base_superid = f"{base_numeric_sku}e"
+#         base_superid = f"{base_numeric_sku}e"
 
-        # Crear el PDF con tamaño 10.2 cm x 5 cm
-        page_width, page_height = 102 * mm, 50 * mm
-        pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
+#         # Crear el PDF con tamaño 10.2 cm x 5 cm
+#         page_width, page_height = 102 * mm, 50 * mm
+#         pdf = canvas.Canvas(absolute_file_path, pagesize=(page_width, page_height))
 
-        super_ids = []
-        for i in range(qty):
-            # Generar SuperID
-            super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
-            super_ids.append(super_id)
+#         super_ids = []
+#         for i in range(qty):
+#             # Generar SuperID
+#             super_id = f"{base_superid}{str(current_correlative).zfill(2)}"
+#             super_ids.append(super_id)
 
-            # Parte izquierda de la etiqueta (SKU y código de barras horizontal)
-            x_sku_left, y_sku_left = 5 * mm, 35 * mm
-            barcode_sku_left = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
-            barcode_sku_left.drawOn(pdf, x_sku_left, y_sku_left)
-            pdf.setFont("Helvetica", 6)
-            pdf.drawString(x_sku_left + 20, y_sku_left - 10, f"SKU: {sku}")
+#             # Parte izquierda de la etiqueta (SKU y código de barras horizontal)
+#             x_sku_left, y_sku_left = 5 * mm, 35 * mm
+#             barcode_sku_left = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
+#             barcode_sku_left.drawOn(pdf, x_sku_left, y_sku_left)
+#             pdf.setFont("Helvetica", 6)
+#             pdf.drawString(x_sku_left + 20, y_sku_left - 10, f"SKU: {sku}")
 
-            # SuperID en vertical (rotado)
-            pdf.saveState()
-            pdf.rotate(90)
-            x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -2 * mm
-            barcode_superid_left = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
-            barcode_superid_left.drawOn(pdf, y_superid_rotated_left, -x_superid_rotated_left)
-            pdf.setFont("Helvetica", 6)
-            pdf.drawString(y_superid_rotated_left + 15, -x_superid_rotated_left - 15, f"SuperID: {super_id}")
-            pdf.restoreState()
+#             # SuperID en vertical (rotado)
+#             pdf.saveState()
+#             pdf.rotate(90)
+#             x_superid_rotated_left, y_superid_rotated_left = 10 * mm, -2 * mm
+#             barcode_superid_left = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
+#             barcode_superid_left.drawOn(pdf, y_superid_rotated_left, -x_superid_rotated_left)
+#             pdf.setFont("Helvetica", 6)
+#             pdf.drawString(y_superid_rotated_left + 15, -x_superid_rotated_left - 15, f"SuperID: {super_id}")
+#             pdf.restoreState()
 
-            # Parte derecha de la etiqueta (si se requiere más de un elemento por página)
-            if i % 2 == 1:
-                x_sku_right, y_sku_right = 60 * mm, 35 * mm
-                barcode_sku_right = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
-                barcode_sku_right.drawOn(pdf, x_sku_right, y_sku_right)
-                pdf.setFont("Helvetica", 6)
-                pdf.drawString(x_sku_right + 20, y_sku_right - 10, f"SKU: {sku}")
+#             # Parte derecha de la etiqueta (si se requiere más de un elemento por página)
+#             if i % 2 == 1:
+#                 x_sku_right, y_sku_right = 60 * mm, 35 * mm
+#                 barcode_sku_right = code128.Code128(sku, barWidth=0.3 * mm, barHeight=9 * mm)
+#                 barcode_sku_right.drawOn(pdf, x_sku_right, y_sku_right)
+#                 pdf.setFont("Helvetica", 6)
+#                 pdf.drawString(x_sku_right + 20, y_sku_right - 10, f"SKU: {sku}")
 
-                pdf.saveState()
-                pdf.rotate(90)
-                x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -2 * mm
-                barcode_superid_right = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
-                barcode_superid_right.drawOn(pdf, y_superid_rotated_right, -x_superid_rotated_right)
-                pdf.setFont("Helvetica", 6)
-                pdf.drawString(y_superid_rotated_right + 15, -x_superid_rotated_right - 15, f"SuperID: {super_id}")
-                pdf.restoreState()
+#                 pdf.saveState()
+#                 pdf.rotate(90)
+#                 x_superid_rotated_right, y_superid_rotated_right = 65 * mm, -2 * mm
+#                 barcode_superid_right = code128.Code128(super_id, barWidth=0.4 * mm, barHeight=9 * mm)
+#                 barcode_superid_right.drawOn(pdf, y_superid_rotated_right, -x_superid_rotated_right)
+#                 pdf.setFont("Helvetica", 6)
+#                 pdf.drawString(y_superid_rotated_right + 15, -x_superid_rotated_right - 15, f"SuperID: {super_id}")
+#                 pdf.restoreState()
 
-            # Guardar el nuevo UniqueProduct
-            Uniqueproducts.objects.create(
-                product=producto,
-                superid=super_id,
-                correlative=current_correlative,
-                state=0,
-                cost=producto.lastcost,
-                locationname="Almacen",
-                observation="Etiqueta generada automáticamente",
-                printlabel=os.path.join(settings.MEDIA_URL, relative_file_path)  # Guardar URL en printlabel
-            )
+#             # Guardar el nuevo UniqueProduct
+#             Uniqueproducts.objects.create(
+#                 product=producto,
+#                 superid=super_id,
+#                 correlative=current_correlative,
+#                 state=0,
+#                 cost=producto.lastcost,
+#                 locationname="Almacen",
+#                 observation="Etiqueta generada automáticamente",
+#                 printlabel=os.path.join(settings.MEDIA_URL, relative_file_path)  # Guardar URL en printlabel
+#             )
 
-            # Incrementar el correlativo
-            current_correlative += 1
+#             # Incrementar el correlativo
+#             current_correlative += 1
 
-            # Añadir una nueva página si es necesario
-            if i % 2 == 1 and i < qty - 1:
-                pdf.showPage()
+#             # Añadir una nueva página si es necesario
+#             if i % 2 == 1 and i < qty - 1:
+#                 pdf.showPage()
 
-        pdf.save()
+#         pdf.save()
 
-        # Actualizar el stock en Bsale
-        office_id = 1  # ID de la oficina en Bsale, cámbialo según sea necesario
-        variant_id = producto.iderp  # Supongamos que el ID del producto es el mismo que la variante en Bsale
-        cost = producto.lastcost
-        print(variant_id, office_id, qty,cost,"DATOS PARA BSALE")
-        bsale_response = actualizar_stock_bsale(variant_id, office_id, qty,cost)
+#         # Actualizar el stock en Bsale
+#         office_id = 1  # ID de la oficina en Bsale, cámbialo según sea necesario
+#         variant_id = producto.iderp  # Supongamos que el ID del producto es el mismo que la variante en Bsale
+#         cost = producto.lastcost
+#         print(variant_id, office_id, qty,cost,"DATOS PARA BSALE")
+#         bsale_response = actualizar_stock_bsale(variant_id, office_id, qty,cost)
 
-        if not bsale_response:
-            return JsonResponse({'error': 'Etiqueta creada, pero no se pudo actualizar stock en Bsale.'}, status=500)
+#         if not bsale_response:
+#             return JsonResponse({'error': 'Etiqueta creada, pero no se pudo actualizar stock en Bsale.'}, status=500)
 
 
-        # Modificar el archivo JSON para marcar el producto como impreso
-        try:
-            with open(url_json, 'r+') as json_file:
-                data = json.load(json_file)
-                for detail in data.get('details', []):
-                    if detail.get('sku') == sku:
-                        detail['printed'] = True
-                json_file.seek(0)
-                json.dump(data, json_file, indent=4)
-                json_file.truncate()
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            return JsonResponse({'error': f'Error al procesar el archivo JSON: {str(e)}'}, status=400)
+#         # Modificar el archivo JSON para marcar el producto como impreso
+#         try:
+#             with open(url_json, 'r+') as json_file:
+#                 data = json.load(json_file)
+#                 for detail in data.get('details', []):
+#                     if detail.get('sku') == sku:
+#                         detail['printed'] = True
+#                 json_file.seek(0)
+#                 json.dump(data, json_file, indent=4)
+#                 json_file.truncate()
+#         except (FileNotFoundError, json.JSONDecodeError) as e:
+#             return JsonResponse({'error': f'Error al procesar el archivo JSON: {str(e)}'}, status=400)
 
-        # Actualizar el estado de la factura si todos los productos están impresos
-        try:
-            facturas = Purchase.objects.filter(urljson=url_json)
-            if not facturas.exists():
-                return JsonResponse({'error': 'No se encontraron facturas asociadas.'}, status=404)
+#         # Actualizar el estado de la factura si todos los productos están impresos
+#         try:
+#             facturas = Purchase.objects.filter(urljson=url_json)
+#             if not facturas.exists():
+#                 return JsonResponse({'error': 'No se encontraron facturas asociadas.'}, status=404)
 
-            factura = facturas.first()  # Obtener la primera factura si hay múltiples
-            if all(detail.get('printed') for detail in data.get('details', [])):
-                factura.status = 3  # Procesado
-                factura.save()
-        except Purchase.DoesNotExist:
-            pass  # Si no existe la factura, no hacemos nada
+#             factura = facturas.first()  # Obtener la primera factura si hay múltiples
+#             if all(detail.get('printed') for detail in data.get('details', [])):
+#                 factura.status = 3  # Procesado
+#                 factura.save()
+#         except Purchase.DoesNotExist:
+#             pass  # Si no existe la factura, no hacemos nada
 
-        # Devolver la URL del PDF generado
-        pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
-        return JsonResponse({
-            'urlPdf': pdf_url,
-            'superids': super_ids,
-            'sku': sku
-        })
+#         # Devolver la URL del PDF generado
+#         pdf_url = os.path.join(settings.MEDIA_URL, relative_file_path)
+#         return JsonResponse({
+#             'urlPdf': pdf_url,
+#             'superids': super_ids,
+#             'sku': sku
+#         })
 
-    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+#     return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
 
 from tqdm import tqdm
