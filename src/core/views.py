@@ -4062,19 +4062,33 @@ def imprimir_etiqueta_qr(request):
 
                 pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
-               # Detalles
+               # Función auxiliar para truncar texto
+                def truncar(texto, max_len=30):
+                    if not texto:
+                        return ""
+                    texto = str(texto).strip()
+                    return texto[:max_len - 3] + "..." if len(texto) > max_len else texto
+
+                # Detalles
                 pdf.setFont("Helvetica-Bold", 10)
+
+                # SKU (no se trunca normalmente)
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 60, f"{sku}")
-                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 50, f"{producto.prefixed}") #bsale categoria
-                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{producto.brands}")#marca
+
+                # Truncado de prefixed y brand
+                prefijo_truncado = truncar(producto.prefixed, max_len=25)
+                marca_truncada = truncar(producto.brands, max_len=25)
+
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 50, prefijo_truncado)
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, marca_truncada)
+
+                # Cantidad y fecha
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
 
-                # Truncado confiable
-                nombre = str(producto.nameproduct).strip()
-                max_len = 30  # ajusta este valor según espacio disponible
-                nombre_truncado = (nombre[:max_len - 3] + "...") if len(nombre) > max_len else nombre
-                pdf.drawString(x_qr, y_qr - 15, f"{nombre_truncado}")
+                # Truncar nombre del producto (nombre principal debajo del QR)
+                nombre_truncado = truncar(producto.nameproduct, max_len=30)
+                pdf.drawString(x_qr, y_qr - 15, nombre_truncado)
 
                 # Código de barras
                 barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
