@@ -4066,7 +4066,7 @@ def imprimir_etiqueta_qr(request):
                 pdf.setFont("Helvetica-Bold", 10)
 
                 # Truncar directamente a 20 caracteres con "..."
-                prefixed = (producto.prefixed[:17] + "...") if producto.prefixed and len(producto.prefixed) > 20 else (producto.prefixed or "")
+                prefixed = (producto.prefixed[:10] + "...") if producto.prefixed and len(producto.prefixed) > 20 else (producto.prefixed or "")
                 brands = (producto.brands[:17] + "...") if producto.brands and len(producto.brands) > 20 else (producto.brands or "")
                 nameproduct = (producto.nameproduct[:17] + "...") if producto.nameproduct and len(producto.nameproduct) > 20 else (producto.nameproduct or "")
 
@@ -4210,7 +4210,7 @@ def reimprimir_etiqueta_qr(request):
             pdf.setFont("Helvetica-Bold", 10)
 
             # Truncar directamente a 20 caracteres con "..."
-            prefixed = (producto.prefixed[:17] + "...") if producto.prefixed and len(producto.prefixed) > 20 else (producto.prefixed or "")
+            prefixed = (producto.prefixed[:10] + "...") if producto.prefixed and len(producto.prefixed) > 20 else (producto.prefixed or "")
             brands = (producto.brands[:17] + "...") if producto.brands and len(producto.brands) > 20 else (producto.brands or "")
             nameproduct = (producto.nameproduct[:17] + "...") if producto.nameproduct and len(producto.nameproduct) > 20 else (producto.nameproduct or "")
 
