@@ -4062,33 +4062,22 @@ def imprimir_etiqueta_qr(request):
 
                 pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
-               # Función auxiliar para truncar texto
-                def truncar(texto, max_len=30):
-                    if not texto:
-                        return ""
-                    texto = str(texto).strip()
-                    return texto[:max_len - 3] + "..." if len(texto) > max_len else texto
-
-                # Detalles
+               # Detalles
                 pdf.setFont("Helvetica-Bold", 10)
 
-                # SKU (no se trunca normalmente)
+                # Truncar directamente a 20 caracteres con "..."
+                prefixed = (producto.prefixed[:17] + "...") if producto.prefixed and len(producto.prefixed) > 20 else (producto.prefixed or "")
+                brands = (producto.brands[:17] + "...") if producto.brands and len(producto.brands) > 20 else (producto.brands or "")
+                nameproduct = (producto.nameproduct[:17] + "...") if producto.nameproduct and len(producto.nameproduct) > 20 else (producto.nameproduct or "")
+
+                # Dibujar en PDF
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 60, f"{sku}")
-
-                # Truncado de prefixed y brand
-                prefijo_truncado = truncar(producto.prefixed, max_len=25)
-                marca_truncada = truncar(producto.brands, max_len=25)
-
-                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 50, prefijo_truncado)
-                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, marca_truncada)
-
-                # Cantidad y fecha
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 50, prefixed)
+                pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, brands)
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
                 pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
 
-                # Truncar nombre del producto (nombre principal debajo del QR)
-                nombre_truncado = truncar(producto.nameproduct, max_len=30)
-                pdf.drawString(x_qr, y_qr - 15, nombre_truncado)
+                pdf.drawString(x_qr, y_qr - 15, nameproduct)
 
                 # Código de barras
                 barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
@@ -4217,32 +4206,30 @@ def reimprimir_etiqueta_qr(request):
             qr_image = ImageReader(buffer)
             pdf.drawImage(qr_image, x_qr, y_qr, width=qr_width, height=qr_height)
 
-            # SKU
+            # Detalles
             pdf.setFont("Helvetica-Bold", 10)
-            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, f"{sku}")
 
-            # Etiqueta contador
+            # Truncar directamente a 20 caracteres con "..."
+            prefixed = (producto.prefixed[:17] + "...") if producto.prefixed and len(producto.prefixed) > 20 else (producto.prefixed or "")
+            brands = (producto.brands[:17] + "...") if producto.brands and len(producto.brands) > 20 else (producto.brands or "")
+            nameproduct = (producto.nameproduct[:17] + "...") if producto.nameproduct and len(producto.nameproduct) > 20 else (producto.nameproduct or "")
+
+            # Dibujar en PDF
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 60, f"{sku}")
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 50, prefixed)
+            pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 30, brands)
             pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 20, f"{i + 1} de {qty}")
-
-            # Fecha
             pdf.drawString(x_qr + qr_width + 4 * mm, y_qr + 10, f"{date.today().strftime('%d-%m-%Y')}")
 
-            # Nombre del producto
-            y_product_text = y_qr - 15
-            pdf.setFont("Helvetica-Bold", 10)
-            pdf.drawString(x_qr, y_product_text, f"{producto.nameproduct}")
+            pdf.drawString(x_qr, y_qr - 15, nameproduct)
 
             # Código de barras
-            x_barcode = x_qr - 6 * mm  # Mover a la derecha o ajustar como desees
-            y_barcode = y_qr - 50  # Ajustar a la misma altura del QR
             barcode_sku = code128.Code128(sku, barWidth=0.38 * mm, barHeight=9 * mm)
-            barcode_sku.drawOn(pdf, x_barcode, y_barcode)
+            barcode_sku.drawOn(pdf, x_qr - 6 * mm, y_qr - 50)
 
-            # SuperID y número de documento
-            y_super_id = y_barcode + 30
-            pdf.setFont("Helvetica-Bold", 10)
-            pdf.drawString(x_qr, y_super_id - 3, f"{super_id}")
-            pdf.drawString(x_qr + 25 * mm, y_super_id - 60, f"{number}")
+            # IDs
+            pdf.drawString(x_qr, y_qr - 60, f"{super_id}")
+            pdf.drawString(x_qr + 25 * mm, y_qr - 60, f"{number}")
 
             if not is_left and i < qty - 1:
                 pdf.showPage()
