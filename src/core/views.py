@@ -454,8 +454,8 @@ def buscar_productosAPI(request):
             'stock_total': stock_total,
             'is_unique_product': False,
             'iderp':producto.iderp,
-            'lastcost':product.lastcost,
-            'lastprice':product.lastprice
+            'lastcost':producto.lastcost,
+            'lastprice':producto.lastprice
         })
 
     return JsonResponse({
