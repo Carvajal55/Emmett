@@ -57,15 +57,22 @@
                                     <td>[[ product.name ]]</td>
                                     <td>[[ product.stock_total ]]</td>
                                     <td>[[ product.price ]]</td>
-                                    <td v-if="product.is_unique_product">
-                                        <p><strong>Sector:</strong> [[ product.location_info.sector ]]</p>
-                                        <p><strong>Bodega:</strong> [[ product.location_info.bodega ]]</p>
+                        
+                                    <!-- Ubicación -->
+                                    <td>
+                                        <template v-if="product.is_unique_product">
+                                            <p><strong>Sector:</strong> [[ product.location_info.sector ]]</p>
+                                            <p><strong>Bodega:</strong> [[ product.location_info.bodega ]]</p>
+                                        </template>
+                                        <template v-else>-</template>
                                     </td>
+                        
+                                    <!-- U.Costo y U.Precio solo si el rol lo permite -->
                                     {% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
                                     <td>[[ product.lastcost ]]</td>
                                     <td>[[ product.lastprice ]]</td>
                                     {% endif %}
-                                    <td v-else>-</td> <!-- Mostrar "-" si no es un Uniqueproduct -->
+                        
                                     <td>
                                         <button class="btn btn-primary" @click="verDetallesProducto(product.id)">Ver Detalles</button>
                                     </td>
@@ -73,7 +80,9 @@
                             </template>
                             <template v-else>
                                 <tr>
-                                    <td colspan="7" class="text-center">No se encontraron resultados para la búsqueda.</td>
+                                    <td colspan="{% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}9{% else %}7{% endif %}" class="text-center">
+                                        No se encontraron resultados para la búsqueda.
+                                    </td>
                                 </tr>
                             </template>
                         </tbody>
