@@ -42,7 +42,7 @@
                                 <th scope="col">Stock Total</th>
                                 <th scope="col">Precio</th>
                                 <th scope="col">Ubicación</th> 
-                                {% if request.user.usuario.rol in ['ADMIN', 'BODEGA'] %}
+                                {% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
                                 <th scope="col">U.Costo</th> 
                                 <th scope="col">U.Precio</th> 
                                 {% endif %}
@@ -61,7 +61,7 @@
                                         <p><strong>Sector:</strong> [[ product.location_info.sector ]]</p>
                                         <p><strong>Bodega:</strong> [[ product.location_info.bodega ]]</p>
                                     </td>
-                                    {% if request.user.usuario.rol in ['ADMIN', 'BODEGA'] %}
+                                    {% if request.user.usuario.rol == 'ADMIN' or request.user.usuario.rol == 'BODEGA' %}
                                     <td>[[ product.lastcost ]]</td>
                                     <td>[[ product.lastprice ]]</td>
                                     {% endif %}
