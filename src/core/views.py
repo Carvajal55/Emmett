@@ -412,7 +412,9 @@ def buscar_productosAPI(request):
                     'is_unique_product': True,
                     'location_info': sector_info,
                     'descripcion': product.description,
-                    'iderp':product.iderp
+                    'iderp':product.iderp,
+                    'lastcost':product.lastcost,
+                    'lastprice':product.lastprice
                 }],
                 'total_pages': 1,
                 'current_page': 1,
