@@ -148,11 +148,10 @@ new Vue({
                     price_list_id: 3
                 });
                 const valor = res.data.valor_actual;
-                this.precioBase.valorActual = valor ? Math.floor(valor) : 0; // Valor NETO, sin IVA
+                this.precioBase.valorActual = valor ? Math.floor(valor) : 0;
                 this.precioBase.valor = this.precioBase.valorActual;
                 this.product.bsalePrice = this.precioBase.valorActual;
-                this.product.precio = this.precioBase.valorActual; // Este es el COSTO que se usará para margen
-
+                this.product.precio = this.precioBase.valorActual;
 
 
                 
@@ -171,7 +170,6 @@ new Vue({
                 this.suggestions = response.data.products;
                 if (response.data.products.length === 1) {
                     this.product = response.data.products[0];
-                    console.log(this.product, "AQUI VIENE EL PRODUCTO")
                     await this.obtenerPrecioBase();
 
                     // Inicializa las listas de precios directamente
@@ -260,12 +258,6 @@ new Vue({
                 .catch(() => Swal.fire('Error', 'No se pudo actualizar el precio', 'error'));
         },
         recalcularMargen(precio) {
-            console.log('---- RECALCULANDO ----');
-            console.log('Costo (this.product.precio):', this.product.lastcost);
-            console.log('Valor ingresado:', precio.valor);
-            console.log('Fee:', precio.fee);
-            console.log('Despacho:', precio.despacho);
-            console.log('IVA:', 1.19);
             const costo = parseFloat(this.product.lastcost || 0);
             const fee = parseFloat(precio.fee || 1.25);
             const n = parseFloat(precio.n || 1.35);
@@ -285,10 +277,6 @@ new Vue({
             const margenDeseado = (100 - (100 / n)) / 100;
             const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
             precio.valorSugerido = valorSugerido;
-
-            console.log('Valor Neto:', valorNeto);
-            console.log('Margen calculado:', margenCalculado);
-
         },
         formatCurrency(value) {
             if (!value || isNaN(value)) return '0';
