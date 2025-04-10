@@ -49,15 +49,15 @@
                         <label>Alto</label>
                         <input type="number" v-model="product.alto" class="form-control">
                     </div>
-                    <div class="d-none form-group">
+                    <div class="form-group">
                         <label>Largo</label>
                         <input type="number" v-model="product.largo" class="form-control">
                     </div>
-                    <div class="d-none form-group">
+                    <div class="form-group">
                         <label>Profundidad</label>
                         <input type="number" v-model="product.profundidad" class="form-control">
                     </div>
-                    <div class="d-none form-group">
+                    <div class="form-group">
                         <label>Peso</label>
                         <input type="number" v-model="product.peso" class="form-control">
                     </div>
@@ -264,9 +264,9 @@ new Vue({
             const valorIngresado = parseFloat(precio.valor);
 
             if (valorIngresado > 0) {
-                const valorNeto = (valorIngresado - despacho) / iva / fee;
-                const margen = ((1 - (costo / valorNeto)) * 100).toFixed(2);
-                precio.margen = margen;
+                const valorNeto = ((valorIngresado - despacho) / iva) / fee; // Paréntesis críticos
+                const margenCalculado = (1 - (costo / valorNeto)) * 100;
+                precio.margen = margenCalculado.toFixed(2);
             } else {
                 precio.margen = 0;
             }
