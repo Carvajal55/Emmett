@@ -148,10 +148,14 @@ new Vue({
                     price_list_id: 3
                 });
                 const valor = res.data.valor_actual;
-                this.precioBase.valorActual = valor ? Math.floor(valor * 1.19) : 0;
+                this.precioBase.valorActual = valor ? Math.floor(valor) : 0; // Valor NETO, sin IVA
                 this.precioBase.valor = this.precioBase.valorActual;
                 this.product.bsalePrice = this.precioBase.valorActual;
-                this.product.precio = this.precioBase.valorActual;
+                this.product.precio = this.precioBase.valorActual; // Este es el COSTO que se usará para margen
+
+
+
+                
             } catch (err) {
                 console.error('Error al obtener precio base:', err);
                 this.precioBase.valorActual = 0;
