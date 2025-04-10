@@ -414,7 +414,7 @@ def buscar_productosAPI(request):
                     'descripcion': product.description,
                     'iderp':product.iderp,
                     'lastcost':product.lastcost,
-                    'lastprice':product.lastprice
+                    'lastprice':product.lastprice,
                 }],
                 'total_pages': 1,
                 'current_page': 1,

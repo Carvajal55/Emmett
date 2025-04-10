@@ -261,12 +261,12 @@ new Vue({
         },
         recalcularMargen(precio) {
             console.log('---- RECALCULANDO ----');
-            console.log('Costo (this.product.precio):', this.product.precio);
+            console.log('Costo (this.product.precio):', this.product.lastcost);
             console.log('Valor ingresado:', precio.valor);
             console.log('Fee:', precio.fee);
             console.log('Despacho:', precio.despacho);
             console.log('IVA:', 1.19);
-            const costo = parseFloat(this.product.precio || 0);
+            const costo = parseFloat(this.product.lastcost || 0);
             const fee = parseFloat(precio.fee || 1.25);
             const n = parseFloat(precio.n || 1.35);
             const despacho = parseFloat(precio.despacho || 0);
