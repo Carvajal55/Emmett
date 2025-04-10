@@ -143,22 +143,23 @@ new Vue({
         async obtenerPrecioBase() {
             if (!this.product || !this.product.sku) return;
             try {
-                console.log(this.product)
                 const res = await axios.post('/api/obtener_valor_actual/', {
                     sku: this.product.sku,
                     price_list_id: 3
                 });
                 const valor = res.data.valor_actual;
+                this.precioBase.valorActual = valor ? Math.floor(valor) : 0; // Valor NETO, sin IVA
+                this.precioBase.valor = this.precioBase.valorActual;
+                this.product.bsalePrice = this.precioBase.valorActual;
+                this.product.precio = this.precioBase.valorActual; // Este es el COSTO que se usará para margen
 
-                // ⚠️ valor_actual viene sin IVA (neto)
-                const costo = valor ? Math.floor(valor) : 0;
 
-                this.product.cost_with_discount = costo; // ← lo importante
-                this.precioBase.valorActual = costo;
-                this.precioBase.valor = costo;
+
+                
             } catch (err) {
                 console.error('Error al obtener precio base:', err);
-                this.product.cost_with_discount = 0;
+                this.precioBase.valorActual = 0;
+                this.precioBase.valor = 0;
             }
         },
 
@@ -170,6 +171,7 @@ new Vue({
                 this.suggestions = response.data.products;
                 if (response.data.products.length === 1) {
                     this.product = response.data.products[0];
+                    console.log(this.product, "AQUI VIENE EL PRODUCTO")
                     await this.obtenerPrecioBase();
 
                     // Inicializa las listas de precios directamente
@@ -258,32 +260,36 @@ new Vue({
                 .catch(() => Swal.fire('Error', 'No se pudo actualizar el precio', 'error'));
         },
         recalcularMargen(precio) {
-    const costo = parseFloat(this.product.cost_with_discount || 0); // ✅ nombre correcto
-    const fee = parseFloat(precio.fee || 1.25);
-    const n = parseFloat(precio.n || 1.35);
-    const despacho = parseFloat(precio.despacho || 0);
-    const iva = 1.19;
-    const valorIngresado = parseFloat(precio.valor || 0);
+            console.log('---- RECALCULANDO ----');
+            console.log('Costo (this.product.precio):', this.product.precio);
+            console.log('Valor ingresado:', precio.valor);
+            console.log('Fee:', precio.fee);
+            console.log('Despacho:', precio.despacho);
+            console.log('IVA:', 1.19);
+            const costo = parseFloat(this.product.precio || 0);
+            const fee = parseFloat(precio.fee || 1.25);
+            const n = parseFloat(precio.n || 1.35);
+            const despacho = parseFloat(precio.despacho || 0);
+            const iva = 1.19;
 
-    console.log('Costo:', costo);
-    console.log('Valor ingresado:', valorIngresado);
-    console.log('Fee:', fee);
-    console.log('Despacho:', despacho);
+            const valorIngresado = parseFloat(precio.valor);
 
-    if (valorIngresado > 0) {
-        const valorNeto = ((valorIngresado - despacho) / iva) / fee;
-        const margen = (1 - (costo / valorNeto)) * 100;
-        precio.margen = margen.toFixed(2);
-        console.log('Valor Neto:', valorNeto);
-        console.log('Margen calculado:', margen);
-    } else {
-        precio.margen = 0;
-    }
+            if (valorIngresado > 0) {
+                const valorNeto = ((valorIngresado - despacho) / iva) / fee; // Paréntesis críticos
+                const margenCalculado = (1 - (costo / valorNeto)) * 100;
+                precio.margen = margenCalculado.toFixed(2);
+            } else {
+                precio.margen = 0;
+            }
 
-    const margenDeseado = (100 - (100 / n)) / 100;
-    const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
-    precio.valorSugerido = valorSugerido;
-},
+            const margenDeseado = (100 - (100 / n)) / 100;
+            const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
+            precio.valorSugerido = valorSugerido;
+
+            console.log('Valor Neto:', valorNeto);
+            console.log('Margen calculado:', margenCalculado);
+
+        },
         formatCurrency(value) {
             if (!value || isNaN(value)) return '0';
             return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
