@@ -259,6 +259,12 @@ new Vue({
                 .catch(() => Swal.fire('Error', 'No se pudo actualizar el precio', 'error'));
         },
         recalcularMargen(precio) {
+            console.log('---- RECALCULANDO ----');
+            console.log('Costo (this.product.precio):', this.product.precio);
+            console.log('Valor ingresado:', precio.valor);
+            console.log('Fee:', precio.fee);
+            console.log('Despacho:', precio.despacho);
+            console.log('IVA:', 1.19);
             const costo = parseFloat(this.product.precio || 0);
             const fee = parseFloat(precio.fee || 1.25);
             const n = parseFloat(precio.n || 1.35);
@@ -278,6 +284,10 @@ new Vue({
             const margenDeseado = (100 - (100 / n)) / 100;
             const valorSugerido = Math.ceil(((costo * fee * iva) / (1 - margenDeseado)) + despacho);
             precio.valorSugerido = valorSugerido;
+
+            console.log('Valor Neto:', valorNeto);
+            console.log('Margen calculado:', margenCalculado);
+
         },
         formatCurrency(value) {
             if (!value || isNaN(value)) return '0';
