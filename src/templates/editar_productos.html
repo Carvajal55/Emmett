@@ -143,6 +143,7 @@ new Vue({
         async obtenerPrecioBase() {
             if (!this.product || !this.product.sku) return;
             try {
+                console.log(this.product)
                 const res = await axios.post('/api/obtener_valor_actual/', {
                     sku: this.product.sku,
                     price_list_id: 3
