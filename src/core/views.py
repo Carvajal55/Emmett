@@ -415,6 +415,10 @@ def buscar_productosAPI(request):
                     'iderp':product.iderp,
                     'lastcost':product.lastcost,
                     'lastprice':product.lastprice,
+                    'alto':product.alto,
+                    'largo':product.largo,
+                    'profundidad':product.profundidad,
+                    'peso':product.peso
                 }],
                 'total_pages': 1,
                 'current_page': 1,
@@ -455,7 +459,11 @@ def buscar_productosAPI(request):
             'is_unique_product': False,
             'iderp':producto.iderp,
             'lastcost':producto.lastcost,
-            'lastprice':producto.lastprice
+            'lastprice':producto.lastprice,
+            'alto':producto.alto,
+            'largo':producto.largo,
+            'profundidad':producto.profundidad,
+            'peso':producto.peso
         })
 
     return JsonResponse({
