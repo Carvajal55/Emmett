@@ -6672,6 +6672,9 @@ def editar_producto(request, sku):
         if update_nombre.status_code not in [200, 201]:
             return JsonResponse({'success': False, 'message': 'Nombre local guardado, pero error al actualizar nombre en Bsale'}, status=500)
 
+        
+
+        return JsonResponse({'success': True, 'message': 'Producto actualizado localmente y en Bsale'}, status=200)
 
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Error al procesar la solicitud'}, status=400)
