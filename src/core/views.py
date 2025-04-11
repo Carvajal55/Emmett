@@ -6672,23 +6672,6 @@ def editar_producto(request, sku):
         if update_nombre.status_code not in [200, 201]:
             return JsonResponse({'success': False, 'message': 'Nombre local guardado, pero error al actualizar nombre en Bsale'}, status=500)
 
-        # --- 2. ACTUALIZAR PRECIO EN BSALE (si viene en el body) ---
-        nuevo_precio = body.get('precio')
-        if nuevo_precio:
-            precio_payload = {
-                "price": float(nuevo_precio)
-            }
-
-            update_precio = requests.put(
-                f"{BSALE_API_URL}/variants/{variant_id}/prices/1.json",  # ID 1 para lista de precios principal
-                headers=HEADERS,
-                data=json.dumps(precio_payload)
-            )
-
-            if update_precio.status_code not in [200, 201]:
-                return JsonResponse({'success': False, 'message': 'Nombre actualizado en Bsale, pero error al actualizar precio'}, status=500)
-
-        return JsonResponse({'success': True, 'message': 'Producto actualizado localmente y en Bsale'}, status=200)
 
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Error al procesar la solicitud'}, status=400)
