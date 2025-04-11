@@ -45,7 +45,7 @@
                         <label>ID ERP</label>
                         <input type="text" v-model="product.iderp" class="form-control">
                     </div>
-                    <div class="d-none form-group">
+                    <div class="form-group">
                         <label>Alto</label>
                         <input type="number" v-model="product.alto" class="form-control">
                     </div>
@@ -61,13 +61,13 @@
                         <label>Peso</label>
                         <input type="number" v-model="product.peso" class="form-control">
                     </div>
-                    <div class="form-group">
+                    <div class="d-none form-group">
                         <label>Precio</label>
                         <input type="number" v-model="product.precio" class="form-control">
                     </div>
                     <hr>
                     <button class="btn btn-info" type="button" @click="abrirModalListas">Editar Precios Marketplaces</button>
-                    <button type="submit" class="btn btn-success" @click="actualizarListaPrecio(3, product.precio)" >Guardar Cambios</button>
+                    <button type="submit" class="btn btn-success" >Guardar Cambios</button>
                 </form>
             </div>
         </div>
