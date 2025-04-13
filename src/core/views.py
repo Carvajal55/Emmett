@@ -1507,6 +1507,7 @@ def crear_producto(request):
         peso = data.get("peso")
         alias = data.get("alias")
         categoria_bs_id = data.get("categoriaBsale")  # 🔥 ID de la categoría en Bsale (equivalente a idERP)
+        categoria_bs_nombre = data.get("categoriaBsaleNombre")
 
         # Validar que la marca exista en la base de datos
         marcas_existentes = [brand.name for brand in Brand.objects.all()]
@@ -1580,6 +1581,7 @@ def crear_producto(request):
                     prefixed=alias,
                     brands=marca,
                     codebar=bar_code,
+                    codebar2 = categoria_bs_nombre,
                     iderp=bsale_variant["id"],  # ID de la variante en Bsale
                     lastprice=precio,
                     codsupplier=proveedor_id,
@@ -1589,6 +1591,7 @@ def crear_producto(request):
                     profundidad=profundidad,
                     peso=peso,
                     description=descripcion_producto  # ✅ Guardar la nueva descripción en la BD
+
                 )
 
                 return JsonResponse({

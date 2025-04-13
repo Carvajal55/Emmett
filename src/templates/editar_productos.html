@@ -33,7 +33,7 @@
                         <label>Nombre</label>
                         <input type="text" v-model="product.name" class="form-control">
                     </div>
-                    <div class="form-group">
+                    <div class="d-none form-group">
                         <label>Prefijo</label>
                         <input type="text" v-model="product.prefixed" class="form-control">
                     </div>
@@ -184,7 +184,6 @@ new Vue({
                         { label: 'Base Bsale', id: 3, fee: 1, n: 1.3, despacho: 0, valorActual: null, valor: null, margen: null, valorSugerido: null }
                     ];
 
-                    // Consultar precios actuales de cada lista
                     this.listasPrecios.forEach(precio => {
                         axios.post('/api/obtener_valor_actual/', {
                             sku: this.product.sku,
