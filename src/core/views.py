@@ -418,7 +418,8 @@ def buscar_productosAPI(request):
                     'alto':product.alto,
                     'largo':product.largo,
                     'profundidad':product.profundidad,
-                    'peso':product.peso
+                    'peso':product.peso,
+                    'brands':product.marca
                 }],
                 'total_pages': 1,
                 'current_page': 1,
@@ -463,7 +464,8 @@ def buscar_productosAPI(request):
             'alto':producto.alto,
             'largo':producto.largo,
             'profundidad':producto.profundidad,
-            'peso':producto.peso
+            'peso':producto.peso,
+            'brands':producto.marca
         })
 
     return JsonResponse({
