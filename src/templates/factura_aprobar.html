@@ -984,7 +984,11 @@
                         title: 'Error',
                         text: 'No hay precios para actualizar.',
                         icon: 'error',
-                        confirmButtonText: 'OK'
+                        showConfirmButton: false,
+                        timer: 3000,
+                        timerProgressBar: true
+                    }).then(() => {
+                        window.location.reload(); // 🔄 Recargar la página después de cerrar la alerta
                     });
                     return;
                 }
@@ -1002,12 +1006,18 @@
                     .then(response => {
                         console.log('Respuesta de la API:', response.data);
                         Swal.fire({
-                            title: 'Éxito',
-                            text: 'Precios actualizados correctamente.',
-                            icon: 'success',
+                            title: 'Resultados de la Actualización',
+                            html: `
+                                <p><strong>Actualizados con éxito:</strong> ${exitos.length}</p>
+                                <p><strong>Errores:</strong> ${errores.length}</p>
+                                ${errores.length > 0 ? `<p><strong>Detalles de errores:</strong></p><ul>${errores.map(err => `<li>${err.label}: ${err.message}</li>`).join('')}</ul>` : ''}
+                            `,
+                            icon: errores.length > 0 ? 'warning' : 'success',
                             confirmButtonText: 'OK',
-                            timer: 3000, // ⏱️ Se cierra en 5 segundos
-                            timerProgressBar: true // 🔄 Barra de tiempo visible
+                            timer: 3000, // ⏱️ Se cierra en 3 segundos
+                            timerProgressBar: true
+                        }).then(() => {
+                            location.reload(); // 🔄 Refrescar la página al cerrar el Swal
                         });
                     })
                     .catch(error => {
