@@ -517,7 +517,9 @@
                                 ${errores.length > 0 ? `<p><strong>Detalles de errores:</strong></p><ul>${errores.map(err => `<li>${err.label}: ${err.message}</li>`).join('')}</ul>` : ''}
                             `,
                             icon: errores.length > 0 ? 'warning' : 'success',
-                            confirmButtonText: 'OK'
+                            confirmButtonText: 'OK',
+                            timer: 3000, // ⏱️ Se cierra en 5 segundos
+                            timerProgressBar: true // 🔄 Barra de tiempo visible
                         });
                     })
                     .catch(error => {
@@ -539,6 +541,7 @@
                 axios.post('/api/obtener_valor_actual/', data)
                     .then(response => {
                         const valorRecibido = response.data.valor_actual;
+                        precio.valor = response.data.valor_actual;
                         if (valorRecibido) {
                             const valorConIva = Math.floor(valorRecibido * 1.19);
                             this.$set(precio, 'valorActual', valorConIva);
