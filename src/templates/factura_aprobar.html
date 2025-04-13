@@ -541,10 +541,11 @@
                 axios.post('/api/obtener_valor_actual/', data)
                     .then(response => {
                         const valorRecibido = response.data.valor_actual;
-                        precio.valor = valorConIva;
                         if (valorRecibido) {
                             const valorConIva = Math.floor(valorRecibido * 1.19);
                             this.$set(precio, 'valorActual', valorConIva);
+                            this.$set(precio, 'valor', valorConIva); // ✅ Aquí prellena el input automáticamente
+                            this.recalcularMargen(precio); // ✅ Recalcula el margen con ese valor
                         } else {
                             this.$set(precio, 'valorActual', 'Pendiente');
                         }
