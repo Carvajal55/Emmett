@@ -235,6 +235,7 @@ new Vue({
                 }).then(response => {
                     const valorRecibido = response.data.valor_actual;
                     precio.valorActual = valorRecibido ? Math.floor(valorRecibido * 1.19) : 0;
+                    precio.valor = precio.valorActual
                     this.recalcularMargen(precio);
                 }).catch(error => {
                     console.error(`Error al obtener precio para ${precio.label}:`, error);
