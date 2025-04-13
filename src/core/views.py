@@ -465,7 +465,7 @@ def buscar_productosAPI(request):
             'largo':producto.largo,
             'profundidad':producto.profundidad,
             'peso':producto.peso,
-            'brands':producto.marca
+            'brands':producto.brands
         })
 
     return JsonResponse({
