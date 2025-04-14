@@ -544,6 +544,9 @@ def producto_detalles(request, product_id):
             'stock_total': stock_total,
             'bodegas': bodegas_stock,
             'unique_products': unique_products_data,
+            'alto':producto.alto,
+            'largo':producto.largo,
+            'profunidad':producto.profundidad
         }
 
         return JsonResponse(response_data)
