@@ -612,13 +612,20 @@
                 axios.post('/api/actualizar_precio/', data)
                     .then(response => {
                         console.log(`Precio para lista ${type} actualizado correctamente:`, response.data);
+
+                        // ✅ NUEVO BLOQUE AÑADIDO
+                        const precio = this.listasPrecios.find(p => p.id === type);
+                        if (precio) {
+                            this.obtenerValorActual(precio); // 🔄 Refresca el valor actual y el margen
+                        }
+
                         Swal.fire({
-                        title: 'Éxito',
-                        text: `El precio para la lista ${type} se actualizó correctamente.`,
-                        icon: 'success',
-                        showConfirmButton: false, // Ocultar el botón de confirmación
-                        timer: 500 // Cerrar automáticamente después de 500ms
-                    });
+                            title: 'Éxito',
+                            text: `El precio para la lista ${type} se actualizó correctamente.`,
+                            icon: 'success',
+                            showConfirmButton: false,
+                            timer: 500
+                        });
                     })
                     .catch(error => {
                         console.error(`Error al actualizar el precio para la lista ${type}:`, error);
