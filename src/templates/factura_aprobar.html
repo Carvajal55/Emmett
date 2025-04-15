@@ -644,13 +644,17 @@
                 console.log("Actualizando precio base:", data);
 
                 axios.post('/api/actualizar_precio/', data)
-                    .then(response => {
+                .then(response => {
                         console.log('Precio base actualizado correctamente:', response.data);
                         Swal.fire({
                             title: 'Éxito',
                             text: 'El precio base se actualizó correctamente.',
                             icon: 'success',
-                            confirmButtonText: 'OK'
+                            showConfirmButton: false, // Oculta el botón
+                            timer: 3000,              // Se cierra en 3 segundos
+                            timerProgressBar: true
+                        }).then(() => {
+                            this.obtenerFactura(); // ✅ Refrescar datos actualizados
                         });
                     })
                     .catch(error => {
@@ -1008,7 +1012,7 @@
 
                         const exitos = response.data.actualizados || [];
                         const errores = response.data.errores || [];
-                        
+
                         Swal.fire({
                             title: 'Resultados de la Actualización',
                             html: `
