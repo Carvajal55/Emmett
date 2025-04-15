@@ -491,11 +491,14 @@
 
                             return axios.put(urlUpdate, dataUpdate, { headers });
                         })
-                        .then(() => ({
-                            label: precio.label,
-                            status: 'success',
-                            message: `Precio actualizado correctamente en ${precio.label}`
-                        }))
+                        .then(() => {
+                            this.obtenerValorActual(precio); // 🔄 Trae el nuevo valor desde la API
+                            return {
+                                label: precio.label,
+                                status: 'success',
+                                message: `Precio actualizado correctamente en ${precio.label}`
+                            };
+                        })
                         .catch(error => ({
                             label: precio.label,
                             status: 'error',
