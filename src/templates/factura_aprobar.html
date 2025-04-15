@@ -1005,6 +1005,10 @@
                 axios.post('/api/actualizar_precios_masivo/', { precios })
                     .then(response => {
                         console.log('Respuesta de la API:', response.data);
+
+                        const exitos = response.data.actualizados || [];
+                        const errores = response.data.errores || [];
+                        
                         Swal.fire({
                             title: 'Resultados de la Actualización',
                             html: `
