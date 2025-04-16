@@ -6216,57 +6216,58 @@ def bulk_upload_products(request):
         if request.method != 'POST':
             return JsonResponse({"status": "error", "message": "Método no permitido."})
 
-        # Leer archivo JSON con manejo de codificación
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
             return JsonResponse({"status": "error", "message": "No se proporcionó un archivo."})
 
         try:
-            file_data = uploaded_file.read()
-            if not file_data:
-                return JsonResponse({"status": "error", "message": "El archivo está vacío."})
-            
-            try:
-                file_data = file_data.decode('utf-8')
-            except UnicodeDecodeError:
-                file_data = file_data.decode('ISO-8859-1', errors='replace')
-            
-            print(f"Contenido del archivo: {file_data[:500]}")  # Mostrar los primeros 500 caracteres para depuración
-            products_data = json.loads(file_data)
-        except json.JSONDecodeError as e:
-            return JsonResponse({"status": "error", "message": f"Error al decodificar JSON: {str(e)}"})
+            df = pd.read_excel(uploaded_file)
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": f"Error al leer el archivo Excel: {str(e)}"})
 
-        # Normalizar claves
-        products_data = normalize_keys(products_data)
-        print(f"Archivo leído y normalizado. Total de registros: {len(products_data)}")
+        df = df.fillna("")
+        products_data = []
 
-        # Extraer SKUs existentes y sus productos
+        for _, row in df.iterrows():
+            producto = {
+                "sku": str(row.get("sku")),
+                "nameproduct": str(row.get("nameproduct")),
+                "brand": str(row.get("brands")),
+                "codebar": str(row.get("codebar")),
+                "description": str(row.get("description")),
+                "lastcost": int(row.get("lastcost")) if str(row.get("lastcost")).isdigit() else 0,
+                "lastprice": int(row.get("lastcost")) if str(row.get("lastcost")).isdigit() else 0,
+                "currentstock": int(row.get("currentstock")) if str(row.get("currentstock")).isdigit() else 0,
+                "createdate": str(row.get("createdate")),
+                "uniquecodebar": True if str(row.get("uniquecodebar")).lower() == "true" else False,
+                "alto": int(row.get("alto")) if str(row.get("alto")).isdigit() else 0,
+                "largo": int(row.get("largo")) if str(row.get("largo")).isdigit() else 0,
+                "profundidad": int(row.get("profundidad")) if str(row.get("profundidad")).isdigit() else 0
+            }
+            products_data.append(producto)
+
         existing_products = {p.sku: p for p in Products.objects.all()}
-        print(f"SKUs existentes en la base de datos: {len(existing_products)}")
 
-        # Procesar productos
         new_products = []
         updated_products = 0
+
         for record in tqdm(products_data, desc="Procesando productos", unit="producto"):
             sku = record.get("sku")
 
-            # Convertir fecha correctamente, asegurándose de que sea un string
             createdate = record.get("createdate")
             if createdate:
                 try:
-                    createdate = str(createdate)  # 🔥 Convertir a string si viene como número
-                    createdate = datetime.strptime(createdate, "%Y/%m/%d %H:%M:%S")
-                except (ValueError, TypeError):  # Capturar errores si la conversión falla
+                    createdate = str(createdate)
+                    createdate = datetime.strptime(createdate, "%Y/%m/%d")
+                except (ValueError, TypeError):
                     createdate = None
             else:
                 createdate = None
 
-            # Convertir uniquecodebar a booleano o None
             uniquecodebar = record.get("uniquecodebar")
             if not isinstance(uniquecodebar, bool):
-                uniquecodebar = None  
+                uniquecodebar = None
 
-            # 🔄 **Si el SKU existe, actualizar el producto**
             if sku in existing_products:
                 existing_product = existing_products[sku]
                 existing_product.nameproduct = record.get("nameproduct", existing_product.nameproduct)
@@ -6277,12 +6278,14 @@ def bulk_upload_products(request):
                 existing_product.currentstock = record.get("currentstock", existing_product.currentstock)
                 existing_product.createdate = createdate or existing_product.createdate
                 existing_product.uniquecodebar = uniquecodebar if uniquecodebar is not None else existing_product.uniquecodebar
-                existing_product.description = record.get("description", existing_product.description)  # 🔥 Actualiza la descripción
+                existing_product.description = record.get("description", existing_product.description)
+                existing_product.alto = record.get("alto") or existing_product.alto
+                existing_product.largo = record.get("largo") or existing_product.largo
+                existing_product.profundidad = record.get("profundidad") or existing_product.profundidad
 
                 existing_product.save()
-                updated_products += 1  # Contador de productos actualizados
+                updated_products += 1
             else:
-                # 🆕 **Si el SKU no existe, crearlo**
                 new_products.append(
                     Products(
                         sku=sku,
@@ -6295,22 +6298,21 @@ def bulk_upload_products(request):
                         createdate=createdate,
                         uniquecodebar=uniquecodebar,
                         description=record.get("description", ""),
+                        alto=record.get("alto") or 0,
+                        largo=record.get("largo") or 0,
+                        profundidad=record.get("profundidad") or 0
                     )
                 )
 
-        # Insertar nuevos productos
         if new_products:
             Products.objects.bulk_create(new_products)
-            print(f"Se han insertado {len(new_products)} nuevos productos.")
 
-        # Respuesta con resumen
         return JsonResponse({
             "status": "success",
-            "message": f"Se insertaron {len(new_products)} productos nuevos y se actualizaron {updated_products} productos existentes.",
+            "message": f"Se insertaron {len(new_products)} productos nuevos y se actualizaron {updated_products} productos existentes."
         })
 
     except Exception as e:
-        print(f"Error durante la carga: {e}")
         return JsonResponse({"status": "error", "message": str(e)})
 
     
@@ -6365,7 +6367,6 @@ def obtener_tipos_productos_y_guardar(request):
     
 
 def generar_excel_stock(request):
-    # Bodegas válidas
     bodega_ids_included = [1, 2, 4, 6, 9, 10, 11]
     bodega_mapping = cache.get('bodega_mapping')
     if not bodega_mapping:
@@ -6373,7 +6374,6 @@ def generar_excel_stock(request):
         bodega_mapping = {b.idoffice: b.name for b in bodegas}
         cache.set('bodega_mapping', bodega_mapping, timeout=300)
 
-    # Cargar sectores válidos
     excluded_sector_ids = Sectoroffice.objects.filter(
         Q(namesector="XT99-99") | Q(zone="NARN") | Q(zone="NRN")
     ).values_list('idsectoroffice', flat=True)
@@ -6385,20 +6385,19 @@ def generar_excel_stock(request):
         sector_mapping = {s['idsectoroffice']: s for s in sectores}
         cache.set('sector_mapping', sector_mapping, timeout=300)
 
-    # Obtener todos los productos
     productos = Products.objects.prefetch_related(
         Prefetch(
             'unique_products',
             queryset=Uniqueproducts.objects.filter(state=0).only('location', 'superid')
         )
-    ).only('id', 'sku', 'nameproduct', 'prefixed', 'brands', 'currentstock','lastprice')
+    ).only('id', 'sku', 'nameproduct', 'prefixed', 'brands', 'currentstock', 'lastprice', 'lastcost',
+           'codebar', 'description', 'createdate', 'uniquecodebar', 'alto', 'largo', 'profundidad')
 
-    # Crear estructura de datos
+    bodega_nombres = list(bodega_mapping.values())
     data = []
     for producto in productos:
-        bodegas_stock = {bodega_mapping[bodega_id]: 0 for bodega_id in bodega_ids_included}
+        bodegas_stock = {bodega: 0 for bodega in bodega_nombres}
 
-        # Procesar productos únicos
         for unique_product in producto.unique_products.all():
             location = unique_product.location
             if location is not None:
@@ -6407,33 +6406,34 @@ def generar_excel_stock(request):
                     bodega_name = bodega_mapping.get(sector['idoffice'], 'Sin información')
                     bodegas_stock[bodega_name] += 1
 
-        # Total de stock disponible
         stock_total = sum(bodegas_stock.values())
 
-        # Agregar datos al Excel
         row = {
-            'SKU': producto.sku,
-            'Nombre': producto.nameproduct,
-            'Prefijo': producto.prefixed,
-            'Marca': producto.brands,
-            'Stock Total': stock_total,
-            'Precio':producto.lastprice
+            'sku': producto.sku,
+            'nameproduct': producto.nameproduct,
+            'prefixed': producto.prefixed,
+            'brands': producto.brands,
+            'codebar': producto.codebar,
+            'description': producto.description,
+            'lastcost': producto.lastcost,
+            'currentstock': stock_total,
+            'createdate': producto.createdate,
+            'uniquecodebar': producto.uniquecodebar,
+            'alto': producto.alto,
+            'largo': producto.largo,
+            'profundidad': producto.profundidad
         }
-        row.update(bodegas_stock)  # Añadir las columnas de bodegas
+        row.update(bodegas_stock)
         data.append(row)
 
-    # Crear DataFrame para Excel
     df = pd.DataFrame(data)
-
-    # Crear archivo Excel en memoria
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Stock')
+        df.to_excel(writer, index=False, sheet_name='Productos')
     buffer.seek(0)
 
-    # Descargar archivo Excel
     response = HttpResponse(buffer, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename="stock_bodegas.xlsx"'
+    response['Content-Disposition'] = 'attachment; filename="productos_stock.xlsx"'
     return response
     
 # def obtener_tipos_productos_incremental(request):
